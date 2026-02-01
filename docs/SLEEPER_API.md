@@ -1,63 +1,68 @@
 # Sleeper API Reference
 
-This document summarizes the Sleeper Fantasy Football API endpoints used in this project. All requests are `GET` and use the base URL: `https://api.sleeper.app/v1`.
+This document serves as a comprehensive reference for the Sleeper Fantasy Football API.
+Base URL: `https://api.sleeper.app/v1`
 
-## 1. User Endpoints
+## 1. User & Leagues
 
-### Get User
-Returns user metadata including `user_id`.
-- **URL**: `/user/<username_or_id>`
-- **Usage**: Getting the unique `user_id` required for all other requests.
+### User
+- **Get User**: `GET /user/<username_or_id>`
+  - Returns `user_id`, `username`, `display_name`, `avatar`.
 
-### Get User Leagues
-Returns all leagues a user is in for a specific sport and season.
-- **URL**: `/user/<user_id>/leagues/<sport>/<season>`
-- **Example**: `/user/5870352423.../leagues/nfl/2025`
+### Leagues
+- **Get User Leagues**: `GET /user/<user_id>/leagues/<sport>/<season>`
+  - Returns all leagues for a specific year (e.g., `nfl`, `2025`).
+- **Get League**: `GET /league/<league_id>`
+  - Returns settings, scoring rules, roster positions.
+- **Get Rosters**: `GET /league/<league_id>/rosters`
+  - Returns all teams, including players, taxi, reserve, and owner IDs.
+- **Get Users**: `GET /league/<league_id>/users`
+  - Returns display names and metadata for league members.
+- **Get Matchups**: `GET /league/<league_id>/matchups/<week>`
+  - Returns points, starters, and matchup IDs for a specific week.
+- **Get Winners Bracket**: `GET /league/<league_id>/winners_bracket`
+- **Get Losers Bracket**: `GET /league/<league_id>/losers_bracket`
+- **Get Transactions**: `GET /league/<league_id>/transactions/<week>`
+  - Returns trades, waivers, and free agent moves for a specific week.
+- **Get Traded Picks**: `GET /league/<league_id>/traded_picks`
+  - Returns all future draft picks that have been traded.
+- **Get State**: `GET /state/<sport>`
+  - Returns current week, season, and season status (pre_draft, in_season, complete).
 
-## 2. League Endpoints
+## 2. Drafts
 
-### Get League
-Returns league settings, scoring, and roster positions.
-- **URL**: `/league/<league_id>`
+- **Get User Drafts**: `GET /user/<user_id>/drafts/<sport>/<season>`
+- **Get League Drafts**: `GET /league/<league_id>/drafts`
+- **Get Draft**: `GET /draft/<draft_id>`
+- **Get Draft Picks**: `GET /draft/<draft_id>/picks`
+  - Returns every pick made in a completed draft.
+- **Get Traded Picks (Draft)**: `GET /draft/<draft_id>/traded_picks`
 
-### Get Rosters
-Returns all rosters in a league (players owned, wins/losses, owner_id).
-- **URL**: `/league/<league_id>/rosters`
-- **Note**: This is the core endpoint for calculating ownership and records.
+## 3. Players
 
-### Get Users
-Returns display names and avatars for all members of a league.
-- **URL**: `/league/<league_id>/users`
+- **Get All Players**: `GET /players/nfl`
+  - **Warning**: 5MB+ file. Fetch once daily.
+- **Get Trending Players**: `GET /players/nfl/trending/<type>`
+  - `type`: `add` or `drop`. Returns players being added/dropped most frequently.
 
-### Get Matchups
-Returns matchups for a specific week, including points and player IDs used.
-- **URL**: `/league/<league_id>/matchups/<week>`
-- **Usage**: Used for "Expected Wins" and "Historical Portfolio".
+## 4. Stats & Projections
 
-## 3. Playoff & Bracket Endpoints
+- **Get Season Stats**: `GET /stats/nfl/regular/<season>`
+- **Get Weekly Stats**: `GET /stats/nfl/regular/<season>/<week>`
+- **Get Season Projections**: `GET /projections/nfl/regular/<season>`
+- **Get Weekly Projections**: `GET /projections/nfl/regular/<season>/<week>`
 
-### Winners Bracket
-Returns the playoff bracket for the championship.
-- **URL**: `/league/<league_id>/winners_bracket`
-- **Key Fields**: `p` (final place), `w` (winner roster_id), `l` (loser roster_id).
+## 5. Avatars & Assets
 
-### Losers Bracket
-Returns the consolation or toilet bowl bracket.
-- **URL**: `/league/<league_id>/losers_bracket`
+- **User Avatar**: `https://sleepercdn.com/avatars/<avatar_id>`
+- **Player Headshot**: `https://sleepercdn.com/content/nfl/players/<player_id>.jpg`
+- **Team Logo**: `https://sleepercdn.com/avatars/<avatar_id>` (if set) or generic shield.
 
-## 4. Player & Stats Endpoints
+## 6. Definitions
 
-### Get All Players
-Returns a massive JSON object (~5MB) of every NFL player.
-- **URL**: `/players/nfl`
-- **Note**: Should be fetched once daily. Our `scripts/update_players.py` handles this.
-
-### Get Stats
-Returns regular season stats for a specific year.
-- **URL**: `/stats/nfl/regular/<year>`
-- **Usage**: Used to populate fantasy points in the Player Database.
-
-## 5. Helpful External Links
-- **Sleeper Official Docs**: [https://docs.sleeper.com/](https://docs.sleeper.com/)
-- **Sleeper Avatars**: `https://sleepercdn.com/avatars/<avatar_id>`
-- **Sleeper League Web Link**: `https://sleeper.com/leagues/<league_id>`
+- **Roster ID**: The ID (1-12) representing a team within a specific league.
+- **Owner ID**: The global User ID of the human managing the team.
+- **Matchup ID**: An integer grouping two teams playing against each other in a specific week.
+- **Playoff Type**:
+  - `0`: Consolation Bracket (Winner advances/gets better rank).
+  - `1`: Toilet Bowl (Loser advances/gets worse rank).
