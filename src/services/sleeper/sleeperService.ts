@@ -16,6 +16,7 @@ export type SleeperLeague = {
   status: string;
   sport: string;
   season: string;
+  previous_league_id?: string;
   avatar?: string;
   settings: {
     playoff_week_start?: number;
@@ -199,6 +200,40 @@ export const SleeperService = {
       console.error(`Error fetching losers bracket for league ${leagueId}`, e);
       return [];
     }
+  },
+
+  async getLeagueHistory(currentLeagueId: string): Promise<SleeperLeague[]> {
+    const history: SleeperLeague[] = [];
+    let currentId = currentLeagueId;
+
+    while (currentId) {
+      const cacheKey = `league_${currentId}`;
+      let league = getCached<SleeperLeague>(cacheKey);
+
+      if (!league) {
+        try {
+          const res = await fetch(`${BASE_URL}/league/${currentId}`);
+          if (!res.ok) break;
+          league = await res.json();
+          setCached(cacheKey, league);
+        } catch (e) {
+          console.error(`Error fetching league ${currentId}`, e);
+          break;
+        }
+      }
+
+      if (league) {
+        history.push(league);
+        currentId = (league as any).previous_league_id; // Cast to access unchecked prop
+      } else {
+        break;
+      }
+      
+      // Safety break for loops
+      if (history.length > 20) break; 
+    }
+
+    return history;
   },
 
   // Batch fetch rosters with concurrency limit

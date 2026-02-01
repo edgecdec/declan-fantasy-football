@@ -30,6 +30,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupsIcon from '@mui/icons-material/Groups'; // Players
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices'; // Medic
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'; // Performance
+import HistoryIcon from '@mui/icons-material/History'; // Legacy
 import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand icon
 import { useUser } from '@/context/UserContext';
 
@@ -39,8 +40,9 @@ const MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
   { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
-  { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
   { text: 'Season Review', href: '/performance', icon: <EmojiEventsIcon /> },
+  { text: 'Legacy Analyzer', href: '/league-history', icon: <HistoryIcon /> },
+  { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
 
