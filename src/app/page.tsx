@@ -23,14 +23,11 @@ export default function HomePage() {
 
       <Grid container spacing={4} sx={{ mt: 4 }}>
         {[
-          { title: 'Live Draft Assistant', desc: 'Real-time pick suggestions based on value.', href: '/draft', cta: 'Start Draft' },
           { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
           { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
           { title: 'Player Database', desc: 'Search and filter all active NFL players.', href: '/players', cta: 'Search Players' },
-          { title: 'Rankings', desc: 'Consensus rankings from top experts.', href: '/rankings', cta: 'View Rankings' },
-          { title: 'Team Rater', desc: 'Get a comprehensive grade for your team.', href: '/rate-my-team', cta: 'Rate Team' },
         ].map((feature) => (
-          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={feature.title}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={feature.title}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Typography gutterBottom variant="h5" component="div">
