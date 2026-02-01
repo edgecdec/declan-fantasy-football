@@ -171,13 +171,28 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
           <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
             <Avatar src={`https://sleepercdn.com/avatars/${league.avatar}`} sx={{ width: 32, height: 32, mr: 2 }} />
             
+import { Link as MuiLink } from '@mui/material'; 
+// Ensure MuiLink is imported if not already, or add it to the import list at the top.
+
+// ... inside LeagueRow component ...
+
             <Box sx={{ flexGrow: 1 }}>
-              <Typography fontWeight={isIncluded ? "bold" : "normal"}>
+              <MuiLink
+                href={`https://sleeper.com/leagues/${league.league_id}`}
+                target="_blank"
+                rel="noopener"
+                color="inherit"
+                underline="hover"
+                onClick={(e) => e.stopPropagation()}
+                sx={{ fontWeight: isIncluded ? "bold" : "normal", fontSize: '1rem', cursor: 'pointer' }}
+              >
                 {league.name}
-              </Typography>
-              {status === 'loading' && <Typography variant="caption" color="primary">Analyzing...</Typography>}
-              {status === 'pending' && <Typography variant="caption" color="text.secondary">Queued</Typography>}
-              {status === 'error' && <Typography variant="caption" color="error">Error</Typography>}
+              </MuiLink>
+              <Box>
+                {status === 'loading' && <Typography variant="caption" color="primary">Analyzing...</Typography>}
+                {status === 'pending' && <Typography variant="caption" color="text.secondary">Queued</Typography>}
+                {status === 'error' && <Typography variant="caption" color="error">Error</Typography>}
+              </Box>
             </Box>
 
             {status === 'complete' && stats && (
