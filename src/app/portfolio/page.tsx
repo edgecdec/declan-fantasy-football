@@ -21,7 +21,8 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  FormControl
+  FormControl,
+  TableSortLabel
 } from '@mui/material';
 import { SleeperService, SleeperUser } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
@@ -29,15 +30,57 @@ import playerData from '../../../data/sleeper_players.json';
 // Types
 type PortfolioItem = {
   playerId: string;
-  playerData: any; // From JSON
+  playerData: any; 
   shares: number;
   startersCount: number;
   benchCount: number;
+  exposure: number; // calculated field for easier sorting
   leagues: {
     id: string;
     name: string;
   }[];
 };
+
+type Order = 'asc' | 'desc';
+
+// Headers Configuration
+const HEAD_CELLS = [
+  { id: 'playerData.last_name', label: 'Player', numeric: false },
+  { id: 'playerData.position', label: 'Position', numeric: false },
+  { id: 'playerData.team', label: 'Team', numeric: false },
+  { id: 'shares', label: 'Shares', numeric: true },
+  { id: 'startersCount', label: 'Start', numeric: true },
+  { id: 'benchCount', label: 'Bench', numeric: true },
+  { id: 'exposure', label: 'Exposure', numeric: true },
+];
+
+function descendingComparator<T>(a: T, b: T, orderBy: keyof T | string) {
+  let aValue: any;
+  let bValue: any;
+
+  // Handle nested sorting
+  if (orderBy.startsWith('playerData.')) {
+    const key = orderBy.split('.')[1];
+    aValue = (a as any).playerData[key] ?? '';
+    bValue = (b as any).playerData[key] ?? '';
+  } else {
+    aValue = (a as any)[orderBy] ?? 0;
+    bValue = (b as any)[orderBy] ?? 0;
+  }
+
+  if (bValue < aValue) return -1;
+  if (bValue > aValue) return 1;
+  return 0;
+}
+
+function getComparator<Key extends keyof any>(
+  order: Order,
+  orderBy: Key,
+): (a: any, b: any) => number {
+  return order === 'desc'
+    ? (a, b) => descendingComparator(a, b, orderBy as string)
+    : (a, b) => -descendingComparator(a, b, orderBy as string);
+}
 
 export default function PortfolioPage() {
   // State
@@ -51,6 +94,16 @@ export default function PortfolioPage() {
   const [portfolio, setPortfolio] = React.useState<PortfolioItem[]>([]);
   const [totalLeagues, setTotalLeagues] = React.useState(0);
 
+  // Sorting
+  const [order, setOrder] = React.useState<Order>('desc');
+  const [orderBy, setOrderBy] = React.useState<string>('shares');
+
+  const handleRequestSort = (property: string) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
   // Auto-analyze when year changes
   React.useEffect(() => {
     if (username && !loading) {
@@ -58,7 +111,10 @@ export default function PortfolioPage() {
     }
   }, [year]);
 
-  // Constants
+  const sortedPortfolio = React.useMemo(() => {
+    return [...portfolio].sort(getComparator(order, orderBy));
+  }, [portfolio, order, orderBy]);
+
   const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
 
   const handleAnalyze = async () => {
@@ -71,14 +127,10 @@ export default function PortfolioPage() {
     setUser(null);
 
     try {
-      // 1. Get User
       const userRes = await SleeperService.getUser(username);
-      if (!userRes) {
-        throw new Error('User not found');
-      }
+      if (!userRes) throw new Error('User not found');
       setUser(userRes);
 
-      // 2. Get Leagues
       const leagues = await SleeperService.getLeagues(userRes.user_id, year);
       setTotalLeagues(leagues.length);
 
@@ -87,14 +139,12 @@ export default function PortfolioPage() {
         return;
       }
 
-      // 3. Fetch Rosters (with progress)
       const rosterMap = await SleeperService.fetchAllRosters(
         leagues, 
         userRes.user_id,
         (completed, total) => setProgress((completed / total) * 100)
       );
 
-      // 4. Aggregation Logic
       const playerCounts = new Map<string, { count: number, startCount: number, benchCount: number, leagueIds: string[] }>();
       
       rosterMap.forEach((roster, leagueId) => {
@@ -103,14 +153,9 @@ export default function PortfolioPage() {
             const current = playerCounts.get(pid) || { count: 0, startCount: 0, benchCount: 0, leagueIds: [] };
             current.count++;
             
-            // Check if player is in starting lineup
-            // Note: starters array can contain '0' or nulls, need to check if pid is in it
             const isStarter = roster.starters && roster.starters.includes(pid);
-            if (isStarter) {
-                current.startCount++;
-            } else {
-                current.benchCount++;
-            }
+            if (isStarter) current.startCount++;
+            else current.benchCount++;
 
             current.leagueIds.push(leagueId);
             playerCounts.set(pid, current);
@@ -118,13 +163,11 @@ export default function PortfolioPage() {
         }
       });
 
-      // 5. Build Portfolio Items
       const items: PortfolioItem[] = [];
       const playersJson = (playerData as any).players;
 
       playerCounts.forEach((data, pid) => {
         const pInfo = playersJson[pid];
-        // Only show relevant positions (skip IDPs or unknown if preferred)
         if (pInfo && ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(pInfo.position)) {
            items.push({
              playerId: pid,
@@ -132,6 +175,7 @@ export default function PortfolioPage() {
              shares: data.count,
              startersCount: data.startCount,
              benchCount: data.benchCount,
+             exposure: (data.count / leagues.length) * 100,
              leagues: data.leagueIds.map(lid => {
                const l = leagues.find(x => x.league_id === lid);
                return { id: lid, name: l ? l.name : 'Unknown League' };
@@ -140,12 +184,8 @@ export default function PortfolioPage() {
         }
       });
 
-      // Sort by shares (desc) then name
-      items.sort((a, b) => {
-        if (b.shares !== a.shares) return b.shares - a.shares;
-        return a.playerData.last_name.localeCompare(b.playerData.last_name);
-      });
-
+      // Initial sort by shares
+      items.sort((a, b) => b.shares - a.shares);
       setPortfolio(items);
 
     } catch (err: any) {
@@ -164,7 +204,6 @@ export default function PortfolioPage() {
         Analyze your exposure across all your Sleeper leagues.
       </Typography>
 
-      {/* Input Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
@@ -174,19 +213,12 @@ export default function PortfolioPage() {
             onChange={(e) => setUsername(e.target.value)}
             disabled={loading}
           />
-          
           <FormControl sx={{ minWidth: 100 }}>
             <InputLabel>Year</InputLabel>
-            <Select
-              value={year}
-              label="Year"
-              onChange={(e) => setYear(e.target.value)}
-              disabled={loading}
-            >
+            <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
               {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
             </Select>
           </FormControl>
-
           <Button 
             variant="contained" 
             size="large" 
@@ -197,13 +229,9 @@ export default function PortfolioPage() {
             {loading ? 'Analyzing...' : 'Analyze Portfolio'}
           </Button>
         </Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
-        )}
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </Paper>
 
-      {/* Loading State */}
       {loading && (
         <Box sx={{ width: '100%', mb: 4 }}>
           <Typography variant="body2" gutterBottom>
@@ -213,7 +241,6 @@ export default function PortfolioPage() {
         </Box>
       )}
 
-      {/* Results */}
       {user && !loading && (
         <>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -233,17 +260,26 @@ export default function PortfolioPage() {
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'background.default' }}>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Position</TableCell>
-                  <TableCell>Team</TableCell>
-                  <TableCell align="right">Shares</TableCell>
-                  <TableCell align="right">Start</TableCell>
-                  <TableCell align="right">Bench</TableCell>
-                  <TableCell align="right">Exposure</TableCell>
+                  {HEAD_CELLS.map((headCell) => (
+                    <TableCell
+                      key={headCell.id}
+                      align={headCell.numeric ? 'right' : 'left'}
+                      sortDirection={orderBy === headCell.id ? order : false}
+                      sx={{ fontWeight: 'bold' }}
+                    >
+                      <TableSortLabel
+                        active={orderBy === headCell.id}
+                        direction={orderBy === headCell.id ? order : 'asc'}
+                        onClick={() => handleRequestSort(headCell.id)}
+                      >
+                        {headCell.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {portfolio.map((item) => (
+                {sortedPortfolio.map((item) => (
                   <TableRow key={item.playerId} hover>
                     <TableCell sx={{ fontWeight: 'bold' }}>
                       {item.playerData.first_name} {item.playerData.last_name}
@@ -271,7 +307,7 @@ export default function PortfolioPage() {
                       {item.benchCount}
                     </TableCell>
                     <TableCell align="right">
-                      {((item.shares / totalLeagues) * 100).toFixed(0)}%
+                      {item.exposure.toFixed(0)}%
                     </TableCell>
                   </TableRow>
                 ))}
