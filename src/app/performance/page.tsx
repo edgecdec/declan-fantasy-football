@@ -132,9 +132,14 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
 
   const avgFinish = active.reduce((s, d) => s + (d.result?.rank || 0), 0) / active.length;
   const avgPercentile = active.reduce((s, d) => s + (d.result?.percentile || 0), 0) / active.length;
+  
   const championships = active.filter(d => d.result?.rank === 1).length;
   const podiums = active.filter(d => (d.result?.rank || 99) <= 3).length;
   const playoffRate = (active.filter(d => d.result?.madePlayoffs).length / active.length) * 100;
+
+  // Expected Calculations
+  const expChampionships = active.reduce((sum, d) => sum + (1 / (d.result?.totalTeams || 12)), 0);
+  const expPodiums = active.reduce((sum, d) => sum + (3 / (d.result?.totalTeams || 12)), 0);
 
   return (
     <Card sx={{ mb: 4, bgcolor: 'secondary.dark', color: 'white' }}>
@@ -143,19 +148,26 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
           <Grid size={{ xs: 6, md: 3 }}>
             <Typography variant="h6" color="secondary.light">Avg Finish %</Typography>
             <Typography variant="h3" fontWeight="bold">{avgPercentile.toFixed(0)}%</Typography>
-            <Typography variant="caption">Avg Finish: {avgFinish.toFixed(1)}</Typography>
+            <Typography variant="caption">Avg Rank: {avgFinish.toFixed(1)}</Typography>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
             <Typography variant="h6" color="secondary.light">Golds 🥇</Typography>
-            <Typography variant="h3" fontWeight="bold">{championships}</Typography>
+            <Typography variant="h3" fontWeight="bold">
+              {championships} <Typography component="span" variant="body1" sx={{ opacity: 0.7 }}>({expChampionships.toFixed(1)})</Typography>
+            </Typography>
+            <Typography variant="caption">Exp: {expChampionships.toFixed(1)}</Typography>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
             <Typography variant="h6" color="secondary.light">Podiums 🏆</Typography>
-            <Typography variant="h3" fontWeight="bold">{podiums}</Typography>
+            <Typography variant="h3" fontWeight="bold">
+              {podiums} <Typography component="span" variant="body1" sx={{ opacity: 0.7 }}>({expPodiums.toFixed(1)})</Typography>
+            </Typography>
+            <Typography variant="caption">Exp: {expPodiums.toFixed(1)}</Typography>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
             <Typography variant="h6" color="secondary.light">Playoffs</Typography>
             <Typography variant="h3" fontWeight="bold">{playoffRate.toFixed(0)}%</Typography>
+            <Typography variant="caption">Rate</Typography>
           </Grid>
         </Grid>
       </CardContent>
