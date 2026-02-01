@@ -59,7 +59,9 @@ export type SleeperBracketMatch = {
   t2: number | null; // roster id 2
   w: number | null; // winner roster id
   l: number | null; // loser roster id
-  p?: number; // place (e.g. 1 for 1st place match)
+  p?: number; // place
+  t1_from?: { w?: number; l?: number } | null;
+  t2_from?: { w?: number; l?: number } | null;
 };
 
 // Cache keys

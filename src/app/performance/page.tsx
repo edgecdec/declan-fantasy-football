@@ -104,33 +104,49 @@ function determineFinalRank(
   
   // 2. Check Losers Bracket
   const playoffTeams = league.settings.playoff_teams || 6;
-  const playoffType = league.settings.playoff_type || 0; // 0=Consolation, 1=Toilet Bowl
-  const totalTeams = rosters.length; // usually 10 or 12
+  const totalTeams = rosters.length;
   
+  // Auto-detect Bracket Type (Toilet Bowl vs Consolation)
+  // Look at the "Championship" of this bracket (p=1)
+  // If its sources are {w: ...}, it's a Winners Bracket (Consolation). Winner gets Rank 7.
+  // If its sources are {l: ...}, it's a Losers Bracket (Toilet Bowl). Winner gets Rank N-1.
+  const bracketChampionship = losersBracket.find(m => m.p === 1);
+  let isToiletBowl = false;
+  
+  if (bracketChampionship) {
+    // Check source. If t1_from has 'l' property, it came from a loss.
+    if (bracketChampionship.t1_from?.l || bracketChampionship.t2_from?.l) {
+      isToiletBowl = true;
+    }
+    // Fallback: Check setting
+    if (league.settings.playoff_type === 1) isToiletBowl = true;
+  }
+
   const consolationMatch = losersBracket.find(m => (m.w === rosterId || m.l === rosterId) && m.p);
   
   if (consolationMatch && consolationMatch.p) {
     const isWinner = consolationMatch.w === rosterId;
     const place = consolationMatch.p;
     
-    if (playoffType === 1) {
-      // Toilet Bowl Logic (Loser Advances, p=1 is the "Toilet Bowl Final" for last place)
-      // p=1 Match: Loser -> Last (12th), Winner -> 2nd Last (11th)
-      // p=3 Match: Loser -> 10th, Winner -> 9th
-      // p=5 Match: Loser -> 8th, Winner -> 7th
+    if (isToiletBowl) {
+      // Toilet Bowl Logic (Loser Advances)
+      // The "Winner" of p=1 is the one who escaped being last.
+      // Rank = TotalTeams - (p - 1) for Loser? 
+      // Actually, p=1 match is usually "Worst vs 2nd Worst".
+      // Loser of p=1 -> 12th (Last). Winner -> 11th.
+      // Loser of p=3 -> 10th. Winner -> 9th.
+      // Loser of p=5 -> 8th. Winner -> 7th.
       
       // Formula: 
-      // Loser Rank = TotalTeams - (p - 1)
-      // Winner Rank = TotalTeams - p
+      // Loser Rank = TotalTeams - (place - 1)
+      // Winner Rank = TotalTeams - place
       
       if (!isWinner) return { rank: totalTeams - (place - 1), madePlayoffs: false, source: 'loser_bracket' };
       return { rank: totalTeams - place, madePlayoffs: false, source: 'loser_bracket' };
       
     } else {
-      // Consolation Logic (Winner Advances, p=1 is "Best of Rest")
+      // Consolation Logic (Winner Advances)
       // p=1 Match: Winner -> 7th, Loser -> 8th
-      // Rank = Offset + p (+1 if loser)
-      
       const offset = playoffTeams;
       if (isWinner) return { rank: offset + place, madePlayoffs: false, source: 'loser_bracket' };
       return { rank: offset + place + 1, madePlayoffs: false, source: 'loser_bracket' };
