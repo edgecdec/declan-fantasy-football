@@ -27,8 +27,9 @@ import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import GroupsIcon from '@mui/icons-material/Groups';
-import SportsFootballIcon from '@mui/icons-material/SportsFootball';
+import GroupsIcon from '@mui/icons-material/Groups'; // Players
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices'; // Medic
+import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand icon
 import { useUser } from '@/context/UserContext';
 
 const drawerWidth = 240;
@@ -37,6 +38,7 @@ const MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
   { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
+  { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
 
