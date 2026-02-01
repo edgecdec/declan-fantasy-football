@@ -3,9 +3,7 @@
 import * as React from 'react';
 import {
   Container,
-  Typography,
   Box,
-  TextField,
   Button,
   Paper,
   LinearProgress,
@@ -27,18 +25,20 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Autocomplete,
   Divider,
   IconButton,
   Tooltip,
   Checkbox,
   FormControlLabel,
-  Link as MuiLink
+  Link as MuiLink,
+  Typography
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster } from '@/services/sleeper/sleeperService';
+import PageHeader from '@/components/common/PageHeader';
+import UserSearchInput from '@/components/common/UserSearchInput';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -70,14 +70,12 @@ type TeamStats = {
 // --- Helper Components ---
 
 function SummaryCard({ data, showAdvanced }: { data: LeagueData[], showAdvanced: boolean }) {
-  // Only sum up INCLUDED and COMPLETE leagues
   const active = data.filter(d => d.category === 'included' && d.status === 'complete');
   
   const totalActual = active.reduce((sum, d) => sum + (d.userStats?.actualWins || 0), 0);
   const totalExpected = active.reduce((sum, d) => sum + (d.userStats?.expectedWins || 0), 0);
   const diff = totalActual - totalExpected;
 
-  // Advanced Stats
   const totalPF = active.reduce((sum, d) => sum + (d.userStats?.pointsFor || 0), 0);
   const totalPA = active.reduce((sum, d) => sum + (d.userStats?.pointsAgainst || 0), 0);
   const pointsDiff = totalPF - totalPA;
@@ -148,7 +146,6 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
-      {/* Action Button - Outside Accordion */}
       <Tooltip title={isIncluded ? "Exclude from totals" : "Include in totals"}>
         <IconButton 
           size="small" 
@@ -171,7 +168,6 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
             <Avatar src={`https://sleepercdn.com/avatars/${league.avatar}`} sx={{ width: 32, height: 32, mr: 2 }} />
-            
             
             <Box sx={{ flexGrow: 1 }}>
               <MuiLink
@@ -278,30 +274,24 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
 // --- Main Component ---
 
 export default function ExpectedWinsPage() {
-  // Inputs
   const [username, setUsername] = React.useState('');
-  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   
-  // State
   const [loadingUser, setLoadingUser] = React.useState(false);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [user, setUser] = React.useState<SleeperUser | null>(null);
   
-  // The Master Data Store
   const [leagueData, setLeagueData] = React.useState<LeagueData[]>([]);
 
   const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
-  // Load Saved Usernames
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSavedUsernames(parsed);
         if (parsed.length > 0) setUsername(parsed[0]);
       } catch (e) { console.error(e); }
     }
@@ -316,10 +306,10 @@ export default function ExpectedWinsPage() {
   };
 
   const saveUsername = (name: string) => {
-    if (!name) return;
-    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5);
-    setSavedUsernames(newSaved);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+    const saved = localStorage.getItem('sleeper_usernames');
+    let list = saved ? JSON.parse(saved) : [];
+    list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
   };
 
   const handleStart = async () => {
@@ -337,7 +327,6 @@ export default function ExpectedWinsPage() {
 
       const leaguesRes = await SleeperService.getLeagues(userRes.user_id, year);
       
-      // Initialize Data
       const initialData: LeagueData[] = leaguesRes.map(l => ({
         league: l,
         status: 'idle',
@@ -346,7 +335,6 @@ export default function ExpectedWinsPage() {
       
       setLeagueData(initialData);
       
-      // Auto-start analysis for INCLUDED leagues
       const toAnalyze = initialData.filter(d => d.category === 'included').map(d => d.league);
       setAnalyzing(true);
       processQueue(toAnalyze, userRes.user_id);
@@ -363,14 +351,13 @@ export default function ExpectedWinsPage() {
     let completed = 0;
 
     for (const league of leaguesToProcess) {
-      // Mark as loading
       setLeagueData(prev => prev.map(d => d.league.league_id === league.league_id ? { ...d, status: 'loading' } : d));
 
       try {
         const result = await analyzeLeague(league, userId);
         setLeagueData(prev => prev.map(d => 
           d.league.league_id === league.league_id 
-            ? { ...d, status: 'complete', stats: result.userStats, standings: result.standings } 
+            ? { ...d, status: 'complete', userStats: result.userStats, standings: result.standings } 
             : d
         ));
       } catch (e) {
@@ -378,12 +365,9 @@ export default function ExpectedWinsPage() {
       }
 
       completed++;
-      // We don't update global progress bar here strictly because user might add more to queue
-      // But we can show a spinner if needed.
-      
       await new Promise(r => setTimeout(r, 500)); 
     }
-    setAnalyzing(false); // Queue finished
+    setAnalyzing(false); 
   };
 
   const toggleCategory = (id: string) => {
@@ -393,10 +377,7 @@ export default function ExpectedWinsPage() {
 
       const newCategory = target.category === 'included' ? 'excluded' : 'included';
       
-      // If moving to included and NOT analyzed, trigger analysis
       if (newCategory === 'included' && (target.status === 'idle' || target.status === 'error')) {
-        // Trigger background analysis for this single league
-        // Note: Ideally we add to a queue manager, but firing one off is okay
         processQueue([target.league], user!.user_id);
       }
 
@@ -404,7 +385,6 @@ export default function ExpectedWinsPage() {
     });
   };
 
-  // Reused Analysis Logic
   const analyzeLeague = async (league: SleeperLeague, userId: string) => {
     const [rostersRes, usersRes] = await Promise.all([
       fetch(`https://api.sleeper.app/v1/league/${league.league_id}/rosters`),
@@ -449,7 +429,6 @@ export default function ExpectedWinsPage() {
             const medianThreshold = sortedByScore[medianCutoffIndex - 1]?.points || 0;
 
             validMatchups.forEach(m1 => {
-                // Calculate Points Against
                 const opponent = validMatchups.find(m2 => m2.matchup_id === m1.matchup_id && m2.roster_id !== m1.roster_id);
                 const t = rosterMap.get(m1.roster_id);
                 if (t && opponent) {
@@ -488,23 +467,15 @@ export default function ExpectedWinsPage() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        League Luck Analyzer
-      </Typography>
+      <PageHeader 
+        title="League Luck Analyzer" 
+        subtitle='See your "True" record across all leagues based on All-Play Expected Wins.' 
+      />
       
-      {/* Input */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Autocomplete
-            freeSolo
-            options={savedUsernames}
-            value={username}
-            onInputChange={(e, newVal) => setUsername(newVal)}
-            renderInput={(params) => (
-              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
-            )}
-            disabled={analyzing || loadingUser}
-          />
+          <UserSearchInput username={username} setUsername={setUsername} disabled={analyzing || loadingUser} />
+          
           <FormControl sx={{ minWidth: 100 }}>
             <InputLabel>Year</InputLabel>
             <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={analyzing}>
@@ -528,12 +499,11 @@ export default function ExpectedWinsPage() {
             {loadingUser ? 'Fetching...' : 'Analyze'}
           </Button>
         </Box>
+        {analyzing && <LinearProgress variant="determinate" value={progress} sx={{ mt: 3 }} />}
       </Paper>
 
-      {/* Summary */}
-      {leagueData.length > 0 && <SummaryCard data={leagueData} showAdvanced={showAdvanced} />}
+      <SummaryCard data={leagueData} showAdvanced={showAdvanced} />
 
-      {/* Included Leagues */}
       {leagueData.some(d => d.category === 'included') && (
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom color="primary">Included Leagues</Typography>
@@ -543,27 +513,22 @@ export default function ExpectedWinsPage() {
               item={item} 
               userId={user!.user_id} 
               onToggle={() => toggleCategory(item.league.league_id)}
-              showAdvanced={showAdvanced} 
+              showAdvanced={showAdvanced}
             />
           ))}
         </Box>
       )}
 
-      {/* Excluded Leagues */}
       {leagueData.some(d => d.category === 'excluded') && (
         <Box sx={{ mb: 4, opacity: 0.8 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-            <Typography variant="h6" color="text.secondary">Excluded Leagues</Typography>
-            <Chip label="Ignored from Totals" size="small" />
-          </Box>
-          <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 2 }} >Excluded Leagues</Divider>
           {leagueData.filter(d => d.category === 'excluded').map(item => (
             <LeagueRow 
               key={item.league.league_id} 
               item={item} 
               userId={user!.user_id} 
               onToggle={() => toggleCategory(item.league.league_id)} 
-              showAdvanced={showAdvanced} 
+              showAdvanced={showAdvanced}
             />
           ))}
         </Box>

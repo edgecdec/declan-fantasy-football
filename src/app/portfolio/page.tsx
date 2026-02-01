@@ -4,9 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import {
   Container,
-  Typography,
   Box,
-  TextField,
   Button,
   Paper,
   LinearProgress,
@@ -17,16 +15,18 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  Autocomplete,
-  Link as MuiLink,
   List,
   ListItem,
   ListItemText,
-  Grid
+  Grid,
+  Link as MuiLink,
+  Typography
 } from '@mui/material';
 import { SleeperService, SleeperUser, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
 import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
+import PageHeader from '@/components/common/PageHeader';
+import UserSearchInput from '@/components/common/UserSearchInput';
 
 // Types
 type LeagueInfo = {
@@ -49,9 +49,7 @@ const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
 const WEEKS = Array.from({length: 18}, (_, i) => i + 1);
 
 export default function PortfolioPage() {
-  // State
   const [username, setUsername] = React.useState('');
-  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
   const [week, setWeek] = React.useState<string>('live'); 
   
@@ -63,26 +61,25 @@ export default function PortfolioPage() {
   const [portfolio, setPortfolio] = React.useState<PortfolioItem[]>([]);
   const [totalLeagues, setTotalLeagues] = React.useState(0);
 
-  // Load Saved Usernames
+  // Init username from localStorage if available
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSavedUsernames(parsed);
-        if (parsed.length > 0 && !username) setUsername(parsed[0]);
-      } catch (e) { console.error(e); }
+        if (parsed.length > 0) setUsername(parsed[0]);
+      } catch (e) {}
     }
   }, []);
 
+  // Save helper
   const saveUsername = (name: string) => {
-    if (!name) return;
-    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5);
-    setSavedUsernames(newSaved);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+    const saved = localStorage.getItem('sleeper_usernames');
+    let list = saved ? JSON.parse(saved) : [];
+    list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
   };
 
-  // Auto-analyze triggers
   React.useEffect(() => {
     if (username && !loading && user) {
       handleAnalyze();
@@ -262,25 +259,22 @@ export default function PortfolioPage() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-       <Typography variant="h4" gutterBottom fontWeight="bold">
-        Fantasy Portfolio Tracker
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Analyze your exposure across all your Sleeper leagues.
-      </Typography>
+      <PageHeader 
+        title="Fantasy Portfolio Tracker" 
+        subtitle="Analyze your exposure across all your Sleeper leagues."
+        action={
+          <Link href="/portfolio/trends" passHref>
+            <Button variant="outlined">View Trends</Button>
+          </Link>
+        }
+      />
 
-      {/* Input Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Autocomplete
-            freeSolo
-            options={savedUsernames}
-            value={username}
-            onInputChange={(e, newVal) => setUsername(newVal)}
-            renderInput={(params) => (
-              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
-            )}
-            disabled={loading}
+          <UserSearchInput 
+            username={username} 
+            setUsername={setUsername} 
+            disabled={loading} 
           />
           
           <FormControl sx={{ minWidth: 100 }}>
@@ -317,16 +311,6 @@ export default function PortfolioPage() {
           >
             {loading ? 'Analyzing...' : 'Analyze'}
           </Button>
-
-          <Link href="/portfolio/trends" passHref>
-            <Button 
-              variant="outlined" 
-              size="large" 
-              sx={{ height: 56 }}
-            >
-              View Trends
-            </Button>
-          </Link>
         </Box>
 
         {error && (
@@ -334,7 +318,6 @@ export default function PortfolioPage() {
         )}
       </Paper>
 
-      {/* Loading State */}
       {loading && (
         <Box sx={{ width: '100%', mb: 4 }}>
           <Typography variant="body2" gutterBottom>
@@ -344,7 +327,6 @@ export default function PortfolioPage() {
         </Box>
       )}
 
-      {/* Results */}
       {user && !loading && (
         <>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -370,7 +352,7 @@ export default function PortfolioPage() {
             noDataMessage="No players found in your rosters."
             renderDetailPanel={(item) => (
               <Grid container spacing={4}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="success.main" gutterBottom>
                     Starting In ({item.startersCount})
                   </Typography>
@@ -390,7 +372,7 @@ export default function PortfolioPage() {
                     ))}
                   </List>
                 </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Bench In ({item.benchCount})
                   </Typography>

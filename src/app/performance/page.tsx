@@ -38,6 +38,8 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperBracketMatch } from '@/services/sleeper/sleeperService';
+import PageHeader from '@/components/common/PageHeader';
+import UserSearchInput from '@/components/common/UserSearchInput';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -106,11 +108,7 @@ function determineFinalRank(
   const playoffTeams = league.settings.playoff_teams || 6;
   const totalTeams = rosters.length;
   
-  // Auto-detect Bracket Type (Toilet Bowl vs Consolation)
-  // We strictly check the "Championship" match (p=1) of this bracket.
-  // If the p=1 match is formed by Winners ({w: ...}), it is a Consolation Bracket (Winner = Best).
-  // If the p=1 match is formed by Losers ({l: ...}), it is a Toilet Bowl (Winner = 2nd Worst).
-  
+  // Auto-detect Bracket Type
   const bracketChampionship = losersBracket.find(m => m.p === 1);
   let isToiletBowl = false;
   
@@ -119,7 +117,6 @@ function determineFinalRank(
       isToiletBowl = true;
     }
   } else {
-    // If no p=1 match found, assume standard unless type=1
     if (league.settings.playoff_type === 1) isToiletBowl = true;
   }
 
@@ -130,37 +127,15 @@ function determineFinalRank(
     const place = consolationMatch.p;
     
     if (isToiletBowl) {
-      // Toilet Bowl Logic (Loser Advances)
-      // p=1 Match: The "Finals" of the Toilet Bowl (Bottom 2 teams). Determines 11th/12th.
-      // p=3 Match: Determines 9th/10th.
-      // p=5 Match: Determines 7th/8th (Best of the losers).
-      
       // In Toilet Bowl API, 'w' = Score Loser = Worse Rank.
       // 'l' = Score Winner = Better Rank.
-      
-      const isBracketWinner = consolationMatch.w === rosterId; // API says we are 'w' (Loser of points)
-      
-      // Dynamic Rank Calculation based on Total Teams
-      // p=1 (Finals) -> The Bottom 2 spots (Total and Total-1)
-      // p=3 (3rd Place) -> The Next 2 spots (Total-2 and Total-3)
-      // p=5 (5th Place) -> The Next 2 spots (Total-4 and Total-5)
-      
-      // Calculate the "Base Rank" for this match's tier
-      // p=1 -> Base = Total
-      // p=3 -> Base = Total - 2
-      // p=5 -> Base = Total - 4
+      const isBracketWinner = consolationMatch.w === rosterId; 
       const baseRank = totalTeams - (place - 1);
-      
-      // If we are 'w' (Worse Rank), we take baseRank (e.g. 12).
-      // If we are 'l' (Better Rank), we take baseRank - 1 (e.g. 11).
-      
       const rank = isBracketWinner ? baseRank : baseRank - 1;
       
       return { rank, madePlayoffs: false, source: 'loser_bracket' };
-      
     } else {
-      // Consolation Logic (Winner Advances)
-      // p=1 Match: Winner -> 7th, Loser -> 8th
+      // Consolation Logic
       const offset = playoffTeams;
       if (isWinner) return { rank: offset + place, madePlayoffs: false, source: 'loser_bracket' };
       return { rank: offset + place + 1, madePlayoffs: false, source: 'loser_bracket' };
@@ -185,12 +160,10 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
 
   const avgFinish = active.reduce((s, d) => s + (d.result?.rank || 0), 0) / active.length;
   const avgPercentile = active.reduce((s, d) => s + (d.result?.percentile || 0), 0) / active.length;
-  
   const championships = active.filter(d => d.result?.rank === 1).length;
   const podiums = active.filter(d => (d.result?.rank || 99) <= 3).length;
   const playoffRate = (active.filter(d => d.result?.madePlayoffs).length / active.length) * 100;
 
-  // Expected Calculations
   const expChampionships = active.reduce((sum, d) => sum + (1 / (d.result?.totalTeams || 12)), 0);
   const expPodiums = active.reduce((sum, d) => sum + (3 / (d.result?.totalTeams || 12)), 0);
 
@@ -234,7 +207,6 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
-      {/* Action Button - Outside Accordion */}
       <Tooltip title={isIncluded ? "Exclude" : "Include"}>
         <IconButton 
           size="small" 
@@ -353,7 +325,6 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
 
 export default function PerformancePage() {
   const [username, setUsername] = React.useState('');
-  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
   
   const [loadingUser, setLoadingUser] = React.useState(false);
@@ -365,22 +336,23 @@ export default function PerformancePage() {
 
   const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
+  // User Loading handled by UserSearchInput automatically? No, we need to init logic
+  // Similar to Portfolio Page
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSavedUsernames(parsed);
         if (parsed.length > 0) setUsername(parsed[0]);
       } catch (e) { console.error(e); }
     }
   }, []);
 
   const saveUsername = (name: string) => {
-    if (!name) return;
-    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5);
-    setSavedUsernames(newSaved);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+    const saved = localStorage.getItem('sleeper_usernames');
+    let list = saved ? JSON.parse(saved) : [];
+    list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
   };
 
   const handleStart = async () => {
@@ -455,29 +427,17 @@ export default function PerformancePage() {
     ]);
     const users: any[] = await usersRes.json();
 
-    // --- SCORE VERIFICATION FIX ---
-    // If the user played in a multi-week match that Sleeper API didn't finalize correctly (or is stale),
-    // we manually check the scores.
+    // SCORE VERIFICATION FIX (Multi-week)
     const playoffType = league.settings.playoff_round_type;
     if (playoffType === 1 || playoffType === 2) {
-      // Find user's last match in brackets
       const userMatch = [...winnersBracket, ...losersBracket]
         .filter(m => m.t1 === myRoster.roster_id || m.t2 === myRoster.roster_id)
         .sort((a, b) => b.r - a.r)[0];
 
       if (userMatch) {
-        // Determine start week of this match round
-        // Start Week = playoff_start + (round - 1)
         const startWeek = (league.settings.playoff_week_start || 14) + (userMatch.r - 1);
-        
-        // If it's potentially multi-week
-        // Type 1: Only Finals (Last Round) are 2 weeks?
-        // Type 2: All rounds are 2 weeks.
-        
-        // Check next week too
         const checkWeeks = [startWeek, startWeek + 1];
         
-        // We only fetch for the user's league, so it's okay cost-wise
         const weekScores = await Promise.all(
           checkWeeks.map(w => SleeperService.getMatchups(league.league_id, w))
         );
@@ -486,15 +446,11 @@ export default function PerformancePage() {
         const m2 = weekScores[1]?.find(m => m.roster_id === myRoster.roster_id);
 
         if (m1 && m2 && m1.matchup_id === m2.matchup_id) {
-          // Confirmed 2-week match
           const myTotal = (m1.points || 0) + (m2.points || 0);
-          
-          // Find opponent
           const opp1 = weekScores[0]?.find(m => m.matchup_id === m1.matchup_id && m.roster_id !== myRoster.roster_id);
           const opp2 = weekScores[1]?.find(m => m.matchup_id === m2.matchup_id && m.roster_id !== myRoster.roster_id);
           const oppTotal = (opp1?.points || 0) + (opp2?.points || 0);
 
-          // Override Bracket Result
           if (myTotal > oppTotal) {
             userMatch.w = myRoster.roster_id;
             userMatch.l = opp1?.roster_id || 0;
@@ -505,9 +461,7 @@ export default function PerformancePage() {
         }
       }
     }
-    // ----------------------------
 
-    // Calculate rank for EVERY roster
     const standings = rosters.map(r => {
       const { rank, madePlayoffs, source } = determineFinalRank(r.roster_id, rosters, winnersBracket, losersBracket, league);
       const owner = users.find(u => u.user_id === r.owner_id);
@@ -527,7 +481,6 @@ export default function PerformancePage() {
     const myResult = standings.find(s => s.ownerId === userId);
     if (!myResult) throw new Error("User not in league");
 
-    // Calculate Percentile for User
     const totalTeams = rosters.length;
     const percentile = totalTeams > 1 ? ((totalTeams - myResult.rank) / (totalTeams - 1)) * 100 : 100;
 
@@ -538,7 +491,7 @@ export default function PerformancePage() {
       madePlayoffs: myResult.madePlayoffs,
       rosterId: myResult.rosterId,
       pointsFor: myResult.pointsFor,
-      standings // Return full standings
+      standings
     };
   };
 
@@ -559,23 +512,15 @@ export default function PerformancePage() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Season Performance Analyzer
-      </Typography>
+      <PageHeader 
+        title="Season Performance Analyzer" 
+        subtitle="Analyze your final placements and playoff performance." 
+      />
       
-      {/* Input */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Autocomplete
-            freeSolo
-            options={savedUsernames}
-            value={username}
-            onInputChange={(e, newVal) => setUsername(newVal)}
-            renderInput={(params) => (
-              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
-            )}
-            disabled={analyzing || loadingUser}
-          />
+          <UserSearchInput username={username} setUsername={setUsername} disabled={analyzing || loadingUser} />
+          
           <FormControl sx={{ minWidth: 100 }}>
             <InputLabel>Year</InputLabel>
             <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={analyzing}>
@@ -600,34 +545,32 @@ export default function PerformancePage() {
       {leagueData.some(d => d.category === 'included') && (
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom color="primary">Included Leagues</Typography>
-          {leagueData
-            .filter(d => d.category === 'included')
-            .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
-            .map(item => (
-              <LeagueRow 
-                key={item.league.league_id} 
-                item={item} 
-                onToggle={() => toggleCategory(item.league.league_id)} 
-                userId={user!.user_id} 
-              />
-            ))}
+          <Grid container spacing={2}>
+            {leagueData
+              .filter(d => d.category === 'included')
+              .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
+              .map(item => (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.league.league_id}>
+                  <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
+                </Grid>
+              ))}
+          </Grid>
         </Box>
       )}
 
       {leagueData.some(d => d.category === 'excluded') && (
         <Box sx={{ mb: 4, opacity: 0.8 }}>
           <Divider sx={{ mb: 2 }} >Excluded Leagues</Divider>
-          {leagueData
-            .filter(d => d.category === 'excluded')
-            .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
-            .map(item => (
-              <LeagueRow 
-                key={item.league.league_id} 
-                item={item} 
-                onToggle={() => toggleCategory(item.league.league_id)} 
-                userId={user!.user_id} 
-              />
-            ))}
+          <Grid container spacing={2}>
+            {leagueData
+              .filter(d => d.category === 'excluded')
+              .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
+              .map(item => (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.league.league_id}>
+                  <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
+                </Grid>
+              ))}
+          </Grid>
         </Box>
       )}
     </Container>
