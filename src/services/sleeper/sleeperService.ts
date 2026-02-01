@@ -17,6 +17,10 @@ export type SleeperLeague = {
   sport: string;
   season: string;
   avatar?: string;
+  settings: {
+    playoff_week_start?: number;
+    [key: string]: any;
+  };
 };
 
 export type SleeperRoster = {

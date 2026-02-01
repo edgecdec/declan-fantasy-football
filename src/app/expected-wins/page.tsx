@@ -97,9 +97,10 @@ export default function ExpectedWinsPage() {
         });
       });
 
-      // 2. Analyze Weeks 1-14 (Standard Regular Season)
-      const REGULAR_SEASON_WEEKS = 14; 
-      // Ideally we check league settings for playstart_week, but 14 is safe default
+      // 2. Analyze Weeks 1-N (Regular Season)
+      // Sleeper provides 'playoff_week_start'. Regular season ends the week before.
+      const playoffStart = league.settings.playoff_week_start || 15;
+      const REGULAR_SEASON_WEEKS = playoffStart - 1;
       
       for (let week = 1; week <= REGULAR_SEASON_WEEKS; week++) {
         const matchups = await SleeperService.getMatchups(league.league_id, week);
