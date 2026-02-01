@@ -445,6 +445,58 @@ export default function PerformancePage() {
     ]);
     const users: any[] = await usersRes.json();
 
+    // --- SCORE VERIFICATION FIX ---
+    // If the user played in a multi-week match that Sleeper API didn't finalize correctly (or is stale),
+    // we manually check the scores.
+    const playoffType = league.settings.playoff_round_type;
+    if (playoffType === 1 || playoffType === 2) {
+      // Find user's last match in brackets
+      const userMatch = [...winnersBracket, ...losersBracket]
+        .filter(m => m.t1 === myRoster.roster_id || m.t2 === myRoster.roster_id)
+        .sort((a, b) => b.r - a.r)[0];
+
+      if (userMatch) {
+        // Determine start week of this match round
+        // Start Week = playoff_start + (round - 1)
+        const startWeek = (league.settings.playoff_week_start || 14) + (userMatch.r - 1);
+        
+        // If it's potentially multi-week
+        // Type 1: Only Finals (Last Round) are 2 weeks?
+        // Type 2: All rounds are 2 weeks.
+        
+        // Check next week too
+        const checkWeeks = [startWeek, startWeek + 1];
+        
+        // We only fetch for the user's league, so it's okay cost-wise
+        const weekScores = await Promise.all(
+          checkWeeks.map(w => SleeperService.getMatchups(league.league_id, w))
+        );
+
+        const m1 = weekScores[0]?.find(m => m.roster_id === myRoster.roster_id);
+        const m2 = weekScores[1]?.find(m => m.roster_id === myRoster.roster_id);
+
+        if (m1 && m2 && m1.matchup_id === m2.matchup_id) {
+          // Confirmed 2-week match
+          const myTotal = (m1.points || 0) + (m2.points || 0);
+          
+          // Find opponent
+          const opp1 = weekScores[0]?.find(m => m.matchup_id === m1.matchup_id && m.roster_id !== myRoster.roster_id);
+          const opp2 = weekScores[1]?.find(m => m.matchup_id === m2.matchup_id && m.roster_id !== myRoster.roster_id);
+          const oppTotal = (opp1?.points || 0) + (opp2?.points || 0);
+
+          // Override Bracket Result
+          if (myTotal > oppTotal) {
+            userMatch.w = myRoster.roster_id;
+            userMatch.l = opp1?.roster_id || 0;
+          } else {
+            userMatch.l = myRoster.roster_id;
+            userMatch.w = opp1?.roster_id || 0;
+          }
+        }
+      }
+    }
+    // ----------------------------
+
     // Calculate rank for EVERY roster
     const standings = rosters.map(r => {
       const { rank, madePlayoffs, source } = determineFinalRank(r.roster_id, rosters, winnersBracket, losersBracket, league);
