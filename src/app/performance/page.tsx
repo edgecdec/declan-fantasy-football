@@ -36,6 +36,16 @@ import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperBrack
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
 
+type Standing = {
+  rosterId: number;
+  ownerId: string;
+  name: string;
+  avatar: string;
+  rank: number;
+  madePlayoffs: boolean;
+  pointsFor: number;
+};
+
 type LeaguePerformanceData = {
   league: SleeperLeague;
   status: AnalysisStatus;
@@ -47,6 +57,7 @@ type LeaguePerformanceData = {
     madePlayoffs: boolean;
     rosterId: number;
     pointsFor: number;
+    standings: Standing[];
   };
 };
 
@@ -146,69 +157,115 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
   );
 }
 
-function LeagueRow({ item, onToggle }: { item: LeaguePerformanceData, onToggle: () => void }) {
+function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, onToggle: () => void, userId: string }) {
   const { league, status, result, category } = item;
   const isIncluded = category === 'included';
 
   return (
-    <Card sx={{ 
-      mb: 2, 
-      opacity: isIncluded ? 1 : 0.75,
-      borderLeft: '6px solid',
-      borderColor: !result ? 'grey.500' : result.rank === 1 ? 'gold' : result.rank <= 3 ? 'silver' : result.madePlayoffs ? 'success.main' : 'error.main'
-    }}>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
-        <Tooltip title={isIncluded ? "Exclude" : "Include"}>
-          <IconButton 
-            size="small" 
-            onClick={onToggle}
-            color={isIncluded ? "error" : "success"}
-            sx={{ mr: 2 }}
-          >
-            {isIncluded ? <RemoveCircleOutlineIcon /> : <AddCircleOutlineIcon />}
-          </IconButton>
-        </Tooltip>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
+      {/* Action Button - Outside Accordion */}
+      <Tooltip title={isIncluded ? "Exclude" : "Include"}>
+        <IconButton 
+          size="small" 
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          color={isIncluded ? "error" : "success"}
+          sx={{ mt: 1.5, mr: 1 }}
+        >
+          {isIncluded ? <RemoveCircleOutlineIcon /> : <AddCircleOutlineIcon />}
+        </IconButton>
+      </Tooltip>
 
-        <Avatar src={`https://sleepercdn.com/avatars/${league.avatar}`} sx={{ mr: 2 }} />
-        
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <MuiLink
-            href={`https://sleeper.com/leagues/${league.league_id}`}
-            target="_blank"
-            rel="noopener"
-            color="inherit"
-            underline="hover"
-            sx={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'block' }}
-          >
-            {league.name}
-          </MuiLink>
-          <Typography variant="caption" color="text.secondary">
-            {league.total_rosters} Teams
-          </Typography>
-        </Box>
-
-        <Box sx={{ textAlign: 'right', minWidth: 100 }}>
-          {status === 'loading' && <Typography variant="caption" color="primary">Analyzing...</Typography>}
-          {status === 'pending' && <Typography variant="caption" color="text.secondary">Queued</Typography>}
-          {status === 'complete' && result && (
-            <>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                <Typography variant="h4" fontWeight="bold">
-                  {getOrdinal(result.rank)}
-                </Typography>
-                {result.rank === 1 && <EmojiEventsIcon sx={{ color: 'gold' }} />}
+      <Accordion 
+        disabled={status !== 'complete'}
+        sx={{ 
+          flexGrow: 1,
+          border: '1px solid',
+          borderColor: isIncluded ? 'transparent' : 'action.disabledBackground',
+        }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
+            <Avatar src={`https://sleepercdn.com/avatars/${league.avatar}`} sx={{ width: 32, height: 32, mr: 2 }} />
+            
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+              <MuiLink
+                href={`https://sleeper.com/leagues/${league.league_id}`}
+                target="_blank"
+                rel="noopener"
+                color="inherit"
+                underline="hover"
+                onClick={(e) => e.stopPropagation()}
+                sx={{ fontWeight: isIncluded ? "bold" : "normal", fontSize: '1rem', cursor: 'pointer' }}
+              >
+                {league.name}
+              </MuiLink>
+              <Box>
+                {status === 'loading' && <Typography variant="caption" color="primary">Analyzing...</Typography>}
+                {status === 'pending' && <Typography variant="caption" color="text.secondary">Queued</Typography>}
+                {status === 'error' && <Typography variant="caption" color="error">Error</Typography>}
               </Box>
-              <Chip 
-                label={`${result.percentile.toFixed(0)}%ile`} 
-                size="small" 
-                color={result.percentile > 75 ? 'success' : result.percentile > 50 ? 'info' : 'default'}
-                variant="outlined"
-              />
-            </>
+            </Box>
+
+            {status === 'complete' && result && (
+              <Box sx={{ textAlign: 'right', display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h5" fontWeight="bold">
+                    {getOrdinal(result.rank)}
+                  </Typography>
+                  {result.rank === 1 && <EmojiEventsIcon sx={{ color: 'gold' }} />}
+                </Box>
+                <Chip 
+                  label={`${result.percentile.toFixed(0)}%ile`} 
+                  size="small" 
+                  color={result.percentile > 75 ? 'success' : result.percentile > 50 ? 'info' : 'default'}
+                  variant={isIncluded ? "filled" : "outlined"}
+                />
+              </Box>
+            )}
+          </Box>
+        </AccordionSummary>
+        
+        <AccordionDetails>
+          {result?.standings && (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Team</TableCell>
+                    <TableCell align="right">Points</TableCell>
+                    <TableCell align="right">Playoffs</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {result.standings.map((team) => (
+                    <TableRow key={team.rosterId} selected={team.ownerId === userId} hover>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography fontWeight="bold" sx={{ width: 24 }}>{team.rank}</Typography>
+                          {team.rank === 1 && <EmojiEventsIcon fontSize="small" sx={{ color: 'gold' }} />}
+                          {team.rank === 2 && <EmojiEventsIcon fontSize="small" sx={{ color: 'silver' }} />}
+                          {team.rank === 3 && <EmojiEventsIcon fontSize="small" sx={{ color: '#cd7f32' }} />}
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar src={`https://sleepercdn.com/avatars/${team.avatar}`} sx={{ width: 24, height: 24 }} />
+                        {team.name}
+                        {team.ownerId === userId && <Chip label="YOU" size="small" color="primary" sx={{ height: 20 }} />}
+                      </TableCell>
+                      <TableCell align="right">{team.pointsFor.toFixed(0)}</TableCell>
+                      <TableCell align="right">
+                        {team.madePlayoffs ? <Chip label="Yes" size="small" color="success" variant="outlined" /> : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
-        </Box>
-      </Box>
-    </Card>
+        </AccordionDetails>
+      </Accordion>
+    </Box>
   );
 }
 
@@ -311,25 +368,44 @@ export default function PerformancePage() {
 
     if (!myRoster) throw new Error("User not in league");
 
-    const [winnersBracket, losersBracket] = await Promise.all([
+    const [winnersBracket, losersBracket, usersRes] = await Promise.all([
       SleeperService.getWinnersBracket(league.league_id),
-      SleeperService.getLosersBracket(league.league_id)
+      SleeperService.getLosersBracket(league.league_id),
+      fetch(`https://api.sleeper.app/v1/league/${league.league_id}/users`)
     ]);
+    const users: any[] = await usersRes.json();
 
-    const { rank, madePlayoffs } = determineFinalRank(myRoster.roster_id, rosters, winnersBracket, losersBracket, league);
-    
-    // Calculate Percentile
-    // Rank 1/12 -> 100%. Rank 12/12 -> 0%.
+    // Calculate rank for EVERY roster
+    const standings = rosters.map(r => {
+      const { rank, madePlayoffs } = determineFinalRank(r.roster_id, rosters, winnersBracket, losersBracket, league);
+      const owner = users.find(u => u.user_id === r.owner_id);
+      
+      return {
+        rosterId: r.roster_id,
+        ownerId: r.owner_id,
+        name: owner?.metadata?.team_name || owner?.display_name || `Team ${r.roster_id}`,
+        avatar: owner?.avatar || '',
+        rank,
+        madePlayoffs,
+        pointsFor: r.settings.fpts
+      };
+    }).sort((a, b) => a.rank - b.rank);
+
+    const myResult = standings.find(s => s.ownerId === userId);
+    if (!myResult) throw new Error("User not in league");
+
+    // Calculate Percentile for User
     const totalTeams = rosters.length;
-    const percentile = totalTeams > 1 ? ((totalTeams - rank) / (totalTeams - 1)) * 100 : 100;
+    const percentile = totalTeams > 1 ? ((totalTeams - myResult.rank) / (totalTeams - 1)) * 100 : 100;
 
     return {
-      rank,
+      rank: myResult.rank,
       totalTeams,
       percentile,
-      madePlayoffs,
-      rosterId: myRoster.roster_id,
-      pointsFor: myRoster.settings.fpts
+      madePlayoffs: myResult.madePlayoffs,
+      rosterId: myResult.rosterId,
+      pointsFor: myResult.pointsFor,
+      standings // Return full standings
     };
   };
 
@@ -394,7 +470,7 @@ export default function PerformancePage() {
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'included').map(item => (
               <Grid item xs={12} md={6} key={item.league.league_id}>
-                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} />
+                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
               </Grid>
             ))}
           </Grid>
@@ -407,7 +483,7 @@ export default function PerformancePage() {
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'excluded').map(item => (
               <Grid item xs={12} md={6} key={item.league.league_id}>
-                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} />
+                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
               </Grid>
             ))}
           </Grid>
