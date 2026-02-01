@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏈 Fantasy Football Analytics Suite
 
-## Getting Started
+### [👉 Live Website: fantasy-football-full-website.vercel.app](https://fantasy-football-full-website.vercel.app/)
 
-First, run the development server:
+A comprehensive suite of tools to analyze your Sleeper Fantasy Football leagues, tracking everything from historical ownership to "luck" and roster health.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 📈 **Portfolio Tracker**
+**"The Stock Market for your Players"**
+- View your total exposure to every player across all your leagues.
+- **Historical View**: Go back in time to see who you owned in Week 1 vs Week 14.
+- **Start vs Bench**: See if you are actually starting the players you own, or just hoarding them.
+- **Trends Graph**: Visualize your ownership percentage over the course of the season.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🍀 **League Luck Analyzer (Expected Wins)**
+**"Did I lose because I'm bad, or because I'm unlucky?"**
+- Calculates **"All-Play" Wins**: Your record if you played every team every week.
+- **League Median Support**: Correctly handles leagues where the top half gets a win.
+- **Advanced Stats**: Toggles to show Points For, Points Against, and Differential.
+- **Dashboard**: See your aggregate "Luck" (Actual Wins - Expected Wins) across all leagues.
 
-## Learn More
+### 🏆 **Season Performance Review**
+**"The Medal Count"**
+- Analyzes Playoff Brackets to determine your **True Final Rank**.
+- **Smart Detection**: Distinguishes between "Consolation Brackets" (Winner = Best) and "Toilet Bowls" (Winner = Worst).
+- **Medal Tracker**: Tracks Golds (1st), Silvers (2nd), and Bronzes (3rd).
+- **Percentiles**: Normalizes your finish based on league size (e.g., 5th/10 is better than 5th/6).
 
-To learn more about Next.js, take a look at the following resources:
+### 🏛️ **Legacy League Analyzer**
+**"The Historian"**
+- Tracks the entire history of a specific league (e.g., 2021-2025).
+- **Head-to-Head Matrix**: See your all-time record against every other owner.
+- **Rivalry Tracker**: See who you have outscored the most (and least) over the years.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🚑 **Roster Medic**
+**"The Check-Up"**
+- Scans all your 2025 leagues for critical issues.
+- **Alerts**:
+  - Empty Starting Slots.
+  - Injured Players in Starting Lineup.
+  - IR-Eligible players clogging up bench spots.
+  - Open Roster Spots.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 🏈 **Player Database**
+- Searchable, sortable list of all 11,000+ NFL players.
+- Filters for Position and Team.
+- View 2025 Season Stats (Standard, Half-PPR, PPR).
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🛠️ Tech Stack
+- **Framework**: Next.js 14 (App Router)
+- **UI**: Material UI (MUI)
+- **Visualization**: Recharts
+- **Data**: Sleeper API (Client-Side + GitHub Actions Pipeline)
+- **Hosting**: Vercel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔄 Data Pipeline
+The application uses a **GitHub Action** to automatically fetch the latest player database and stats from Sleeper every morning at 8:00 AM UTC, ensuring the Player Database is always up to date without slamming Sleeper's API limits from the client.
