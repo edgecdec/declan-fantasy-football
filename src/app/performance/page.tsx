@@ -125,23 +125,25 @@ function determineFinalRank(
       // p=3 Match: Determines 9th/10th.
       // p=5 Match: Determines 7th/8th (Best of the losers).
       
-      // In these placement matches, the "Winner" (w) is the team that scored more points (Better Rank).
-      // The "Loser" (l) scored less (Worse Rank).
+      // In Toilet Bowl API, 'w' is the team that "Won the Bracket Node" (Advanced).
+      // But in a Toilet Bowl, Advancing means LOSING the football game (Scoring Less).
+      // So 'w' = Score Loser = Worse Rank.
+      // 'l' = Score Winner = Better Rank.
       
-      const isWinner = consolationMatch.w === rosterId;
+      const isBracketWinner = consolationMatch.w === rosterId; // API says we are 'w'
       
       if (place === 1) { // 11th/12th
-        return { rank: isWinner ? 11 : 12, madePlayoffs: false, source: 'loser_bracket' };
+        return { rank: isBracketWinner ? 12 : 11, madePlayoffs: false, source: 'loser_bracket' };
       }
       if (place === 3) { // 9th/10th
-        return { rank: isWinner ? 9 : 10, madePlayoffs: false, source: 'loser_bracket' };
+        return { rank: isBracketWinner ? 10 : 9, madePlayoffs: false, source: 'loser_bracket' };
       }
       if (place === 5) { // 7th/8th
-        return { rank: isWinner ? 7 : 8, madePlayoffs: false, source: 'loser_bracket' };
+        return { rank: isBracketWinner ? 8 : 7, madePlayoffs: false, source: 'loser_bracket' };
       }
       
-      // Fallback if p is weird
-      return { rank: isWinner ? 11 : 12, madePlayoffs: false, source: 'loser_bracket' };
+      // Fallback
+      return { rank: isBracketWinner ? 12 : 11, madePlayoffs: false, source: 'loser_bracket' };
       
     } else {
       // Consolation Logic (Winner Advances)
