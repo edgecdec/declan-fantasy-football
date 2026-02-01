@@ -15,7 +15,8 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  FormControl
+  FormControl,
+  Autocomplete
 } from '@mui/material';
 import { SleeperService, SleeperUser } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
@@ -40,6 +41,7 @@ const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
 export default function PortfolioPage() {
   // State
   const [username, setUsername] = React.useState('');
+  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -49,9 +51,28 @@ export default function PortfolioPage() {
   const [portfolio, setPortfolio] = React.useState<PortfolioItem[]>([]);
   const [totalLeagues, setTotalLeagues] = React.useState(0);
 
+  // Load Saved Usernames
+  React.useEffect(() => {
+    const saved = localStorage.getItem('sleeper_usernames');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSavedUsernames(parsed);
+        if (parsed.length > 0 && !username) setUsername(parsed[0]);
+      } catch (e) { console.error(e); }
+    }
+  }, []);
+
+  const saveUsername = (name: string) => {
+    if (!name) return;
+    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5);
+    setSavedUsernames(newSaved);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+  };
+
   // Auto-analyze when year changes
   React.useEffect(() => {
-    if (username && !loading) {
+    if (username && !loading && user) {
       handleAnalyze();
     }
   }, [year]);
@@ -69,6 +90,7 @@ export default function PortfolioPage() {
       const userRes = await SleeperService.getUser(username);
       if (!userRes) throw new Error('User not found');
       setUser(userRes);
+      saveUsername(username);
 
       const leagues = await SleeperService.getLeagues(userRes.user_id, year);
       setTotalLeagues(leagues.length);
@@ -203,11 +225,14 @@ export default function PortfolioPage() {
       {/* Input Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
-            label="Sleeper Username"
-            variant="outlined"
+          <Autocomplete
+            freeSolo
+            options={savedUsernames}
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onInputChange={(e, newVal) => setUsername(newVal)}
+            renderInput={(params) => (
+              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
+            )}
             disabled={loading}
           />
           
