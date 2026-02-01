@@ -46,9 +46,11 @@ type LeagueData = {
   league: SleeperLeague;
   status: AnalysisStatus;
   category: 'included' | 'excluded';
-  stats?: {
+  userStats?: {
     actualWins: number;
     expectedWins: number;
+    pointsFor: number;
+    pointsAgainst: number;
   };
   standings?: TeamStats[];
 };
@@ -466,7 +468,8 @@ export default function ExpectedWinsPage() {
       userStats: myStats ? {
         actualWins: myStats.actualWins,
         expectedWins: myStats.expectedWins,
-        pointsFor: myStats.pointsFor
+        pointsFor: myStats.pointsFor,
+        pointsAgainst: myStats.pointsAgainst
       } : undefined
     };
   };
