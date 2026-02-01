@@ -136,7 +136,7 @@ export default function SmartTable<T>({
               size="small"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: { xs: '100%', sm: 250 }, flexGrow: 1 }}
             />
           )}
 

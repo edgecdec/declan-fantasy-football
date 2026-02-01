@@ -310,7 +310,7 @@ export default function LeagueHistoryPage() {
 
       {/* Input */}
       {step === 'user' && (
-        <Paper sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
+        <Paper sx={{ p: 3, mb: 4 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
             <Autocomplete
               freeSolo

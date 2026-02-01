@@ -35,7 +35,7 @@ export default function UserSearchInput({ username, setUsername, disabled }: Use
           {...params} 
           label="Sleeper Username" 
           variant="outlined" 
-          sx={{ minWidth: 200 }} 
+          sx={{ minWidth: { xs: '100%', sm: 250 }, flexGrow: 1 }} 
         />
       )}
       disabled={disabled}
