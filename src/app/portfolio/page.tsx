@@ -18,14 +18,12 @@ import {
   Chip,
   Alert,
   Avatar,
-  Card,
-  CardContent,
   Select,
   MenuItem,
   InputLabel,
   FormControl
 } from '@mui/material';
-import { SleeperService, SleeperUser, SleeperLeague } from '@/services/sleeper/sleeperService';
+import { SleeperService, SleeperUser } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
 
 // Types
@@ -33,6 +31,8 @@ type PortfolioItem = {
   playerId: string;
   playerData: any; // From JSON
   shares: number;
+  startersCount: number;
+  benchCount: number;
   leagues: {
     id: string;
     name: string;
@@ -95,13 +95,23 @@ export default function PortfolioPage() {
       );
 
       // 4. Aggregation Logic
-      const playerCounts = new Map<string, { count: number, leagueIds: string[] }>();
+      const playerCounts = new Map<string, { count: number, startCount: number, benchCount: number, leagueIds: string[] }>();
       
       rosterMap.forEach((roster, leagueId) => {
         if (roster.players) {
           roster.players.forEach(pid => {
-            const current = playerCounts.get(pid) || { count: 0, leagueIds: [] };
+            const current = playerCounts.get(pid) || { count: 0, startCount: 0, benchCount: 0, leagueIds: [] };
             current.count++;
+            
+            // Check if player is in starting lineup
+            // Note: starters array can contain '0' or nulls, need to check if pid is in it
+            const isStarter = roster.starters && roster.starters.includes(pid);
+            if (isStarter) {
+                current.startCount++;
+            } else {
+                current.benchCount++;
+            }
+
             current.leagueIds.push(leagueId);
             playerCounts.set(pid, current);
           });
@@ -120,6 +130,8 @@ export default function PortfolioPage() {
              playerId: pid,
              playerData: pInfo,
              shares: data.count,
+             startersCount: data.startCount,
+             benchCount: data.benchCount,
              leagues: data.leagueIds.map(lid => {
                const l = leagues.find(x => x.league_id === lid);
                return { id: lid, name: l ? l.name : 'Unknown League' };
@@ -225,6 +237,8 @@ export default function PortfolioPage() {
                   <TableCell>Position</TableCell>
                   <TableCell>Team</TableCell>
                   <TableCell align="right">Shares</TableCell>
+                  <TableCell align="right">Start</TableCell>
+                  <TableCell align="right">Bench</TableCell>
                   <TableCell align="right">Exposure</TableCell>
                 </TableRow>
               </TableHead>
@@ -250,6 +264,12 @@ export default function PortfolioPage() {
                     <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
                       {item.shares}
                     </TableCell>
+                    <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                      {item.startersCount}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: 'text.secondary' }}>
+                      {item.benchCount}
+                    </TableCell>
                     <TableCell align="right">
                       {((item.shares / totalLeagues) * 100).toFixed(0)}%
                     </TableCell>
@@ -257,7 +277,7 @@ export default function PortfolioPage() {
                 ))}
                 {portfolio.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                       No players found in your rosters.
                     </TableCell>
                   </TableRow>
