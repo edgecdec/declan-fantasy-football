@@ -121,19 +121,27 @@ function determineFinalRank(
     
     if (isToiletBowl) {
       // Toilet Bowl Logic (Loser Advances)
-      // The "Winner" of p=1 is the one who escaped being last.
-      // Rank = TotalTeams - (p - 1) for Loser? 
-      // Actually, p=1 match is usually "Worst vs 2nd Worst".
-      // Loser of p=1 -> 12th (Last). Winner -> 11th.
-      // Loser of p=3 -> 10th. Winner -> 9th.
-      // Loser of p=5 -> 8th. Winner -> 7th.
+      // p=1 Match: The "Finals" of the Toilet Bowl (Bottom 2 teams). Determines 11th/12th.
+      // p=3 Match: Determines 9th/10th.
+      // p=5 Match: Determines 7th/8th (Best of the losers).
       
-      // Formula: 
-      // Loser Rank = TotalTeams - (place - 1)
-      // Winner Rank = TotalTeams - place
+      // In these placement matches, the "Winner" (w) is the team that scored more points (Better Rank).
+      // The "Loser" (l) scored less (Worse Rank).
       
-      if (!isWinner) return { rank: totalTeams - (place - 1), madePlayoffs: false, source: 'loser_bracket' };
-      return { rank: totalTeams - place, madePlayoffs: false, source: 'loser_bracket' };
+      const isWinner = consolationMatch.w === rosterId;
+      
+      if (place === 1) { // 11th/12th
+        return { rank: isWinner ? 11 : 12, madePlayoffs: false, source: 'loser_bracket' };
+      }
+      if (place === 3) { // 9th/10th
+        return { rank: isWinner ? 9 : 10, madePlayoffs: false, source: 'loser_bracket' };
+      }
+      if (place === 5) { // 7th/8th
+        return { rank: isWinner ? 7 : 8, madePlayoffs: false, source: 'loser_bracket' };
+      }
+      
+      // Fallback if p is weird
+      return { rank: isWinner ? 11 : 12, madePlayoffs: false, source: 'loser_bracket' };
       
     } else {
       // Consolation Logic (Winner Advances)
