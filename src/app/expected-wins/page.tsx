@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   Container,
   Box,
@@ -36,53 +37,41 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import HistoryIcon from '@mui/icons-material/History';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster } from '@/services/sleeper/sleeperService';
+import { analyzeLeague, TeamStats } from '@/services/stats/expectedWins';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 
 // --- Types ---
-// ... (Types remain same)
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
 
 type LeagueData = {
   league: SleeperLeague;
   status: AnalysisStatus;
   category: 'included' | 'excluded';
-  userStats?: {
-    actualWins: number;
-    expectedWins: number;
-    pointsFor: number;
-    pointsAgainst: number;
-  };
+  userStats?: TeamStats;
   standings?: TeamStats[];
 };
 
-type TeamStats = {
-  rosterId: number;
-  ownerId: string;
-  name: string;
-  avatar: string;
-  actualWins: number;
-  expectedWins: number;
-  pointsFor: number;
-  pointsAgainst: number;
-};
+// --- Helper Components ---
 
-// ... (Helper Components remain same)
 function SummaryCard({ data, showAdvanced }: { data: LeagueData[], showAdvanced: boolean }) {
   const active = data.filter(d => d.category === 'included' && d.status === 'complete');
   
   const totalActual = active.reduce((sum, d) => sum + (d.userStats?.actualWins || 0), 0);
   const totalExpected = active.reduce((sum, d) => sum + (d.userStats?.expectedWins || 0), 0);
+  const totalOpportunities = active.reduce((sum, d) => sum + (d.userStats?.totalOpportunities || 0), 0);
+  
   const diff = totalActual - totalExpected;
 
   const totalPF = active.reduce((sum, d) => sum + (d.userStats?.pointsFor || 0), 0);
   const totalPA = active.reduce((sum, d) => sum + (d.userStats?.pointsAgainst || 0), 0);
   const pointsDiff = totalPF - totalPA;
 
-  const approxGames = active.length * 14; 
-  const actualPct = approxGames > 0 ? (totalActual / approxGames) * 100 : 0;
-  const expectedPct = approxGames > 0 ? (totalExpected / approxGames) * 100 : 0;
+  const actualPct = totalOpportunities > 0 ? (totalActual / totalOpportunities) * 100 : 0;
+  const expectedPct = totalOpportunities > 0 ? (totalExpected / totalOpportunities) * 100 : 0;
 
   return (
     <Card sx={{ mb: 4, bgcolor: 'secondary.dark', color: 'white' }}>
@@ -146,16 +135,25 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
-      <Tooltip title={isIncluded ? "Exclude from totals" : "Include in totals"}>
-        <IconButton 
-          size="small" 
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          color={isIncluded ? "error" : "success"}
-          sx={{ mt: 1.5, mr: 1 }}
-        >
-          {isIncluded ? <RemoveCircleOutlineIcon /> : <AddCircleOutlineIcon />}
-        </IconButton>
-      </Tooltip>
+      <Box sx={{ display: 'flex', flexDirection: 'column', mt: 1 }}>
+        <Tooltip title={isIncluded ? "Exclude from totals" : "Include in totals"}>
+          <IconButton 
+            size="small" 
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+            color={isIncluded ? "error" : "success"}
+          >
+            {isIncluded ? <RemoveCircleOutlineIcon /> : <AddCircleOutlineIcon />}
+          </IconButton>
+        </Tooltip>
+        
+        <Tooltip title="View History Graph">
+          <Link href={`/expected-wins/league-history/${league.league_id}`} passHref>
+            <IconButton size="small" color="primary">
+              <ShowChartIcon />
+            </IconButton>
+          </Link>
+        </Tooltip>
+      </Box>
 
       <Accordion 
         disabled={status !== 'complete'} 
@@ -284,7 +282,7 @@ export default function ExpectedWinsPage() {
   const [user, setUser] = React.useState<SleeperUser | null>(null);
   
   const [leagueData, setLeagueData] = React.useState<LeagueData[]>([]);
-
+  
   const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
   React.useEffect(() => {
@@ -356,7 +354,6 @@ export default function ExpectedWinsPage() {
   };
 
   const processQueue = async (leaguesToProcess: SleeperLeague[], userId: string) => {
-    // ... existing logic ...
     const total = leaguesToProcess.length;
     let completed = 0;
 
@@ -364,7 +361,7 @@ export default function ExpectedWinsPage() {
       setLeagueData(prev => prev.map(d => d.league.league_id === league.league_id ? { ...d, status: 'loading' } : d));
 
       try {
-        const result = await analyzeLeague(league, userId);
+        const result = await analyzeLeagueWrapper(league, userId);
         setLeagueData(prev => prev.map(d => 
           d.league.league_id === league.league_id 
             ? { ...d, status: 'complete', userStats: result.userStats, standings: result.standings } 
@@ -395,85 +392,8 @@ export default function ExpectedWinsPage() {
     });
   };
 
-  const analyzeLeague = async (league: SleeperLeague, userId: string) => {
-    // ... existing logic (no changes) ...
-    const [rostersRes, usersRes] = await Promise.all([
-      fetch(`https://api.sleeper.app/v1/league/${league.league_id}/rosters`),
-      fetch(`https://api.sleeper.app/v1/league/${league.league_id}/users`)
-    ]);
-    const rosters: SleeperRoster[] = await rostersRes.json();
-    const users: any[] = await usersRes.json();
-
-    const rosterMap = new Map<number, TeamStats>();
-    let myRosterId = -1;
-
-    rosters.forEach(r => {
-      if (r.owner_id === userId) myRosterId = r.roster_id;
-      const owner = users.find(u => u.user_id === r.owner_id);
-      rosterMap.set(r.roster_id, {
-        rosterId: r.roster_id,
-        ownerId: r.owner_id,
-        name: owner?.metadata?.team_name || owner?.display_name || `Team ${r.roster_id}`,
-        avatar: owner?.avatar || '',
-        actualWins: r.settings.wins,
-        expectedWins: 0,
-        pointsFor: r.settings.fpts + (r.settings.fpts_decimal || 0) / 100,
-        pointsAgainst: 0
-      });
-    });
-
-    const playoffStart = league.settings.playoff_week_start;
-    const weeksToAnalyze = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
-    const useMedian = league.settings.league_average_match === 1;
-
-    const weeks = Array.from({length: weeksToAnalyze}, (_, i) => i + 1);
-    for (let i = 0; i < weeks.length; i += 4) {
-        const chunk = weeks.slice(i, i + 4);
-        await Promise.all(chunk.map(async (week) => {
-            const matchups = await SleeperService.getMatchups(league.league_id, week);
-            if (!matchups || matchups.length < 2) return;
-            const validMatchups = matchups.filter(m => m.points !== undefined && m.points !== null);
-            if (validMatchups.length < 2) return;
-
-            const sortedByScore = [...validMatchups].sort((a, b) => b.points - a.points);
-            const medianCutoffIndex = Math.floor(validMatchups.length / 2);
-            const medianThreshold = sortedByScore[medianCutoffIndex - 1]?.points || 0;
-
-            validMatchups.forEach(m1 => {
-                const opponent = validMatchups.find(m2 => m2.matchup_id === m1.matchup_id && m2.roster_id !== m1.roster_id);
-                const t = rosterMap.get(m1.roster_id);
-                if (t && opponent) {
-                    t.pointsAgainst += opponent.points;
-                }
-
-                let wins = 0;
-                validMatchups.forEach(m2 => {
-                    if (m1.roster_id === m2.roster_id) return;
-                    if (m1.points > m2.points) wins += 1;
-                    if (m1.points === m2.points) wins += 0.5;
-                });
-                const h2hEw = wins / (validMatchups.length - 1);
-                
-                let medianEw = 0;
-                if (useMedian && m1.points >= medianThreshold && m1.points > 0) medianEw = 1;
-
-                if (t) t.expectedWins += (h2hEw + medianEw);
-            });
-        }));
-    }
-
-    const standings = Array.from(rosterMap.values()).sort((a, b) => b.expectedWins - a.expectedWins);
-    const myStats = rosterMap.get(myRosterId);
-
-    return {
-      standings,
-      userStats: myStats ? {
-        actualWins: myStats.actualWins,
-        expectedWins: myStats.expectedWins,
-        pointsFor: myStats.pointsFor,
-        pointsAgainst: myStats.pointsAgainst
-      } : undefined
-    };
+  const analyzeLeagueWrapper = async (league: SleeperLeague, userId: string) => {
+    return await analyzeLeague(league, userId);
   };
 
   return (
@@ -481,6 +401,17 @@ export default function ExpectedWinsPage() {
       <PageHeader 
         title="League Luck Analyzer" 
         subtitle='See your "True" record across all leagues based on All-Play Expected Wins.' 
+        action={
+          <Link href="/expected-wins/trends" passHref>
+            <Button
+              variant="outlined"
+              startIcon={<HistoryIcon />}
+              sx={{ height: 40 }}
+            >
+              Historical Analysis
+            </Button>
+          </Link>
+        }
       />
       
       <Paper sx={{ p: 3, mb: 4 }}>
@@ -522,7 +453,12 @@ export default function ExpectedWinsPage() {
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'included').map(item => (
               <Grid size={{ xs: 12 }} key={item.league.league_id}>
-                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} showAdvanced={showAdvanced} />
+                <LeagueRow 
+                  item={item} 
+                  onToggle={() => toggleCategory(item.league.league_id)} 
+                  userId={user!.user_id} 
+                  showAdvanced={showAdvanced}
+                />
               </Grid>
             ))}
           </Grid>
@@ -535,7 +471,12 @@ export default function ExpectedWinsPage() {
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'excluded').map(item => (
               <Grid size={{ xs: 12 }} key={item.league.league_id}>
-                <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} showAdvanced={showAdvanced} />
+                <LeagueRow 
+                  item={item} 
+                  onToggle={() => toggleCategory(item.league.league_id)} 
+                  userId={user!.user_id} 
+                  showAdvanced={showAdvanced}
+                />
               </Grid>
             ))}
           </Grid>
