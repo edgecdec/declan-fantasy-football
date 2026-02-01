@@ -16,7 +16,11 @@ import {
   TextField,
   MenuItem,
   Chip,
-  TableSortLabel
+  TableSortLabel,
+  Select,
+  FormControl,
+  InputLabel,
+  OutlinedInput
 } from '@mui/material';
 
 // Import JSON data
@@ -64,6 +68,7 @@ const ALL_PLAYERS: Player[] = Object.values(playerData.players)
 
 // Extract unique teams for dropdown
 const TEAMS = Array.from(new Set(ALL_PLAYERS.map(p => p.team).filter(t => t && t !== 'FA'))).sort();
+const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 // Sorting Helper
 type Order = 'asc' | 'desc';
@@ -109,12 +114,23 @@ const HEAD_CELLS = [
   { id: 'stats.gp', label: 'GP', numeric: true },
 ];
 
+const ITEM_HEIGHT = 48;
+const ITEM_PADDING_TOP = 8;
+const MenuProps = {
+  PaperProps: {
+    style: {
+      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+      width: 250,
+    },
+  },
+};
+
 export default function PlayersPage() {
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(25);
   const [filterName, setFilterName] = React.useState('');
-  const [filterPos, setFilterPos] = React.useState('ALL');
-  const [filterTeam, setFilterTeam] = React.useState('ALL');
+  const [filterPos, setFilterPos] = React.useState<string[]>([]);
+  const [filterTeam, setFilterTeam] = React.useState<string[]>([]);
   
   // Sorting State
   const [order, setOrder] = React.useState<Order>('desc');
@@ -133,8 +149,8 @@ export default function PlayersPage() {
         player.first_name.toLowerCase().includes(filterName.toLowerCase()) || 
         player.last_name.toLowerCase().includes(filterName.toLowerCase());
       
-      const matchesPos = filterPos === 'ALL' || player.position === filterPos;
-      const matchesTeam = filterTeam === 'ALL' || player.team === filterTeam;
+      const matchesPos = filterPos.length === 0 || filterPos.includes(player.position);
+      const matchesTeam = filterTeam.length === 0 || filterTeam.includes(player.team!);
 
       return matchesName && matchesPos && matchesTeam;
     });
@@ -153,7 +169,7 @@ export default function PlayersPage() {
       </Typography>
       
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <TextField 
             label="Search Player" 
             variant="outlined" 
@@ -166,42 +182,61 @@ export default function PlayersPage() {
             sx={{ minWidth: 200 }}
           />
           
-          <TextField
-            select
-            label="Position"
-            value={filterPos}
-            onChange={(e) => {
-              setFilterPos(e.target.value);
-              setPage(0); 
-            }}
-            size="small"
-            sx={{ minWidth: 120 }}
-          >
-            <MenuItem value="ALL">All Positions</MenuItem>
-            <MenuItem value="QB">QB</MenuItem>
-            <MenuItem value="RB">RB</MenuItem>
-            <MenuItem value="WR">WR</MenuItem>
-            <MenuItem value="TE">TE</MenuItem>
-            <MenuItem value="K">K</MenuItem>
-            <MenuItem value="DEF">DEF</MenuItem>
-          </TextField>
+          <FormControl size="small" sx={{ minWidth: 200, maxWidth: 300 }}>
+            <InputLabel>Positions</InputLabel>
+            <Select
+              multiple
+              value={filterPos}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFilterPos(typeof value === 'string' ? value.split(',') : value);
+                setPage(0);
+              }}
+              input={<OutlinedInput label="Positions" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} size="small" />
+                  ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
+            >
+              {POSITIONS.map((pos) => (
+                <MenuItem key={pos} value={pos}>
+                  {pos}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          <TextField
-            select
-            label="Team"
-            value={filterTeam}
-            onChange={(e) => {
-              setFilterTeam(e.target.value);
-              setPage(0); 
-            }}
-            size="small"
-            sx={{ minWidth: 120 }}
-          >
-            <MenuItem value="ALL">All Teams</MenuItem>
-            {TEAMS.map((team) => (
-              <MenuItem key={team} value={team}>{team}</MenuItem>
-            ))}
-          </TextField>
+          <FormControl size="small" sx={{ minWidth: 200, maxWidth: 300 }}>
+            <InputLabel>Teams</InputLabel>
+            <Select
+              multiple
+              value={filterTeam}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFilterTeam(typeof value === 'string' ? value.split(',') : value);
+                setPage(0);
+              }}
+              input={<OutlinedInput label="Teams" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} size="small" />
+                  ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
+            >
+              {TEAMS.map((team) => (
+                <MenuItem key={team} value={team}>
+                  {team}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
       </Paper>
 
