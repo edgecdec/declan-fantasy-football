@@ -9,7 +9,8 @@ import {
   LinearProgress,
   Autocomplete,
   TextField,
-  Button
+  Button,
+  createFilterOptions
 } from '@mui/material';
 import { 
   LineChart, 
@@ -38,6 +39,11 @@ const COLORS = [
   '#a4de6c', '#8dd1e1', '#83a6ed', '#8e4585', '#ff0000'
 ];
 
+const filterOptions = createFilterOptions({
+  matchFrom: 'any',
+  limit: 50,
+});
+
 export default function TrendsPage() {
   const { user } = useUser();
   const [year, setYear] = React.useState('2025');
@@ -56,6 +62,13 @@ export default function TrendsPage() {
     const p = (playerData.players as any)[id];
     return p ? `${p.first_name} ${p.last_name}` : id;
   };
+
+  // Auto-run when user is loaded
+  React.useEffect(() => {
+    if (user && !loading && history.length === 0) {
+      startAnalysis();
+    }
+  }, [user]);
 
   const startAnalysis = async () => {
     if (!user) return;
@@ -183,6 +196,7 @@ export default function TrendsPage() {
             <Autocomplete
               multiple
               options={availablePlayers}
+              filterOptions={filterOptions}
               getOptionLabel={(option) => option.name}
               value={availablePlayers.filter(p => selectedPlayers.includes(p.id))}
               onChange={(_, newValue) => {

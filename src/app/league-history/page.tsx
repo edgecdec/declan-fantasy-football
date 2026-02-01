@@ -146,6 +146,14 @@ export default function LeagueHistoryPage() {
     }
   }, []);
 
+  // Auto-fetch leagues when username is available
+  React.useEffect(() => {
+    if (username && leagues.length === 0 && !loading) {
+      const t = setTimeout(() => handleFetchLeagues(), 800);
+      return () => clearTimeout(t);
+    }
+  }, [username]);
+
   const handleFetchLeagues = async () => {
     if (!username) return;
     setLoading(true);
@@ -342,7 +350,6 @@ export default function LeagueHistoryPage() {
               </FormControl>
               <Button 
                 variant="contained" 
-                color="secondary"
                 onClick={handleAnalyze} 
                 disabled={loading || !selectedLeagueId}
                 sx={{ height: 56 }}

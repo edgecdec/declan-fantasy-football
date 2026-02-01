@@ -20,6 +20,8 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import { useRouter } from 'next/navigation';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { analyzeLeague } from '@/services/stats/expectedWins';
@@ -41,6 +43,7 @@ type YearlyStats = {
 };
 
 export default function LuckTrendsPage() {
+  const router = useRouter();
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
   
@@ -169,6 +172,14 @@ export default function LuckTrendsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Button 
+        startIcon={<ArrowBackIcon />} 
+        onClick={() => router.back()} 
+        sx={{ mb: 2 }}
+      >
+        Back to Analysis
+      </Button>
+
       <PageHeader 
         title="Historical Luck Trends" 
         subtitle="Visualize your Actual vs. Expected Win Rate over the years."
@@ -215,7 +226,7 @@ export default function LuckTrendsPage() {
                 contentStyle={{ backgroundColor: '#333', border: 'none' }}
                 itemStyle={{ color: '#fff' }}
                 labelStyle={{ color: '#aaa' }}
-                formatter={(val: number) => `${val}%`}
+                formatter={(val: any) => `${val}%`}
               />
               <Legend />
               

@@ -433,7 +433,6 @@ export default function ExpectedWinsPage() {
 
           <Button 
             variant="contained" 
-            color="secondary"
             size="large" 
             onClick={handleStart}
             disabled={loadingUser || !username}

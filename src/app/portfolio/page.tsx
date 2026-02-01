@@ -335,7 +335,6 @@ export default function PortfolioPage() {
           <Button 
             variant="contained" 
             size="large" 
-            color="secondary"
             onClick={handleAnalyze}
             disabled={loading || !username}
             sx={{ height: 56 }}

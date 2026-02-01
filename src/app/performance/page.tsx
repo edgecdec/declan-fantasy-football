@@ -530,7 +530,6 @@ export default function PerformancePage() {
           </FormControl>
           <Button 
             variant="contained" 
-            color="secondary"
             size="large" 
             onClick={handleStart}
             disabled={loadingUser || !username}

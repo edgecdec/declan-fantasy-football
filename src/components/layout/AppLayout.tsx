@@ -21,7 +21,8 @@ import {
   useTheme,
   Avatar,
   Menu,
-  MenuItem as MuiMenuItem
+  MenuItem as MuiMenuItem,
+  Chip
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
@@ -79,6 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
           FF Analytics
         </Typography>
+        <Chip label="BETA" color="secondary" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 'bold' }} />
       </Toolbar>
       <Divider />
       <List>
@@ -142,41 +144,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Typography>
 
           {user && (
-            <div>
-              <IconButton
-                size="large"
-                aria-label="account of current user"
-                aria-controls="menu-appbar"
-                aria-haspopup="true"
-                onClick={handleMenu}
-                color="inherit"
-                sx={{ p: 0 }}
-              >
-                <Avatar 
-                  src={`https://sleepercdn.com/avatars/${user.avatar}`} 
-                  alt={user.display_name}
-                />
-              </IconButton>
-              <Menu
-                id="menu-appbar"
-                anchorEl={anchorEl}
-                anchorOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-              >
-                <MuiMenuItem disabled>{user.display_name}</MuiMenuItem>
-                <Divider />
-                <MuiMenuItem onClick={handleLogout}>Change User</MuiMenuItem>
-              </Menu>
-            </div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                Welcome, <strong>{user.display_name}</strong>
+              </Typography>
+              <div>
+                <IconButton
+                  size="large"
+                  aria-label="account of current user"
+                  aria-controls="menu-appbar"
+                  aria-haspopup="true"
+                  onClick={handleMenu}
+                  color="inherit"
+                  sx={{ p: 0 }}
+                >
+                  <Avatar 
+                    src={`https://sleepercdn.com/avatars/${user.avatar}`} 
+                    alt={user.display_name}
+                  />
+                </IconButton>
+                <Menu
+                  id="menu-appbar"
+                  anchorEl={anchorEl}
+                  anchorOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                  keepMounted
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
+                >
+                  <MuiMenuItem disabled>{user.display_name}</MuiMenuItem>
+                  <Divider />
+                  <MuiMenuItem onClick={handleLogout}>Change User</MuiMenuItem>
+                </Menu>
+              </div>
+            </Box>
           )}
         </Toolbar>
       </AppBar>
