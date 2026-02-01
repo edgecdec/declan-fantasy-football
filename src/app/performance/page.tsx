@@ -50,6 +50,7 @@ type Standing = {
   rank: number;
   madePlayoffs: boolean;
   pointsFor: number;
+  rankSource: 'winner_bracket' | 'loser_bracket' | 'regular_season';
 };
 
 type LeaguePerformanceData = {
@@ -81,22 +82,22 @@ function determineFinalRank(
   winnersBracket: SleeperBracketMatch[], 
   losersBracket: SleeperBracketMatch[],
   league: SleeperLeague
-): { rank: number, madePlayoffs: boolean } {
+): { rank: number, madePlayoffs: boolean, source: 'winner_bracket' | 'loser_bracket' | 'regular_season' } {
   // 1. Check Winners Bracket
   const championship = winnersBracket.find(m => m.p === 1);
   if (championship) {
-    if (championship.w === rosterId) return { rank: 1, madePlayoffs: true };
-    if (championship.l === rosterId) return { rank: 2, madePlayoffs: true };
+    if (championship.w === rosterId) return { rank: 1, madePlayoffs: true, source: 'winner_bracket' };
+    if (championship.l === rosterId) return { rank: 2, madePlayoffs: true, source: 'winner_bracket' };
   }
   const thirdPlace = winnersBracket.find(m => m.p === 3);
   if (thirdPlace) {
-    if (thirdPlace.w === rosterId) return { rank: 3, madePlayoffs: true };
-    if (thirdPlace.l === rosterId) return { rank: 4, madePlayoffs: true };
+    if (thirdPlace.w === rosterId) return { rank: 3, madePlayoffs: true, source: 'winner_bracket' };
+    if (thirdPlace.l === rosterId) return { rank: 4, madePlayoffs: true, source: 'winner_bracket' };
   }
   const fifthPlace = winnersBracket.find(m => m.p === 5);
   if (fifthPlace) {
-    if (fifthPlace.w === rosterId) return { rank: 5, madePlayoffs: true };
-    if (fifthPlace.l === rosterId) return { rank: 6, madePlayoffs: true };
+    if (fifthPlace.w === rosterId) return { rank: 5, madePlayoffs: true, source: 'winner_bracket' };
+    if (fifthPlace.l === rosterId) return { rank: 6, madePlayoffs: true, source: 'winner_bracket' };
   }
 
   const inPlayoffs = winnersBracket.some(m => m.t1 === rosterId || m.t2 === rosterId);
@@ -109,8 +110,8 @@ function determineFinalRank(
   if (consolationMatch && consolationMatch.p) {
     const isWinner = consolationMatch.w === rosterId;
     const place = consolationMatch.p;
-    if (isWinner) return { rank: offset + place, madePlayoffs: false };
-    return { rank: offset + place + 1, madePlayoffs: false };
+    if (isWinner) return { rank: offset + place, madePlayoffs: false, source: 'loser_bracket' };
+    return { rank: offset + place + 1, madePlayoffs: false, source: 'loser_bracket' };
   }
 
   // 3. Fallback: Regular Season Rank
@@ -119,7 +120,7 @@ function determineFinalRank(
     return b.settings.fpts - a.settings.fpts;
   });
   const regSeasonRank = sortedRosters.findIndex(r => r.roster_id === rosterId) + 1;
-  return { rank: regSeasonRank, madePlayoffs: inPlayoffs };
+  return { rank: regSeasonRank, madePlayoffs: inPlayoffs, source: 'regular_season' };
 }
 
 // --- Components ---
@@ -239,6 +240,7 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
                     <TableCell>Rank</TableCell>
                     <TableCell>Team</TableCell>
                     <TableCell align="right">Points</TableCell>
+                    <TableCell align="right">Source</TableCell>
                     <TableCell align="right">Playoffs</TableCell>
                   </TableRow>
                 </TableHead>
@@ -259,6 +261,14 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
                         {team.ownerId === userId && <Chip label="YOU" size="small" color="primary" sx={{ height: 20 }} />}
                       </TableCell>
                       <TableCell align="right">{team.pointsFor.toFixed(0)}</TableCell>
+                      <TableCell align="right">
+                        <Chip 
+                          label={team.rankSource === 'regular_season' ? 'Reg Season' : 'Bracket'} 
+                          size="small" 
+                          variant="outlined" 
+                          color="default"
+                        />
+                      </TableCell>
                       <TableCell align="right">
                         {team.madePlayoffs ? <Chip label="Yes" size="small" color="success" variant="outlined" /> : '-'}
                       </TableCell>
@@ -382,7 +392,7 @@ export default function PerformancePage() {
 
     // Calculate rank for EVERY roster
     const standings = rosters.map(r => {
-      const { rank, madePlayoffs } = determineFinalRank(r.roster_id, rosters, winnersBracket, losersBracket, league);
+      const { rank, madePlayoffs, source } = determineFinalRank(r.roster_id, rosters, winnersBracket, losersBracket, league);
       const owner = users.find(u => u.user_id === r.owner_id);
       
       return {
@@ -392,7 +402,8 @@ export default function PerformancePage() {
         avatar: owner?.avatar || '',
         rank,
         madePlayoffs,
-        pointsFor: r.settings.fpts
+        pointsFor: r.settings.fpts,
+        rankSource: source
       };
     }).sort((a, b) => a.rank - b.rank);
 
