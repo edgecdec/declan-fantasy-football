@@ -3,7 +3,6 @@
 import * as React from 'react';
 import {
   Container,
-  Typography,
   Box,
   Paper,
   LinearProgress,
@@ -24,7 +23,7 @@ import {
   TableBody,
   Avatar,
   Tooltip,
-  Alert
+  Typography
 } from '@mui/material';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import PageHeader from '@/components/common/PageHeader';
@@ -134,6 +133,8 @@ export default function LeagueHistoryPage() {
   const [historyData, setHistoryData] = React.useState<MemberHistory[]>([]);
   const [viewMode, setViewMode] = React.useState<'record' | 'diff'>('record');
 
+  const [step, setStep] = React.useState<'user' | 'league' | 'analyzing' | 'done'>('user');
+
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
     if (saved) {
@@ -158,6 +159,8 @@ export default function LeagueHistoryPage() {
 
       const leaguesRes = await SleeperService.getLeagues(userRes.user_id, year);
       setLeagues(leaguesRes);
+      
+      // Removed setStep('league') because we now render inline
     } catch (e) {
       console.error(e);
     } finally {
@@ -307,58 +310,60 @@ export default function LeagueHistoryPage() {
 
       {/* Input */}
       {step === 'user' && (
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Autocomplete
-            freeSolo
-            options={savedUsernames}
-            value={username}
-            onInputChange={(e, newVal) => setUsername(newVal)}
-            renderInput={(params) => <TextField {...params} label="Sleeper Username" sx={{ minWidth: 200 }} />}
-            disabled={loading && leagues.length === 0}
-          />
-          <Button 
-            variant="contained" 
-            onClick={handleFetchLeagues} 
-            disabled={loading && leagues.length === 0}
-            sx={{ height: 56 }}
-          >
-            Find Leagues
-          </Button>
-        </Box>
-
-        {leagues.length > 0 && (
-          <Box sx={{ mt: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-            <FormControl sx={{ minWidth: 250 }}>
-              <InputLabel>Select League</InputLabel>
-              <Select value={selectedLeagueId} label="Select League" onChange={(e) => setSelectedLeagueId(e.target.value)}>
-                {leagues.map(l => (
-                  <MenuItem key={l.league_id} value={l.league_id}>{l.name} ({l.season})</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        <Paper sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Autocomplete
+              freeSolo
+              options={savedUsernames}
+              value={username}
+              onInputChange={(e, newVal) => setUsername(newVal)}
+              renderInput={(params) => <TextField {...params} label="Sleeper Username" sx={{ minWidth: 200 }} />}
+              disabled={loading && leagues.length === 0}
+            />
             <Button 
               variant="contained" 
-              color="secondary"
-              onClick={handleAnalyze} 
-              disabled={loading || !selectedLeagueId}
+              onClick={handleFetchLeagues} 
+              disabled={loading && leagues.length === 0}
               sx={{ height: 56 }}
             >
-              {loading ? 'Analyzing...' : 'Analyze History'}
+              Find Leagues
             </Button>
           </Box>
-        )}
 
-        {loading && (
-          <Box sx={{ width: '100%', mt: 3 }}>
-            <Typography align="center" gutterBottom>{statusText}</Typography>
-            <LinearProgress variant="determinate" value={progress} />
-          </Box>
-        )}
-      </Paper>
+          {leagues.length > 0 && (
+            <Box sx={{ mt: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <FormControl sx={{ minWidth: 250 }}>
+                <InputLabel>Select League</InputLabel>
+                <Select value={selectedLeagueId} label="Select League" onChange={(e) => setSelectedLeagueId(e.target.value)}>
+                  {leagues.map(l => (
+                    <MenuItem key={l.league_id} value={l.league_id}>{l.name} ({l.season})</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Button 
+                variant="contained" 
+                color="secondary"
+                onClick={handleAnalyze} 
+                disabled={loading || !selectedLeagueId}
+                sx={{ height: 56 }}
+              >
+                {loading ? 'Analyzing...' : 'Analyze History'}
+              </Button>
+            </Box>
+          )}
+
+          {loading && (
+            <Box sx={{ width: '100%', mt: 3 }}>
+              <Typography align="center" gutterBottom>{statusText}</Typography>
+              <LinearProgress variant="determinate" value={progress} />
+            </Box>
+          )}
+        </Paper>
+      )}
 
       {/* Results */}
       {historyData.length > 0 && (
-        <Box>
+        <Box sx={{ mt: 4 }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
             <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)}>
               <Tab label="Head-to-Head Record" value="record" />
