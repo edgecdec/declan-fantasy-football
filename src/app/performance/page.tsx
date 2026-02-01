@@ -552,7 +552,7 @@ export default function PerformancePage() {
               .filter(d => d.category === 'included')
               .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
               .map(item => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.league.league_id}>
+                <Grid size={{ xs: 12 }} key={item.league.league_id}>
                   <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
                 </Grid>
               ))}
@@ -568,7 +568,7 @@ export default function PerformancePage() {
               .filter(d => d.category === 'excluded')
               .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
               .map(item => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.league.league_id}>
+                <Grid size={{ xs: 12 }} key={item.league.league_id}>
                   <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} />
                 </Grid>
               ))}

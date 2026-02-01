@@ -521,7 +521,7 @@ export default function ExpectedWinsPage() {
           <Typography variant="h6" gutterBottom color="primary">Included Leagues</Typography>
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'included').map(item => (
-              <Grid size={{ xs: 12, md: 6 }} key={item.league.league_id}>
+              <Grid size={{ xs: 12 }} key={item.league.league_id}>
                 <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} showAdvanced={showAdvanced} />
               </Grid>
             ))}
@@ -534,7 +534,7 @@ export default function ExpectedWinsPage() {
           <Divider sx={{ mb: 2 }} >Excluded Leagues</Divider>
           <Grid container spacing={2}>
             {leagueData.filter(d => d.category === 'excluded').map(item => (
-              <Grid size={{ xs: 12, md: 6 }} key={item.league.league_id}>
+              <Grid size={{ xs: 12 }} key={item.league.league_id}>
                 <LeagueRow item={item} onToggle={() => toggleCategory(item.league.league_id)} userId={user!.user_id} showAdvanced={showAdvanced} />
               </Grid>
             ))}
