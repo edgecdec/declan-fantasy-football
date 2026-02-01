@@ -131,6 +131,22 @@ export const SleeperService = {
     }
   },
 
+  shouldIgnoreLeague(league: SleeperLeague): boolean {
+    const name = league.name.toLowerCase();
+    // Keywords to exclude
+    if (name.includes('guillotine') || 
+        name.includes('chopped') || 
+        name.includes('test') || 
+        name.includes('mock') ||
+        name.includes('best ball') ||
+        name.includes('bestball')) {
+      return true;
+    }
+    // Check settings if available (settings.type might be 0, 1, 2 etc. but documentation is sparse)
+    // Guillotine usually has specific roster settings, but name is most reliable for now.
+    return false;
+  },
+
   // Batch fetch rosters with concurrency limit
   async fetchAllRosters(
     leagues: SleeperLeague[], 

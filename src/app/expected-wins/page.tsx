@@ -26,7 +26,10 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Checkbox,
+  FormControlLabel,
+  Autocomplete
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperMatchup } from '@/services/sleeper/sleeperService';
@@ -42,7 +45,7 @@ type LeagueAnalysis = {
     expectedWins: number;
     pointsFor: number;
   };
-  standings?: TeamStats[]; // Full league standings
+  standings?: TeamStats[];
 };
 
 type TeamStats = {
@@ -64,7 +67,6 @@ function SummaryCard({ analyses }: { analyses: LeagueAnalysis[] }) {
   const totalExpected = completed.reduce((sum, a) => sum + (a.userStats?.expectedWins || 0), 0);
   const diff = totalActual - totalExpected;
 
-  // Approx games played (assuming ~14 per league) - strictly for win % calc
   const approxGames = completed.length * 14; 
   const actualPct = approxGames > 0 ? (totalActual / approxGames) * 100 : 0;
   const expectedPct = approxGames > 0 ? (totalExpected / approxGames) * 100 : 0;
@@ -106,48 +108,94 @@ function SummaryCard({ analyses }: { analyses: LeagueAnalysis[] }) {
 
 export default function ExpectedWinsPage() {
   const [username, setUsername] = React.useState('');
+  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
-  const [loadingUser, setLoadingUser] = React.useState(false);
+  
+  const [loadingLeagues, setLoadingLeagues] = React.useState(false);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   
-  const [analyses, setAnalyses] = React.useState<LeagueAnalysis[]>([]);
   const [user, setUser] = React.useState<SleeperUser | null>(null);
+  const [leagues, setLeagues] = React.useState<SleeperLeague[]>([]);
+  
+  // Selection State
+  const [selectedLeagueIds, setSelectedLeagueIds] = React.useState<Set<string>>(new Set());
+  const [hasFetched, setHasFetched] = React.useState(false);
+
+  // Analysis State
+  const [analyses, setAnalyses] = React.useState<LeagueAnalysis[]>([]);
 
   const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
-  const handleStart = async () => {
-    if (!username) return;
-    setLoadingUser(true);
-    setAnalyzing(false);
-    setAnalyses([]);
-    setProgress(0);
+  // Load username from local storage on mount
+  React.useEffect(() => {
+    const saved = localStorage.getItem('sleeper_usernames');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSavedUsernames(parsed);
+        if (parsed.length > 0) setUsername(parsed[0]);
+      } catch (e) { console.error(e); }
+    }
+  }, []);
 
+  const saveUsername = (name: string) => {
+    if (!name) return;
+    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5); // Keep top 5
+    setSavedUsernames(newSaved);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+  };
+
+  const handleFetchLeagues = async () => {
+    if (!username) return;
+    setLoadingLeagues(true);
+    setHasFetched(false);
+    setLeagues([]);
+    setAnalyses([]);
+    
     try {
       const userRes = await SleeperService.getUser(username);
       if (!userRes) throw new Error('User not found');
       setUser(userRes);
+      saveUsername(username);
 
-      const leagues = await SleeperService.getLeagues(userRes.user_id, year);
-      
-      // Initialize states
-      const initialAnalyses: LeagueAnalysis[] = leagues.map(l => ({
-        leagueId: l.league_id,
-        name: l.name,
-        avatar: l.avatar || '',
-        status: 'pending'
-      }));
-      setAnalyses(initialAnalyses);
-      
-      // Start the analysis queue
-      setAnalyzing(true);
-      processQueue(leagues, userRes.user_id);
+      const leaguesRes = await SleeperService.getLeagues(userRes.user_id, year);
+      setLeagues(leaguesRes);
+
+      // Auto-select leagues that are NOT ignored
+      const initialSelection = new Set<string>();
+      leaguesRes.forEach(l => {
+        if (!SleeperService.shouldIgnoreLeague(l)) {
+          initialSelection.add(l.league_id);
+        }
+      });
+      setSelectedLeagueIds(initialSelection);
+      setHasFetched(true);
 
     } catch (e) {
       console.error(e);
     } finally {
-      setLoadingUser(false);
+      setLoadingLeagues(false);
     }
+  };
+
+  const handleAnalyzeSelected = async () => {
+    if (!user) return;
+    
+    // Filter leagues to only selected ones
+    const leaguesToAnalyze = leagues.filter(l => selectedLeagueIds.has(l.league_id));
+    
+    // Initialize Analysis State
+    const initialAnalyses: LeagueAnalysis[] = leaguesToAnalyze.map(l => ({
+      leagueId: l.league_id,
+      name: l.name,
+      avatar: l.avatar || '',
+      status: 'pending'
+    }));
+    setAnalyses(initialAnalyses);
+    
+    setAnalyzing(true);
+    processQueue(leaguesToAnalyze, user.user_id);
   };
 
   const processQueue = async (leagues: SleeperLeague[], userId: string) => {
@@ -176,7 +224,7 @@ export default function ExpectedWinsPage() {
       completed++;
       setProgress((completed / total) * 100);
       
-      // Rate limit delay (very important for this deep scan)
+      // Rate limit delay
       await new Promise(r => setTimeout(r, 500)); 
     }
     setAnalyzing(false);
@@ -214,10 +262,8 @@ export default function ExpectedWinsPage() {
     const weeksToAnalyze = playoffStart - 1;
     const useMedian = league.settings.league_average_match === 1;
 
-    // We can batch fetch these in parallel chunks of 4 weeks to speed up without killing API
     const weeks = Array.from({length: weeksToAnalyze}, (_, i) => i + 1);
     
-    // Process in chunks of 4
     for (let i = 0; i < weeks.length; i += 4) {
         const chunk = weeks.slice(i, i + 4);
         await Promise.all(chunk.map(async (week) => {
@@ -228,16 +274,13 @@ export default function ExpectedWinsPage() {
             const totalTeams = validMatchups.length;
             if (totalTeams < 2) return;
 
-            // Sort for Median Calculation
-            // Sleeper Median: Top half gets a win. (e.g. 12 teams -> Top 6)
+            // Sort for Median
             const sortedByScore = [...validMatchups].sort((a, b) => b.points - a.points);
             const medianCutoffIndex = Math.floor(totalTeams / 2);
-            // Example: 10 teams. Half is 5. Index 0-4 are top 5. Index 4 is the cutoff score.
-            // If strictly greater than index 5? Sleeper usually just takes top N.
             const medianThreshold = sortedByScore[medianCutoffIndex - 1]?.points || 0;
 
             validMatchups.forEach(m1 => {
-                // 1. H2H Expected Wins (All-Play)
+                // H2H
                 let wins = 0;
                 validMatchups.forEach(m2 => {
                     if (m1.roster_id === m2.roster_id) return;
@@ -246,16 +289,10 @@ export default function ExpectedWinsPage() {
                 });
                 const h2hEw = wins / (totalTeams - 1);
                 
-                // 2. Median Expected Win
+                // Median
                 let medianEw = 0;
-                if (useMedian) {
-                    // Logic: If you are in the top half, you 'Expect' a win.
-                    // We check if this team is in the top half.
-                    // Note: Handling ties at the median boundary is complex in Sleeper, 
-                    // generally all tied for last spot get the win.
-                    if (m1.points >= medianThreshold && m1.points > 0) {
-                        medianEw = 1;
-                    }
+                if (useMedian && m1.points >= medianThreshold && m1.points > 0) {
+                    medianEw = 1;
                 }
 
                 const t = rosterMap.get(m1.roster_id);
@@ -277,6 +314,13 @@ export default function ExpectedWinsPage() {
     };
   };
 
+  const handleToggleLeague = (id: string) => {
+    const newSet = new Set(selectedLeagueIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedLeagueIds(newSet);
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" gutterBottom fontWeight="bold">
@@ -289,13 +333,17 @@ export default function ExpectedWinsPage() {
       {/* Input */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
-            label="Sleeper Username"
-            variant="outlined"
+          <Autocomplete
+            freeSolo
+            options={savedUsernames}
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onInputChange={(e, newVal) => setUsername(newVal)}
+            renderInput={(params) => (
+              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
+            )}
             disabled={analyzing}
           />
+          
           <FormControl sx={{ minWidth: 100 }}>
             <InputLabel>Year</InputLabel>
             <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={analyzing}>
@@ -305,19 +353,65 @@ export default function ExpectedWinsPage() {
           <Button 
             variant="contained" 
             size="large" 
-            onClick={handleStart}
-            disabled={loadingUser || analyzing || !username}
+            onClick={handleFetchLeagues}
+            disabled={loadingLeagues || analyzing || !username}
             sx={{ height: 56 }}
           >
-            {analyzing ? 'Analyzing...' : 'Analyze All Leagues'}
+            {loadingLeagues ? 'Fetching...' : 'Find Leagues'}
           </Button>
         </Box>
-        {analyzing && <LinearProgress variant="determinate" value={progress} sx={{ mt: 3 }} />}
       </Paper>
 
+      {/* League Selection Step */}
+      {hasFetched && !analyzing && analyses.length === 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Found {leagues.length} Leagues ({selectedLeagueIds.size} Selected)
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleAnalyzeSelected}
+              disabled={selectedLeagueIds.size === 0}
+            >
+              Analyze Selected
+            </Button>
+          </Box>
+          
+          <Grid container spacing={2}>
+            {leagues.map(l => {
+              const ignored = SleeperService.shouldIgnoreLeague(l);
+              return (
+                <Grid item xs={12} md={6} lg={4} key={l.league_id}>
+                  <Paper variant="outlined" sx={{ 
+                    p: 2, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    opacity: selectedLeagueIds.has(l.league_id) ? 1 : 0.6,
+                    bgcolor: selectedLeagueIds.has(l.league_id) ? 'background.paper' : 'action.hover'
+                  }}>
+                    <Checkbox 
+                      checked={selectedLeagueIds.has(l.league_id)}
+                      onChange={() => handleToggleLeague(l.league_id)}
+                    />
+                    <Avatar src={`https://sleepercdn.com/avatars/${l.avatar}`} sx={{ width: 32, height: 32, mr: 1 }} />
+                    <Box sx={{ overflow: 'hidden' }}>
+                      <Typography noWrap fontWeight="medium" title={l.name}>{l.name}</Typography>
+                      {ignored && <Typography variant="caption" color="warning.main">Auto-Ignored</Typography>}
+                    </Box>
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      )}
+
       {/* Results */}
-      {analyses.length > 0 && (
+      {(analyzing || analyses.length > 0) && (
         <>
+          {analyzing && <LinearProgress variant="determinate" value={progress} sx={{ mb: 3 }} />}
           <SummaryCard analyses={analyses} />
 
           <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
@@ -340,7 +434,7 @@ export default function ExpectedWinsPage() {
                     <Box sx={{ textAlign: 'right', display: 'flex', gap: 2, alignItems: 'center' }}>
                       <Box>
                         <Typography variant="caption" display="block" color="text.secondary">Record</Typography>
-                        <Typography fontWeight="bold">{league.userStats.actualWins} Wins</Typography>
+                        <Typography fontWeight="bold">{league.userStats.actualWins.toFixed(1)} Wins</Typography>
                       </Box>
                       <Box>
                         <Typography variant="caption" display="block" color="text.secondary">Expected</Typography>
