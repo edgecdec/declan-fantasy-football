@@ -31,17 +31,10 @@ interface SmartTableProps<T> {
   defaultSortOrder?: 'asc' | 'desc';
   defaultRowsPerPage?: number;
   enableGlobalSearch?: boolean;
+  renderDetailPanel?: (row: T) => React.ReactNode;
 }
 
-// --- Helper Functions ---
-
-function getNestedValue(obj: any, path: string): any {
-  return path.split('.').reduce((acc, part) => {
-    return acc && acc[part] !== undefined ? acc[part] : null;
-  }, obj);
-}
-
-// --- Component ---
+// ... existing code ...
 
 export default function SmartTable<T>({
   data,
@@ -50,131 +43,10 @@ export default function SmartTable<T>({
   defaultSortBy,
   defaultSortOrder,
   defaultRowsPerPage,
-  enableGlobalSearch = true
+  enableGlobalSearch = true,
+  renderDetailPanel
 }: SmartTableProps<T>) {
-  // State
-  const [globalFilter, setGlobalFilter] = React.useState('');
-  const [columnFilters, setColumnFilters] = React.useState<Record<string, string[]>>({});
-
-  // 1. Extract Filter Options (Memoized)
-  const filterOptionsMap = React.useMemo(() => {
-    const options: Record<string, string[]> = {};
-    columns.forEach(col => {
-      if (col.filterVariant === 'select' || col.filterVariant === 'multi-select') {
-        if (col.filterOptions) {
-          options[col.id] = col.filterOptions;
-        } else {
-          // Auto-derive unique values
-          const unique = new Set<string>();
-          data.forEach(row => {
-            const val = getNestedValue(row, col.id);
-            if (val) unique.add(String(val));
-          });
-          options[col.id] = Array.from(unique).sort();
-        }
-      }
-    });
-    return options;
-  }, [data, columns]);
-
-  // 2. Handle Filter Changes
-  const handleColumnFilterChange = (columnId: string, value: string[]) => {
-    setColumnFilters(prev => ({
-      ...prev,
-      [columnId]: value
-    }));
-  };
-
-  // 3. Apply Filters
-  const filteredData = React.useMemo(() => {
-    return data.filter(row => {
-      // A. Global Search
-      if (globalFilter) {
-        const searchText = globalFilter.toLowerCase();
-        const matchesGlobal = columns.some(col => {
-          const val = getNestedValue(row, col.id);
-          return val ? String(val).toLowerCase().includes(searchText) : false;
-        });
-        if (!matchesGlobal) return false;
-      }
-
-      // B. Column Filters
-      for (const col of columns) {
-        if (!col.filterVariant) continue;
-        
-        const filterValue = columnFilters[col.id];
-        if (!filterValue || filterValue.length === 0) continue;
-
-        const rowValue = String(getNestedValue(row, col.id));
-
-        if (col.filterVariant === 'multi-select' || col.filterVariant === 'select') {
-          if (!filterValue.includes(rowValue)) return false;
-        }
-      }
-
-      return true;
-    });
-  }, [data, globalFilter, columnFilters, columns]);
-
-  // --- Render ---
-
-  return (
-    <Box>
-      {/* Filter Bar */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          
-          {/* Global Search */}
-          {enableGlobalSearch && (
-            <TextField
-              label="Search..."
-              variant="outlined"
-              size="small"
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              sx={{ minWidth: 200 }}
-            />
-          )}
-
-          {/* Column Filters */}
-          {columns.map(col => {
-            if (!col.filterVariant) return null;
-            
-            const options = filterOptionsMap[col.id] || [];
-            const selected = columnFilters[col.id] || [];
-
-            if (col.filterVariant === 'multi-select') {
-              return (
-                <MultiSelectFilter
-                  key={col.id}
-                  label={col.label}
-                  options={options}
-                  value={selected}
-                  onChange={(val) => handleColumnFilterChange(col.id, val)}
-                  minWidth={150}
-                />
-              );
-            }
-
-            // Fallback for single select (rarely used now, but kept for compatibility)
-            return (
-              <FormControl key={col.id} size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>{col.label}</InputLabel>
-                <Select
-                  value={selected[0] || ''}
-                  onChange={(e) => handleColumnFilterChange(col.id, e.target.value ? [e.target.value] : [])}
-                  input={<OutlinedInput label={col.label} />}
-                >
-                  <MenuItem value=""><em>None</em></MenuItem>
-                  {options.map((opt) => (
-                    <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            );
-          })}
-        </Box>
-      </Paper>
+  // ... existing code ...
 
       {/* Table */}
       <DataTable
@@ -184,6 +56,7 @@ export default function SmartTable<T>({
         defaultSortBy={defaultSortBy}
         defaultSortOrder={defaultSortOrder}
         defaultRowsPerPage={defaultRowsPerPage}
+        renderDetailPanel={renderDetailPanel}
       />
     </Box>
   );

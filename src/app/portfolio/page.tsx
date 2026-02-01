@@ -16,13 +16,24 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  Autocomplete
+  Autocomplete,
+  Link as MuiLink,
+  List,
+  ListItem,
+  ListItemText,
+  Grid
 } from '@mui/material';
 import { SleeperService, SleeperUser, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
-import DataTable, { Column } from '@/components/common/SmartTable';
+import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 
 // Types
+type LeagueInfo = {
+  id: string;
+  name: string;
+  isStarter: boolean;
+};
+
 type PortfolioItem = {
   playerId: string;
   playerData: any; 
@@ -30,10 +41,7 @@ type PortfolioItem = {
   startersCount: number;
   benchCount: number;
   exposure: number;
-  leagues: {
-    id: string;
-    name: string;
-  }[];
+  leagues: LeagueInfo[];
 };
 
 const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
@@ -44,7 +52,7 @@ export default function PortfolioPage() {
   const [username, setUsername] = React.useState('');
   const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
-  const [week, setWeek] = React.useState<string>('live'); // 'live' or '1'...'18'
+  const [week, setWeek] = React.useState<string>('live'); 
   
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -88,11 +96,7 @@ export default function PortfolioPage() {
     setProgress(0);
     setPortfolio([]);
     
-    // Don't clear user here if it's just a week switch, but safety check:
-    // setUser(null); 
-
     try {
-      // 1. Get User (or reuse)
       let currentUser = user;
       if (!currentUser || currentUser.username.toLowerCase() !== username.toLowerCase()) {
         currentUser = await SleeperService.getUser(username);
@@ -101,7 +105,6 @@ export default function PortfolioPage() {
         saveUsername(username);
       }
 
-      // 2. Get Leagues
       const leagues = await SleeperService.getLeagues(currentUser.user_id, year);
       setTotalLeagues(leagues.length);
 
@@ -110,74 +113,66 @@ export default function PortfolioPage() {
         return;
       }
 
-      // 3. Fetch Rosters (Always needed for Owner ID -> Roster ID mapping)
-      // Note: If we are doing 'live' view, we treat this as 50% of work. 
-      // If doing historical, this is 50%, matchups are 50%.
       const rosterMap = await SleeperService.fetchAllRosters(
         leagues, 
         currentUser.user_id,
         (completed, total) => {
-          // If we also need matchups, this is only the first half of progress
           const scale = week === 'live' ? 100 : 50;
           setProgress((completed / total) * scale);
         }
       );
 
-      // 4. Fetch Matchups (If historical)
       let matchupMap = new Map<string, SleeperMatchup[]>();
       if (week !== 'live') {
         matchupMap = await SleeperService.fetchAllMatchups(
           leagues,
           parseInt(week, 10),
           (completed, total) => {
-            // Second half of progress (50% to 100%)
             setProgress(50 + (completed / total) * 50);
           }
         );
       }
 
-      // 5. Aggregation
-      const playerCounts = new Map<string, { count: number, startCount: number, benchCount: number, leagueIds: string[] }>();
+      // Aggregation
+      const playerCounts = new Map<string, { count: number, startCount: number, benchCount: number, leagues: LeagueInfo[] }>();
       
       leagues.forEach(league => {
         const userRoster = rosterMap.get(league.league_id);
-        if (!userRoster) return; // User not in this league (or error)
+        if (!userRoster) return;
 
         let players: string[] = [];
         let starters: string[] = [];
 
         if (week === 'live') {
-          // Use current roster state
           players = userRoster.players || [];
           starters = userRoster.starters || [];
         } else {
-          // Use historical matchup data
           const leagueMatchups = matchupMap.get(league.league_id);
           const myMatchup = leagueMatchups?.find(m => m.roster_id === userRoster.roster_id);
-          
           if (myMatchup) {
             players = myMatchup.players || [];
             starters = myMatchup.starters || [];
           }
         }
 
-        // Count 'em
         players.forEach(pid => {
-          const current = playerCounts.get(pid) || { count: 0, startCount: 0, benchCount: 0, leagueIds: [] };
+          const current = playerCounts.get(pid) || { count: 0, startCount: 0, benchCount: 0, leagues: [] };
           current.count++;
           
-          if (starters.includes(pid)) {
-            current.startCount++;
-          } else {
-            current.benchCount++;
-          }
+          const isStarter = starters.includes(pid);
+          if (isStarter) current.startCount++;
+          else current.benchCount++;
 
-          current.leagueIds.push(league.league_id);
+          current.leagues.push({
+            id: league.league_id,
+            name: league.name,
+            isStarter
+          });
+          
           playerCounts.set(pid, current);
         });
       });
 
-      // 6. Build Items
       const items: PortfolioItem[] = [];
       const playersJson = (playerData as any).players;
 
@@ -191,10 +186,7 @@ export default function PortfolioPage() {
              startersCount: data.startCount,
              benchCount: data.benchCount,
              exposure: (data.count / leagues.length) * 100,
-             leagues: data.leagueIds.map(lid => {
-               const l = leagues.find(x => x.league_id === lid);
-               return { id: lid, name: l ? l.name : 'Unknown League' };
-             })
+             leagues: data.leagues
            });
         }
       });
@@ -209,7 +201,7 @@ export default function PortfolioPage() {
   };
 
   // Define Columns
-  const columns: Column<PortfolioItem>[] = [
+  const columns: SmartColumn<PortfolioItem>[] = [
     { 
       id: 'playerData.last_name', 
       label: 'Player', 
@@ -357,7 +349,7 @@ export default function PortfolioPage() {
             </Box>
           </Box>
 
-          <DataTable
+          <SmartTable
             data={portfolio}
             columns={columns}
             keyField="playerId"
@@ -365,6 +357,50 @@ export default function PortfolioPage() {
             defaultSortOrder="desc"
             defaultRowsPerPage={25}
             noDataMessage="No players found in your rosters."
+            renderDetailPanel={(item) => (
+              <Grid container spacing={4}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="success.main" gutterBottom>
+                    Starting In ({item.startersCount})
+                  </Typography>
+                  <List dense>
+                    {item.leagues.filter(l => l.isStarter).map(l => (
+                      <ListItem key={l.id} disablePadding>
+                        <MuiLink 
+                          href={`https://sleeper.com/leagues/${l.id}`} 
+                          target="_blank" 
+                          rel="noopener"
+                          color="inherit"
+                          underline="hover"
+                        >
+                          <ListItemText primary={l.name} />
+                        </MuiLink>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Bench In ({item.benchCount})
+                  </Typography>
+                  <List dense>
+                    {item.leagues.filter(l => !l.isStarter).map(l => (
+                      <ListItem key={l.id} disablePadding>
+                        <MuiLink 
+                          href={`https://sleeper.com/leagues/${l.id}`} 
+                          target="_blank" 
+                          rel="noopener"
+                          color="inherit"
+                          underline="hover"
+                        >
+                          <ListItemText primary={l.name} />
+                        </MuiLink>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+              </Grid>
+            )}
           />
         </>
       )}
