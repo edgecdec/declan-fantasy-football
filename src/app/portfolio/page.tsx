@@ -51,6 +51,13 @@ export default function PortfolioPage() {
   const [portfolio, setPortfolio] = React.useState<PortfolioItem[]>([]);
   const [totalLeagues, setTotalLeagues] = React.useState(0);
 
+  // Auto-analyze when year changes
+  React.useEffect(() => {
+    if (username && !loading) {
+      handleAnalyze();
+    }
+  }, [year]);
+
   // Constants
   const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
 
