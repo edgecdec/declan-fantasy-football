@@ -39,7 +39,7 @@ function descendingComparator<T>(a: T, b: T, orderBy: keyof T | string) {
   let bValue: any;
 
   // Handle nested stats sorting
-  if (orderBy.startsWith('stats.')) {
+  if (typeof orderBy === 'string' && orderBy.startsWith('stats.')) {
     const statKey = orderBy.split('.')[1] as keyof PlayerStats;
     aValue = (a as any).stats?.[statKey] ?? -9999;
     bValue = (b as any).stats?.[statKey] ?? -9999;
@@ -58,10 +58,10 @@ function descendingComparator<T>(a: T, b: T, orderBy: keyof T | string) {
 function getComparator<Key extends keyof any>(
   order: Order,
   orderBy: Key,
-): (a: { [key in Key]: number | string }, b: { [key in Key]: number | string }) => number {
+): (a: any, b: any) => number {
   return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
+    ? (a, b) => descendingComparator(a, b, orderBy as string)
+    : (a, b) => -descendingComparator(a, b, orderBy as string);
 }
 
 export default function PlayersPage() {

@@ -34,6 +34,7 @@ export type SleeperRoster = {
     losses: number;
     ties: number;
     fpts: number;
+    fpts_decimal?: number;
   };
 };
 
