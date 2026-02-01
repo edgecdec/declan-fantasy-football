@@ -27,6 +27,7 @@ import {
   Alert
 } from '@mui/material';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperMatchup } from '@/services/sleeper/sleeperService';
+import PageHeader from '@/components/common/PageHeader';
 
 // --- Types ---
 type MemberHistory = {
@@ -299,15 +300,13 @@ export default function LeagueHistoryPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Legacy League Analyzer
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Visualize the entire history of your league. Rivalries, All-Time Records, and more.
-      </Typography>
+      <PageHeader 
+        title="Legacy League Analyzer" 
+        subtitle="Visualize the entire history of your league. Rivalries, All-Time Records, and more." 
+      />
 
       {/* Input */}
-      <Paper sx={{ p: 3, mb: 4 }}>
+      {step === 'user' && (
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <Autocomplete
             freeSolo

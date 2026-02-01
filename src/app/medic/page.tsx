@@ -14,7 +14,6 @@ import {
   ListItemIcon,
   Chip,
   Card,
-  CardContent,
   Avatar,
   Link as MuiLink,
   Accordion,
@@ -28,12 +27,13 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useUser } from '@/context/UserContext';
-import { SleeperService, SleeperLeague, SleeperRoster } from '@/services/sleeper/sleeperService';
+import { SleeperService, SleeperLeague } from '@/services/sleeper/sleeperService';
 import playerData from '../../../data/sleeper_players.json';
+import PageHeader from '@/components/common/PageHeader';
+import UserSearchInput from '@/components/common/UserSearchInput';
 
 // --- Types ---
 type IssueType = 'critical' | 'warning' | 'info';
@@ -55,21 +55,21 @@ type LeagueHealth = {
 
 export default function RosterMedicPage() {
   const [username, setUsername] = React.useState('');
-  const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [results, setResults] = React.useState<LeagueHealth[]>([]);
   const [scanned, setScanned] = React.useState(false);
   
-  const { fetchUser } = useUser(); // Used to ensure user context is set if needed
+  const { fetchUser } = useUser(); 
 
+  // Initialize username logic matches others (via UserSearchInput internal + parent state)
+  // We rely on UserSearchInput for the dropdown, but we need to load initial state here if we want auto-fill
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSavedUsernames(parsed);
         if (parsed.length > 0) setUsername(parsed[0]);
       } catch (e) { console.error(e); }
     }
@@ -77,9 +77,10 @@ export default function RosterMedicPage() {
 
   const saveUsername = (name: string) => {
     if (!name) return;
-    const newSaved = [name, ...savedUsernames.filter(u => u !== name)].slice(0, 5);
-    setSavedUsernames(newSaved);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+    const saved = localStorage.getItem('sleeper_usernames');
+    let list = saved ? JSON.parse(saved) : [];
+    list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
+    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
   };
 
   const startScan = async () => {
@@ -90,26 +91,22 @@ export default function RosterMedicPage() {
     setScanned(false);
 
     try {
-      // Fetch User ID (and update context)
       const user = await SleeperService.getUser(username);
       if (!user) throw new Error("User not found");
       saveUsername(username);
 
-      // 1. Get Leagues (2025)
       const leagues = await SleeperService.getLeagues(user.user_id, '2025');
       if (leagues.length === 0) {
         setLoading(false);
         return;
       }
 
-      // 2. Fetch Rosters
       const rosterMap = await SleeperService.fetchAllRosters(
         leagues,
         user.user_id,
         (c, t) => setProgress((c / t) * 100)
       );
 
-      // 3. Analyze
       const healthReports: LeagueHealth[] = [];
       const allPlayers = (playerData as any).players;
 
@@ -119,12 +116,11 @@ export default function RosterMedicPage() {
 
         const issues: MedicIssue[] = [];
         
-        // A. Check Empty Spots
+        // A. Empty Spots
         const maxRoster = league.settings.max_roster_size || 0;
         const totalPlayers = roster.players?.length || 0;
         const taxiCount = roster.taxi?.length || 0;
-        const reserveCount = roster.reserve?.length || 0; // IR
-        
+        const reserveCount = roster.reserve?.length || 0; 
         const activeCount = totalPlayers - taxiCount - reserveCount;
         
         if (maxRoster > 0 && activeCount < maxRoster) {
@@ -139,7 +135,7 @@ export default function RosterMedicPage() {
           });
         }
 
-        // B. Check IR Optimization
+        // B. IR Optimization
         const maxIr = league.settings.reserve_slots || 0;
         if (maxIr > 0 && reserveCount < maxIr) {
           const eligibleStatus = ['IR', 'PUP'];
@@ -168,7 +164,7 @@ export default function RosterMedicPage() {
           });
         }
 
-        // C. Check Starters
+        // C. Starters
         if (roster.starters) {
           roster.starters.forEach((pid, index) => {
             if (pid === '0') {
@@ -225,28 +221,19 @@ export default function RosterMedicPage() {
   const criticalCount = results.reduce((sum, r) => sum + r.issues.filter(i => i.type === 'critical').length, 0);
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          <MedicalServicesIcon fontSize="large" color="error" /> Roster Medic
-        </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph>
-          Scan all your leagues for inactive starters, empty roster spots, and missed IR opportunities.
-        </Typography>
-      </Box>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <PageHeader 
+        title="Roster Medic" 
+        subtitle="Scan all your leagues for inactive starters, empty roster spots, and missed IR opportunities." 
+      />
 
       {/* Input Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Autocomplete
-            freeSolo
-            options={savedUsernames}
-            value={username}
-            onInputChange={(e, newVal) => setUsername(newVal)}
-            renderInput={(params) => (
-              <TextField {...params} label="Sleeper Username" variant="outlined" sx={{ minWidth: 200 }} />
-            )}
-            disabled={loading}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <UserSearchInput 
+            username={username} 
+            setUsername={setUsername} 
+            disabled={loading} 
           />
           
           <Button 
@@ -260,30 +247,22 @@ export default function RosterMedicPage() {
             {loading ? 'Scanning...' : 'Scan My Rosters'}
           </Button>
         </Box>
+        {loading && <LinearProgress variant="determinate" value={progress} color="error" sx={{ mt: 3 }} />}
       </Paper>
 
-      {loading && (
-        <Box sx={{ width: '100%', mb: 4 }}>
-          <LinearProgress variant="determinate" value={progress} color="error" />
-          <Typography variant="caption" align="center" display="block" sx={{ mt: 1 }}>
-            Checking {Math.round(progress)}%
-          </Typography>
-        </Box>
-      )}
-
       {scanned && totalIssues === 0 && (
-        <Alert severity="success" variant="filled" sx={{ mb: 4, justifyContent: 'center' }}>
+        <Alert severity="success" variant="filled" sx={{ mb: 4 }}>
           <Typography variant="h6">All clear! No roster issues found.</Typography>
         </Alert>
       )}
 
       {scanned && totalIssues > 0 && (
         <>
-          <Paper sx={{ p: 2, mb: 4, bgcolor: '#fff3f3', border: '1px solid #ffcdd2' }}>
-            <Typography variant="h6" color="error.main" fontWeight="bold" align="center">
+          <Alert severity="error" variant="outlined" sx={{ mb: 4, justifyContent: 'center' }}>
+            <Typography variant="h6" fontWeight="bold">
               {totalIssues} Issues Found ({criticalCount} Critical)
             </Typography>
-          </Paper>
+          </Alert>
 
           {results.map((report) => (
             <Card key={report.league.league_id} sx={{ mb: 2, borderLeft: '6px solid', borderColor: report.issues.some(i => i.type === 'critical') ? 'error.main' : 'warning.main' }}>

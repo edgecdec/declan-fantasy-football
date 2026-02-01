@@ -24,6 +24,7 @@ import {
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import playerData from '../../../../data/sleeper_players.json';
+import PageHeader from '@/components/common/PageHeader';
 
 // --- Types ---
 type WeeklyData = {
@@ -154,16 +155,19 @@ export default function TrendsPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold">Exposure Trends</Typography>
-        <Button 
-          variant="contained" 
-          onClick={startAnalysis} 
-          disabled={loading || !user}
-        >
-          {loading ? 'Scanning History...' : 'Generate Graph'}
-        </Button>
-      </Box>
+      <PageHeader 
+        title="Exposure Trends" 
+        subtitle="Visualize how your player ownership has changed throughout the season."
+        action={
+          <Button 
+            variant="contained" 
+            onClick={startAnalysis} 
+            disabled={loading || !user}
+          >
+            {loading ? 'Scanning History...' : 'Generate Graph'}
+          </Button>
+        }
+      />
 
       {loading && (
         <Box sx={{ width: '100%', mb: 4 }}>

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Container, Typography, Chip } from '@mui/material';
 import { Player } from '@/types/player';
 import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
+import PageHeader from '@/components/common/PageHeader';
 import playerData from '../../../data/sleeper_players.json';
 
 // --- Data Preparation ---
@@ -94,9 +95,10 @@ export default function PlayersPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Player Database & Stats (2025)
-      </Typography>
+      <PageHeader 
+        title="Player Database" 
+        subtitle="Search and filter all active NFL players and view 2025 stats." 
+      />
       
       <SmartTable
         data={ALL_PLAYERS}
