@@ -59,17 +59,23 @@ type TeamStats = {
   actualWins: number;
   expectedWins: number;
   pointsFor: number;
+  pointsAgainst: number;
 };
 
 // --- Helper Components ---
 
-function SummaryCard({ data }: { data: LeagueData[] }) {
+function SummaryCard({ data, showAdvanced }: { data: LeagueData[], showAdvanced: boolean }) {
   // Only sum up INCLUDED and COMPLETE leagues
   const active = data.filter(d => d.category === 'included' && d.status === 'complete');
   
   const totalActual = active.reduce((sum, d) => sum + (d.stats?.actualWins || 0), 0);
   const totalExpected = active.reduce((sum, d) => sum + (d.stats?.expectedWins || 0), 0);
   const diff = totalActual - totalExpected;
+
+  // Advanced Stats
+  const totalPF = active.reduce((sum, d) => sum + (d.stats?.pointsFor || 0), 0);
+  const totalPA = active.reduce((sum, d) => sum + (d.stats?.pointsAgainst || 0), 0);
+  const pointsDiff = totalPF - totalPA;
 
   const approxGames = active.length * 14; 
   const actualPct = approxGames > 0 ? (totalActual / approxGames) * 100 : 0;
@@ -102,13 +108,36 @@ function SummaryCard({ data }: { data: LeagueData[] }) {
             </Typography>
             <Typography variant="body2">Wins vs Expected</Typography>
           </Grid>
+
+          {showAdvanced && (
+            <>
+              <Grid size={{ xs: 12 }}><Divider sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} /></Grid>
+              
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="h6" color="primary.light">Points For</Typography>
+                <Typography variant="h4" fontWeight="bold">{totalPF.toLocaleString()}</Typography>
+              </Grid>
+              
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="h6" color="primary.light">Points Against</Typography>
+                <Typography variant="h4" fontWeight="bold">{totalPA.toLocaleString()}</Typography>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Typography variant="h6" color="primary.light">Point Diff</Typography>
+                <Typography variant="h4" fontWeight="bold" sx={{ color: pointsDiff > 0 ? '#66bb6a' : '#f44336' }}>
+                  {pointsDiff > 0 ? '+' : ''}{pointsDiff.toLocaleString()}
+                </Typography>
+              </Grid>
+            </>
+          )}
         </Grid>
       </CardContent>
     </Card>
   );
 }
 
-function LeagueRow({ item, userId, onToggle }: { item: LeagueData, userId: string, onToggle: () => void }) {
+function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData, userId: string, onToggle: () => void, showAdvanced: boolean }) {
   const { league, status, stats, standings, category } = item;
   const isIncluded = category === 'included';
 
@@ -149,6 +178,13 @@ function LeagueRow({ item, userId, onToggle }: { item: LeagueData, userId: strin
 
             {status === 'complete' && stats && (
               <Box sx={{ textAlign: 'right', display: 'flex', gap: 2, alignItems: 'center' }}>
+                {showAdvanced && (
+                  <Box sx={{ display: { xs: 'none', sm: 'block' }, mr: 2 }}>
+                    <Typography variant="caption" display="block" color="text.secondary">PF</Typography>
+                    <Typography fontWeight="bold">{stats.pointsFor.toFixed(0)}</Typography>
+                  </Box>
+                )}
+                
                 <Box>
                   <Typography variant="caption" display="block" color="text.secondary">Record</Typography>
                   <Typography fontWeight="bold">{stats.actualWins.toFixed(1)}</Typography>
@@ -178,6 +214,13 @@ function LeagueRow({ item, userId, onToggle }: { item: LeagueData, userId: strin
                     <TableCell align="right">Actual</TableCell>
                     <TableCell align="right">Expected</TableCell>
                     <TableCell align="right">Diff</TableCell>
+                    {showAdvanced && (
+                      <>
+                        <TableCell align="right">PF</TableCell>
+                        <TableCell align="right">PA</TableCell>
+                        <TableCell align="right">+/-</TableCell>
+                      </>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -195,6 +238,15 @@ function LeagueRow({ item, userId, onToggle }: { item: LeagueData, userId: strin
                       }}>
                         {(team.actualWins - team.expectedWins).toFixed(2)}
                       </TableCell>
+                      {showAdvanced && (
+                        <>
+                          <TableCell align="right">{team.pointsFor.toFixed(1)}</TableCell>
+                          <TableCell align="right">{team.pointsAgainst.toFixed(1)}</TableCell>
+                          <TableCell align="right" sx={{ color: team.pointsFor - team.pointsAgainst > 0 ? 'success.main' : 'error.main' }}>
+                            {(team.pointsFor - team.pointsAgainst).toFixed(1)}
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -214,6 +266,7 @@ export default function ExpectedWinsPage() {
   const [username, setUsername] = React.useState('');
   const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
   
   // State
   const [loadingUser, setLoadingUser] = React.useState(false);
@@ -236,7 +289,15 @@ export default function ExpectedWinsPage() {
         if (parsed.length > 0) setUsername(parsed[0]);
       } catch (e) { console.error(e); }
     }
+    const savedAdv = localStorage.getItem('sleeper_show_advanced');
+    if (savedAdv === 'true') setShowAdvanced(true);
   }, []);
+
+  const toggleAdvanced = () => {
+    const newVal = !showAdvanced;
+    setShowAdvanced(newVal);
+    localStorage.setItem('sleeper_show_advanced', String(newVal));
+  };
 
   const saveUsername = (name: string) => {
     if (!name) return;
@@ -349,7 +410,8 @@ export default function ExpectedWinsPage() {
         avatar: owner?.avatar || '',
         actualWins: r.settings.wins,
         expectedWins: 0,
-        pointsFor: r.settings.fpts + (r.settings.fpts_decimal || 0) / 100
+        pointsFor: r.settings.fpts + (r.settings.fpts_decimal || 0) / 100,
+        pointsAgainst: 0
       });
     });
 
@@ -371,6 +433,13 @@ export default function ExpectedWinsPage() {
             const medianThreshold = sortedByScore[medianCutoffIndex - 1]?.points || 0;
 
             validMatchups.forEach(m1 => {
+                // Calculate Points Against
+                const opponent = validMatchups.find(m2 => m2.matchup_id === m1.matchup_id && m2.roster_id !== m1.roster_id);
+                const t = rosterMap.get(m1.roster_id);
+                if (t && opponent) {
+                    t.pointsAgainst += opponent.points;
+                }
+
                 let wins = 0;
                 validMatchups.forEach(m2 => {
                     if (m1.roster_id === m2.roster_id) return;
@@ -382,7 +451,6 @@ export default function ExpectedWinsPage() {
                 let medianEw = 0;
                 if (useMedian && m1.points >= medianThreshold && m1.points > 0) medianEw = 1;
 
-                const t = rosterMap.get(m1.roster_id);
                 if (t) t.expectedWins += (h2hEw + medianEw);
             });
         }));
@@ -426,6 +494,13 @@ export default function ExpectedWinsPage() {
               {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
             </Select>
           </FormControl>
+          
+          <FormControlLabel
+            control={<Checkbox checked={showAdvanced} onChange={toggleAdvanced} />}
+            label="Advanced Stats"
+            sx={{ mr: 2 }}
+          />
+
           <Button 
             variant="contained" 
             size="large" 
@@ -439,7 +514,7 @@ export default function ExpectedWinsPage() {
       </Paper>
 
       {/* Summary */}
-      {leagueData.length > 0 && <SummaryCard data={leagueData} />}
+      {leagueData.length > 0 && <SummaryCard data={leagueData} showAdvanced={showAdvanced} />}
 
       {/* Included Leagues */}
       {leagueData.some(d => d.category === 'included') && (
@@ -450,7 +525,8 @@ export default function ExpectedWinsPage() {
               key={item.league.league_id} 
               item={item} 
               userId={user!.user_id} 
-              onToggle={() => toggleCategory(item.league.league_id)} 
+              onToggle={() => toggleCategory(item.league.league_id)}
+              showAdvanced={showAdvanced} 
             />
           ))}
         </Box>
@@ -470,6 +546,7 @@ export default function ExpectedWinsPage() {
               item={item} 
               userId={user!.user_id} 
               onToggle={() => toggleCategory(item.league.league_id)} 
+              showAdvanced={showAdvanced} 
             />
           ))}
         </Box>
