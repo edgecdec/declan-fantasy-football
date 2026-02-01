@@ -140,7 +140,7 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
       <CardContent>
         <Grid container spacing={4} textAlign="center">
           <Grid size={{ xs: 6, md: 3 }}>
-            <Typography variant="h6" color="secondary.light">Avg Percentile</Typography>
+            <Typography variant="h6" color="secondary.light">Avg Finish %</Typography>
             <Typography variant="h3" fontWeight="bold">{avgPercentile.toFixed(0)}%</Typography>
             <Typography variant="caption">Avg Finish: {avgFinish.toFixed(1)}</Typography>
           </Grid>
@@ -220,7 +220,7 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
                   {result.rank === 1 && <EmojiEventsIcon sx={{ color: 'gold' }} />}
                 </Box>
                 <Chip 
-                  label={`${result.percentile.toFixed(0)}%ile`} 
+                  label={`${result.percentile.toFixed(0)}%`} 
                   size="small" 
                   color={result.percentile > 75 ? 'success' : result.percentile > 50 ? 'info' : 'default'}
                   variant={isIncluded ? "filled" : "outlined"}
@@ -472,28 +472,34 @@ export default function PerformancePage() {
       {leagueData.some(d => d.category === 'included') && (
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom color="primary">Included Leagues</Typography>
-          {leagueData.filter(d => d.category === 'included').map(item => (
-            <LeagueRow 
-              key={item.league.league_id} 
-              item={item} 
-              onToggle={() => toggleCategory(item.league.league_id)} 
-              userId={user!.user_id} 
-            />
-          ))}
+          {leagueData
+            .filter(d => d.category === 'included')
+            .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
+            .map(item => (
+              <LeagueRow 
+                key={item.league.league_id} 
+                item={item} 
+                onToggle={() => toggleCategory(item.league.league_id)} 
+                userId={user!.user_id} 
+              />
+            ))}
         </Box>
       )}
 
       {leagueData.some(d => d.category === 'excluded') && (
         <Box sx={{ mb: 4, opacity: 0.8 }}>
           <Divider sx={{ mb: 2 }} >Excluded Leagues</Divider>
-          {leagueData.filter(d => d.category === 'excluded').map(item => (
-            <LeagueRow 
-              key={item.league.league_id} 
-              item={item} 
-              onToggle={() => toggleCategory(item.league.league_id)} 
-              userId={user!.user_id} 
-            />
-          ))}
+          {leagueData
+            .filter(d => d.category === 'excluded')
+            .sort((a, b) => (a.result?.rank || 99) - (b.result?.rank || 99))
+            .map(item => (
+              <LeagueRow 
+                key={item.league.league_id} 
+                item={item} 
+                onToggle={() => toggleCategory(item.league.league_id)} 
+                userId={user!.user_id} 
+              />
+            ))}
         </Box>
       )}
     </Container>
