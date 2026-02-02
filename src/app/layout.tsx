@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 import AppLayout from '@/components/layout/AppLayout';
 import { UserProvider } from '@/context/UserContext';
+import GoogleAnalytics from '@/components/common/GoogleAnalytics';
 
 export const metadata: Metadata = {
   title: 'Fantasy Football Analytics',
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <GoogleAnalytics GA_MEASUREMENT_ID="G-KC140X1TPV" />
         <ThemeRegistry>
           <UserProvider>
             <AppLayout>

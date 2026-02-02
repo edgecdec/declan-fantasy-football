@@ -38,6 +38,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (!history.includes(newUser.username)) {
         localStorage.setItem('sleeper_usernames', JSON.stringify([newUser.username, ...history].slice(0, 5)));
       }
+      
+      // Track in GA
+      if (typeof window !== 'undefined' && (window as any).gtag) {
+        (window as any).gtag('event', 'login', {
+          method: 'Sleeper',
+          username: newUser.username
+        });
+      }
     } else {
       localStorage.removeItem('sleeper_active_user');
     }

@@ -20,7 +20,9 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
-  Chip
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HistoryIcon from '@mui/icons-material/History';
@@ -44,6 +46,69 @@ import UserSearchInput from '@/components/common/UserSearchInput';
 
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
+type AggregatePositionStats = {
+  position: string;
+  // Total Output Stats
+  avgUserPoints: number;
+  avgLeaguePoints: number;
+  diffPoints: number;
+  diffPct: number;
+  // Efficiency Stats
+  avgUserEff: number;
+  avgLeagueEff: number;
+  diffEff: number;
+  diffEffPct: number;
+};
+
+// Custom Tooltip Component
+const CustomTooltip = ({ active, payload, label, metric }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload as AggregatePositionStats;
+    const isTotal = metric === 'total';
+    
+    // Select values based on metric
+    const userVal = isTotal ? data.avgUserPoints : data.avgUserEff;
+    const leagueVal = isTotal ? data.avgLeaguePoints : data.avgLeagueEff;
+    const diffVal = isTotal ? data.diffPoints : data.diffEff;
+    const diffPct = isTotal ? data.diffPct : data.diffEffPct;
+    const unit = isTotal ? 'pts/wk' : 'pts/start';
+
+    return (
+      <Paper sx={{ p: 2, bgcolor: 'rgba(20, 20, 20, 0.95)', border: '1px solid #333', minWidth: 200 }}>
+        <Typography variant="h6" sx={{ mb: 1, color: '#fff', fontWeight: 'bold' }}>
+          {data.position} ({isTotal ? 'Output' : 'Efficiency'})
+        </Typography>
+        
+        <Box sx={{ mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: '#aaa' }}>Your Avg:</Typography>
+            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 'bold' }}>{userVal.toFixed(1)} {unit}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: '#aaa' }}>League Avg:</Typography>
+            <Typography variant="body2" sx={{ color: '#fff' }}>{leagueVal.toFixed(1)} {unit}</Typography>
+          </Box>
+        </Box>
+        
+        <Divider sx={{ my: 1, bgcolor: 'rgba(255,255,255,0.1)' }} />
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ color: '#aaa' }}>Difference:</Typography>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="body2" sx={{ color: diffVal > 0 ? '#66bb6a' : '#ef5350', fontWeight: 'bold' }}>
+              {diffVal > 0 ? '+' : ''}{diffVal.toFixed(1)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: diffVal > 0 ? '#66bb6a' : '#ef5350' }}>
+              ({diffPct > 0 ? '+' : ''}{diffPct.toFixed(1)}%)
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
+    );
+  }
+  return null;
+};
+
 export default function PositionalBenchmarksPage() {
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
@@ -54,7 +119,8 @@ export default function PositionalBenchmarksPage() {
   const [status, setStatus] = React.useState('');
   
   const [results, setResults] = React.useState<LeagueBenchmarkResult[]>([]);
-  const [aggregateDiffs, setAggregateDiffs] = React.useState<any[]>([]);
+  const [aggregateData, setAggregateData] = React.useState<AggregatePositionStats[]>([]);
+  const [metric, setMetric] = React.useState<'total' | 'efficiency'>('total');
 
   // Init
   React.useEffect(() => {
@@ -126,11 +192,11 @@ export default function PositionalBenchmarksPage() {
   };
 
   const calculateAggregates = (data: LeagueBenchmarkResult[]) => {
-    // Calculate Weighted Avg % Diff across all leagues
-    // We simply average the % Diff for each position
-    
-    const sums: Record<string, number> = {};
-    const counts: Record<string, number> = {};
+    const sums = {
+        total: { user: {} as Record<string, number>, league: {} as Record<string, number> },
+        efficiency: { user: {} as Record<string, number>, league: {} as Record<string, number> }
+    };
+    const counts = {} as Record<string, number>;
 
     data.forEach(res => {
       VALID_POSITIONS.forEach(pos => {
@@ -138,19 +204,44 @@ export default function PositionalBenchmarksPage() {
         const l = res.leagueAverageStats[pos];
         
         if (l.avgPointsPerWeek > 0) {
-          const diffPct = ((u.avgPointsPerWeek - l.avgPointsPerWeek) / l.avgPointsPerWeek) * 100;
-          sums[pos] = (sums[pos] || 0) + diffPct;
+          sums.total.user[pos] = (sums.total.user[pos] || 0) + u.avgPointsPerWeek;
+          sums.total.league[pos] = (sums.total.league[pos] || 0) + l.avgPointsPerWeek;
+          
+          sums.efficiency.user[pos] = (sums.efficiency.user[pos] || 0) + u.avgPointsPerStarter;
+          sums.efficiency.league[pos] = (sums.efficiency.league[pos] || 0) + l.avgPointsPerStarter;
+          
           counts[pos] = (counts[pos] || 0) + 1;
         }
       });
     });
 
-    const aggData = VALID_POSITIONS.map(pos => ({
-      position: pos,
-      diff: counts[pos] ? sums[pos] / counts[pos] : 0
-    }));
+    const aggData: AggregatePositionStats[] = VALID_POSITIONS.map(pos => {
+        const c = counts[pos] || 1;
+        
+        const avgUserPoints = sums.total.user[pos] / c;
+        const avgLeaguePoints = sums.total.league[pos] / c;
+        const diffPoints = avgUserPoints - avgLeaguePoints;
+        const diffPct = avgLeaguePoints > 0 ? (diffPoints / avgLeaguePoints) * 100 : 0;
 
-    setAggregateDiffs(aggData);
+        const avgUserEff = sums.efficiency.user[pos] / c;
+        const avgLeagueEff = sums.efficiency.league[pos] / c;
+        const diffEff = avgUserEff - avgLeagueEff;
+        const diffEffPct = avgLeagueEff > 0 ? (diffEff / avgLeagueEff) * 100 : 0;
+
+        return {
+            position: pos,
+            avgUserPoints,
+            avgLeaguePoints,
+            diffPoints,
+            diffPct,
+            avgUserEff,
+            avgLeagueEff,
+            diffEff,
+            diffEffPct
+        };
+    });
+
+    setAggregateData(aggData);
   };
 
   return (
@@ -200,29 +291,45 @@ export default function PositionalBenchmarksPage() {
       </Paper>
 
       {/* Aggregate Chart */}
-      {!loading && aggregateDiffs.length > 0 && (
+      {!loading && aggregateData.length > 0 && (
         <Paper sx={{ p: 3, mb: 4, bgcolor: '#1e293b' }}>
-          <Typography variant="h5" gutterBottom color="white">Overall "Skill Profile"</Typography>
-          <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ mb: 3 }}>
-            Your average scoring surplus/deficit compared to league median across all leagues.
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box>
+                <Typography variant="h5" gutterBottom color="white">Overall "Skill Profile"</Typography>
+                <Typography variant="body2" color="rgba(255,255,255,0.7)">
+                    Your average {metric === 'total' ? 'scoring surplus/deficit' : 'efficiency gap'} vs league average across all leagues.
+                </Typography>
+            </Box>
+            
+            <ToggleButtonGroup
+                value={metric}
+                exclusive
+                onChange={(_, v) => v && setMetric(v)}
+                size="small"
+                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+            >
+                <ToggleButton value="total" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
+                    Total Output
+                </ToggleButton>
+                <ToggleButton value="efficiency" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
+                    Efficiency
+                </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
           
           <Box sx={{ height: 400, width: '100%' }}>
             <ResponsiveContainer>
-              <BarChart data={aggregateDiffs} layout="vertical" margin={{ left: 20, right: 20 }}>
+              <BarChart data={aggregateData} layout="vertical" margin={{ left: 20, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" horizontal={false} />
                 <XAxis type="number" stroke="#888" unit="%" />
                 <YAxis dataKey="position" type="category" stroke="#fff" width={50} />
-                <Tooltip 
-                  cursor={{ fill: 'transparent' }}
-                  contentStyle={{ backgroundColor: '#333', border: 'none', color: '#fff' }}
-                  formatter={(val: any) => `${val > 0 ? '+' : ''}${Number(val).toFixed(1)}%`}
-                />
+                <Tooltip content={<CustomTooltip metric={metric} />} />
                 <ReferenceLine x={0} stroke="#fff" />
-                <Bar dataKey="diff" name="% Diff">
-                  {aggregateDiffs.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.diff > 0 ? '#66bb6a' : '#ef5350'} />
-                  ))}
+                <Bar dataKey={metric === 'total' ? 'diffPct' : 'diffEffPct'} name="% Diff">
+                  {aggregateData.map((entry, index) => {
+                    const val = metric === 'total' ? entry.diffPct : entry.diffEffPct;
+                    return <Cell key={`cell-${index}`} fill={val > 0 ? '#66bb6a' : '#ef5350'} />;
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
