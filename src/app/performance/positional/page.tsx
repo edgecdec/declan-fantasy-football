@@ -61,6 +61,9 @@ type AggregatePositionStats = {
 };
 
 // Custom Tooltip Component
+// ... (omitted for brevity, just inserting metadata before export default)
+
+// Custom Tooltip Component
 const CustomTooltip = ({ active, payload, label, metric }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload as AggregatePositionStats;
