@@ -12,16 +12,20 @@ interface UserSearchInputProps {
 export default function UserSearchInput({ username, setUsername, disabled }: UserSearchInputProps) {
   const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
 
-  // Load Saved Usernames
+  // Load Saved Usernames and ensure example is present
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
+    let list: string[] = [];
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setSavedUsernames(parsed);
-        // We do NOT auto-set username here, we let the parent control initial state
+        list = JSON.parse(saved);
       } catch (e) { console.error(e); }
     }
+    // Add example user if not present (optional, but good for dropdown)
+    if (!list.includes('edgecdec')) {
+        list.push('edgecdec');
+    }
+    setSavedUsernames(list);
   }, []);
 
   return (
@@ -34,7 +38,13 @@ export default function UserSearchInput({ username, setUsername, disabled }: Use
         <TextField 
           {...params} 
           label="Sleeper Username" 
+          placeholder="e.g. edgecdec"
           variant="outlined" 
+          helperText={
+            <span>
+              Don't have one? Try <strong style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setUsername('edgecdec')}>edgecdec</strong>
+            </span>
+          }
           sx={{ minWidth: { xs: '100%', sm: 250 }, flexGrow: 1 }} 
         />
       )}

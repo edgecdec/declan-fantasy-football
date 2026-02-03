@@ -87,6 +87,16 @@ export default function HomePage() {
                 </Button>
               </Box>
             </form>
+            
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => fetchUser('edgecdec')} 
+              disabled={loading}
+              sx={{ mt: 1, textTransform: 'none', color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent', textDecoration: 'underline' } }}
+            >
+              Don't have a username? Try <strong>&nbsp;edgecdec</strong>
+            </Button>
           </Box>
         )}
 
