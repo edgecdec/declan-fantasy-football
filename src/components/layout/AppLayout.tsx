@@ -42,12 +42,12 @@ const drawerWidth = 240;
 
 const MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
-  { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
   { text: 'Positional Benchmarks', href: '/performance/positional', icon: <BarChartIcon /> },
   { text: 'Season Review', href: '/performance', icon: <EmojiEventsIcon /> },
   { text: 'Legacy Analyzer', href: '/league-history', icon: <HistoryIcon /> },
   { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
+  { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
 

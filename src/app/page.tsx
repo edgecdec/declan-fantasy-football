@@ -98,12 +98,12 @@ export default function HomePage() {
       {/* Feature Cards */}
       <Grid container spacing={4} sx={{ mt: 2 }}>
         {[
-          { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
           { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
           { title: 'Positional Benchmarks', desc: 'Compare your positional output and efficiency against league averages.', href: '/performance/positional', cta: 'View Benchmarks' },
           { title: 'Season Review', desc: 'Analyze your final placements and playoff performance.', href: '/performance', cta: 'View Results' },
           { title: 'Legacy Analyzer', desc: 'Explore all-time history, rivalries, and head-to-head records.', href: '/league-history', cta: 'Explore History' },
           { title: 'Roster Medic', desc: 'Scan rosters for empty spots, IR violations, and inactive starters.', href: '/medic', cta: 'Scan Rosters' },
+          { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
           { title: 'Player Database', desc: 'Search and filter all active NFL players.', href: '/players', cta: 'Search Players' },
         ].map((feature) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={feature.title}>
