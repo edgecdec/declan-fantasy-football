@@ -60,6 +60,8 @@ export async function analyzePositionalBenchmarks(
   const numTeams = rostersData.length;
 
   const players = (playerData as any).players;
+  console.log(`[Benchmarks] League: ${league.name}, Teams: ${numTeams}, Weeks: ${weeks.length}`);
+  console.log(`[Benchmarks] Players DB Size: ${Object.keys(players).length}`);
 
   // 3. Phase 1: Calculate League Weekly Averages
   // Map<WeekIndex, Map<Position, AvgScore>>
@@ -70,14 +72,19 @@ export async function analyzePositionalBenchmarks(
     
     // Sum points per position for the whole league this week
     weekMatchups.forEach(matchup => {
+      const pointsArray = (matchup as any).starters_points;
+      if (!pointsArray) return;
+
       matchup.starters?.forEach((playerId, index) => {
         let position = 'FLEX';
         const pData = players[playerId];
-        if (pData) position = pData.position;
+        if (pData) {
+            position = pData.position;
+        }
+        
         if (!VALID_POSITIONS.includes(position)) return;
 
-        // @ts-ignore
-        const points = matchup.starters_points ? matchup.starters_points[index] : 0;
+        const points = pointsArray[index] || 0;
         weekPosTotals.set(position, (weekPosTotals.get(position) || 0) + points);
       });
     });
@@ -122,14 +129,16 @@ export async function analyzePositionalBenchmarks(
     const weekPosTotals = new Map<string, { points: number, count: number }>();
     
     weekMatchups.forEach(matchup => {
+      const pointsArray = (matchup as any).starters_points;
+      if (!pointsArray) return;
+
       matchup.starters?.forEach((playerId, index) => {
         let position = 'FLEX';
         const pData = players[playerId];
         if (pData) position = pData.position;
         if (!VALID_POSITIONS.includes(position)) return;
 
-        // @ts-ignore
-        const points = matchup.starters_points ? matchup.starters_points[index] : 0;
+        const points = pointsArray[index] || 0;
         
         const curr = weekPosTotals.get(position) || { points: 0, count: 0 };
         curr.points += points;
@@ -143,33 +152,35 @@ export async function analyzePositionalBenchmarks(
     });
 
     // Now assess my players
-    myMatchup.starters.forEach((playerId, index) => {
-        let position = 'FLEX';
-        const pData = players[playerId];
-        if (pData) position = pData.position;
-        if (!VALID_POSITIONS.includes(position)) return;
+    const myPointsArray = (myMatchup as any).starters_points;
+    if (myPointsArray) {
+        myMatchup.starters.forEach((playerId, index) => {
+            let position = 'FLEX';
+            const pData = players[playerId];
+            if (pData) position = pData.position;
+            if (!VALID_POSITIONS.includes(position)) return;
 
-        // @ts-ignore
-        const points = matchup.starters_points ? myMatchup.starters_points[index] : 0;
-        const baseline = weekAvgPerStarter.get(position) || 0;
-        const impact = points - baseline;
+            const points = myPointsArray[index] || 0;
+            const baseline = weekAvgPerStarter.get(position) || 0;
+            const impact = points - baseline;
 
-        // Update User Position Stats
-        const uPos = userPosStats.get(position)!;
-        uPos.points += points;
-        uPos.count += 1;
+            // Update User Position Stats
+            const uPos = userPosStats.get(position)!;
+            uPos.points += points;
+            uPos.count += 1;
 
-        // Update Player Impact
-        const pImpact = playerImpactMap.get(playerId) || { 
-            totalPOLA: 0, 
-            weeks: 0, 
-            name: pData ? `${pData.first_name} ${pData.last_name}` : 'Unknown',
-            pos: position
-        };
-        pImpact.totalPOLA += impact;
-        pImpact.weeks += 1;
-        playerImpactMap.set(playerId, pImpact);
-    });
+            // Update Player Impact
+            const pImpact = playerImpactMap.get(playerId) || { 
+                totalPOLA: 0, 
+                weeks: 0, 
+                name: pData ? `${pData.first_name} ${pData.last_name}` : 'Unknown',
+                pos: position
+            };
+            pImpact.totalPOLA += impact;
+            pImpact.weeks += 1;
+            playerImpactMap.set(playerId, pImpact);
+        });
+    }
   });
 
   // 5. Aggregate League Season Averages (for the Charts)
@@ -177,13 +188,16 @@ export async function analyzePositionalBenchmarks(
   // Re-looping simply to sum up totals for the season-long view
   allWeeksMatchups.forEach(weekMatchups => {
       weekMatchups.forEach(matchup => {
+          const pointsArray = (matchup as any).starters_points;
+          if (!pointsArray) return;
+
           matchup.starters?.forEach((playerId, index) => {
               let position = 'FLEX';
               const pData = players[playerId];
               if (pData) position = pData.position;
               if (!VALID_POSITIONS.includes(position)) return;
-              // @ts-ignore
-              const points = matchup.starters_points ? matchup.starters_points[index] : 0;
+              
+              const points = pointsArray[index] || 0;
               const curr = leagueAgg.get(position) || { points: 0, count: 0 };
               curr.points += points;
               curr.count += 1;

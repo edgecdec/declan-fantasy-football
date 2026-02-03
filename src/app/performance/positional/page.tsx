@@ -211,51 +211,127 @@ export default function PositionalBenchmarksPage() {
     setGlobalImpacts(sorted);
   };
 
-  const calculateAggregates = (data: LeagueBenchmarkResult[]) => {
-    const sums = {
-        total: { user: {} as Record<string, number>, league: {} as Record<string, number> },
-        efficiency: { user: {} as Record<string, number>, league: {} as Record<string, number> }
-    };
-    const counts = {} as Record<string, number>;
+    const calculateAggregates = (data: LeagueBenchmarkResult[]) => {
 
-    data.forEach(res => {
+      const sums = {
+
+          total: { user: {} as Record<string, number>, league: {} as Record<string, number> },
+
+          efficiency: { user: {} as Record<string, number>, league: {} as Record<string, number> }
+
+      };
+
+      const counts = {} as Record<string, number>;
+
+  
+
+      // Initialize with 0
+
       VALID_POSITIONS.forEach(pos => {
-        const u = res.userStats[pos];
-        const l = res.leagueAverageStats[pos];
-        
-        if (l.avgPointsPerWeek > 0) {
-          sums.total.user[pos] = (sums.total.user[pos] || 0) + u.avgPointsPerWeek;
-          sums.total.league[pos] = (sums.total.league[pos] || 0) + l.avgPointsPerWeek;
-          
-          sums.efficiency.user[pos] = (sums.efficiency.user[pos] || 0) + u.avgPointsPerStarter;
-          sums.efficiency.league[pos] = (sums.efficiency.league[pos] || 0) + l.avgPointsPerStarter;
-          
-          counts[pos] = (counts[pos] || 0) + 1;
-        }
+
+          sums.total.user[pos] = 0;
+
+          sums.total.league[pos] = 0;
+
+          sums.efficiency.user[pos] = 0;
+
+          sums.efficiency.league[pos] = 0;
+
+          counts[pos] = 0;
+
       });
-    });
 
-    const aggData: AggregatePositionStats[] = VALID_POSITIONS.map(pos => {
-        const c = counts[pos] || 1;
-        const avgUserPoints = sums.total.user[pos] / c;
-        const avgLeaguePoints = sums.total.league[pos] / c;
-        const diffPoints = avgUserPoints - avgLeaguePoints;
-        const diffPct = avgLeaguePoints > 0 ? (diffPoints / avgLeaguePoints) * 100 : 0;
+  
 
-        const avgUserEff = sums.efficiency.user[pos] / c;
-        const avgLeagueEff = sums.efficiency.league[pos] / c;
-        const diffEff = avgUserEff - avgLeagueEff;
-        const diffEffPct = avgLeagueEff > 0 ? (diffEff / avgLeagueEff) * 100 : 0;
+      data.forEach(res => {
 
-        return {
-            position: pos,
-            avgUserPoints, avgLeaguePoints, diffPoints, diffPct,
-            avgUserEff, avgLeagueEff, diffEff, diffEffPct
-        };
-    });
+        VALID_POSITIONS.forEach(pos => {
 
-    setAggregateData(aggData);
-  };
+          const u = res.userStats[pos];
+
+          const l = res.leagueAverageStats[pos];
+
+          
+
+          if (l.avgPointsPerWeek > 0) {
+
+            sums.total.user[pos] += u.avgPointsPerWeek;
+
+            sums.total.league[pos] += l.avgPointsPerWeek;
+
+            
+
+            sums.efficiency.user[pos] += u.avgPointsPerStarter;
+
+            sums.efficiency.league[pos] += l.avgPointsPerStarter;
+
+            
+
+            counts[pos]++;
+
+          }
+
+        });
+
+      });
+
+  
+
+      const aggData: AggregatePositionStats[] = VALID_POSITIONS.map(pos => {
+
+          const c = counts[pos] || 1; // Avoid division by zero, though if count is 0, sums are 0, so result is 0.
+
+          
+
+          const avgUserPoints = sums.total.user[pos] / c;
+
+          const avgLeaguePoints = sums.total.league[pos] / c;
+
+          const diffPoints = avgUserPoints - avgLeaguePoints;
+
+          const diffPct = avgLeaguePoints > 0 ? (diffPoints / avgLeaguePoints) * 100 : 0;
+
+  
+
+          const avgUserEff = sums.efficiency.user[pos] / c;
+
+          const avgLeagueEff = sums.efficiency.league[pos] / c;
+
+          const diffEff = avgUserEff - avgLeagueEff;
+
+          const diffEffPct = avgLeagueEff > 0 ? (diffEff / avgLeagueEff) * 100 : 0;
+
+  
+
+          return {
+
+              position: pos,
+
+              avgUserPoints,
+
+              avgLeaguePoints,
+
+              diffPoints,
+
+              diffPct,
+
+              avgUserEff,
+
+              avgLeagueEff,
+
+              diffEff,
+
+              diffEffPct
+
+          };
+
+      });
+
+  
+
+      setAggregateData(aggData);
+
+    };
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
