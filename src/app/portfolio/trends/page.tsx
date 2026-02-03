@@ -56,9 +56,10 @@ const COLORS = [
   '#a4de6c', '#8dd1e1', '#83a6ed', '#8e4585', '#ff0000'
 ];
 
-const filterOptions = createFilterOptions({
+const filterOptions = createFilterOptions<PlayerMeta>({
   matchFrom: 'any',
   limit: 50,
+  stringify: (option) => `${option.name} ${option.position}`,
 });
 
 // Custom Tooltip Component
