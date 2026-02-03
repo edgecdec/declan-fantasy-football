@@ -32,13 +32,16 @@ const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 export async function analyzePositionalBenchmarks(
   league: SleeperLeague,
-  userId: string
+  userId: string,
+  includePlayoffs: boolean = true
 ): Promise<LeagueBenchmarkResult> {
   
-  // 1. Determine Regular Season Weeks
+  // 1. Determine Weeks to Analyze
   const startWeek = league.settings.start_week || 1;
-  const playoffStart = league.settings.playoff_week_start;
-  const endWeek = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
+  const playoffStart = league.settings.playoff_week_start || 15;
+  const lastScoredLeg = league.settings.last_scored_leg || 18; // Default to 18 if undefined/ongoing
+  
+  const endWeek = includePlayoffs ? lastScoredLeg : (playoffStart - 1);
   
   const weeks: number[] = [];
   if (endWeek >= startWeek) {
@@ -60,8 +63,6 @@ export async function analyzePositionalBenchmarks(
   const numTeams = rostersData.length;
 
   const players = (playerData as any).players;
-  console.log(`[Benchmarks] League: ${league.name}, Teams: ${numTeams}, Weeks: ${weeks.length}`);
-  console.log(`[Benchmarks] Players DB Size: ${Object.keys(players).length}`);
 
   // 3. Phase 1: Calculate League Weekly Averages
   // Map<WeekIndex, Map<Position, AvgScore>>
@@ -70,18 +71,31 @@ export async function analyzePositionalBenchmarks(
   allWeeksMatchups.forEach((weekMatchups, weekIdx) => {
     const weekPosTotals = new Map<string, number>();
     
-    // Sum points per position for the whole league this week
+    // In playoffs, only count active teams (teams with a valid matchup_id)
+    // In regular season, usually everyone has a matchup_id.
+    // Exception: Bye weeks in playoffs (matchup_id might be null or special).
+    // Sleeper: Consolation bracket teams also have matchup_ids.
+    // If a team is eliminated and NOT in consolation, they might not have matchup_id.
+    
+    // We will count how many rosters actually contributed to the stats this week
+    // to calculate the correct average.
+    let activeRostersThisWeek = 0;
+
     weekMatchups.forEach(matchup => {
+      // Filter out empty/invalid matchups
+      // Valid if they have starters AND (matchup_id exists OR points > 0)
+      if (!matchup.starters || matchup.starters.length === 0) return;
+      if (!matchup.matchup_id && matchup.points === 0) return; 
+
+      activeRostersThisWeek++;
+
       const pointsArray = (matchup as any).starters_points;
       if (!pointsArray) return;
 
-      matchup.starters?.forEach((playerId, index) => {
+      matchup.starters.forEach((playerId, index) => {
         let position = 'FLEX';
         const pData = players[playerId];
-        if (pData) {
-            position = pData.position;
-        }
-        
+        if (pData) position = pData.position;
         if (!VALID_POSITIONS.includes(position)) return;
 
         const points = pointsArray[index] || 0;
@@ -89,13 +103,12 @@ export async function analyzePositionalBenchmarks(
       });
     });
 
-    // Compute Average per Team (Total / NumTeams)
+    // Compute Average per ACTIVE Team
     const weekAvgs = new Map<string, number>();
     VALID_POSITIONS.forEach(pos => {
       const total = weekPosTotals.get(pos) || 0;
-      // Note: This is "Average Output per Team", not "Average per Player"
-      // If the league averages 25 RB points per team, and I scored 30, I am +5.
-      weekAvgs.set(pos, total / (numTeams || 1));
+      // Use active count for divisor, min 1
+      weekAvgs.set(pos, total / (activeRostersThisWeek || 1));
     });
     leagueWeeklyAvgs.set(weekIdx, weekAvgs);
   });
@@ -106,40 +119,36 @@ export async function analyzePositionalBenchmarks(
 
   VALID_POSITIONS.forEach(p => userPosStats.set(p, { points: 0, count: 0 }));
 
+  let myWeeksPlayed = 0;
+
   allWeeksMatchups.forEach((weekMatchups, weekIdx) => {
     const myMatchup = weekMatchups.find(m => m.roster_id === myRosterId);
-    if (!myMatchup || !myMatchup.starters) return;
+    
+    // Check if I actually played this week
+    if (!myMatchup || !myMatchup.starters || myMatchup.starters.length === 0) return;
+    if (!myMatchup.matchup_id && myMatchup.points === 0) return;
 
-    // Track which positions we have filled this week to subtract from league avg
-    // Wait, comparing individual player to league average position total?
-    // No, "Impact" is usually: (PlayerPoints - ReplacementLevel) or (PlayerPoints - LeagueAvgPerStarter).
-    // The user asked: "output of a starter to the overall league average at that position".
-    // If I start 2 RBs, and league average RBs score 12 pts/player.
-    // RB1: 20 pts. Impact: +8.
-    // RB2: 5 pts. Impact: -7.
-    // Total RB Impact: +1.
-    
-    // So I need "League Average Points PER STARTER", not "Per Team".
-    
-    // Let's recalculate the baseline.
-    // Baseline = TotalPointsForPos / TotalStartersForPos (in the league that week).
-    
-    // Re-calculating baseline...
+    myWeeksPlayed++;
+
+    // Re-calculate baseline per starter for this week (Efficiency comparison)
     const weekAvgPerStarter = new Map<string, number>();
     const weekPosTotals = new Map<string, { points: number, count: number }>();
     
+    // Need to filter active rosters again for consistency
     weekMatchups.forEach(matchup => {
+      if (!matchup.starters || matchup.starters.length === 0) return;
+      if (!matchup.matchup_id && matchup.points === 0) return;
+
       const pointsArray = (matchup as any).starters_points;
       if (!pointsArray) return;
 
-      matchup.starters?.forEach((playerId, index) => {
+      matchup.starters.forEach((playerId, index) => {
         let position = 'FLEX';
         const pData = players[playerId];
         if (pData) position = pData.position;
         if (!VALID_POSITIONS.includes(position)) return;
 
         const points = pointsArray[index] || 0;
-        
         const curr = weekPosTotals.get(position) || { points: 0, count: 0 };
         curr.points += points;
         curr.count += 1;
@@ -151,7 +160,7 @@ export async function analyzePositionalBenchmarks(
         weekAvgPerStarter.set(pos, val.count > 0 ? val.points / val.count : 0);
     });
 
-    // Now assess my players
+    // Assess my players
     const myPointsArray = (myMatchup as any).starters_points;
     if (myPointsArray) {
         myMatchup.starters.forEach((playerId, index) => {
@@ -183,15 +192,22 @@ export async function analyzePositionalBenchmarks(
     }
   });
 
-  // 5. Aggregate League Season Averages (for the Charts)
+  // 5. Aggregate League Season Averages (Weighted by Active Weeks)
   const leagueAgg = new Map<string, { points: number, count: number }>();
-  // Re-looping simply to sum up totals for the season-long view
+  let totalLeagueActiveWeeks = 0; // Denominator for per-week avg
+
   allWeeksMatchups.forEach(weekMatchups => {
+      let activeRostersThisWeek = 0;
       weekMatchups.forEach(matchup => {
+          if (!matchup.starters || matchup.starters.length === 0) return;
+          if (!matchup.matchup_id && matchup.points === 0) return;
+          
+          activeRostersThisWeek++;
+
           const pointsArray = (matchup as any).starters_points;
           if (!pointsArray) return;
 
-          matchup.starters?.forEach((playerId, index) => {
+          matchup.starters.forEach((playerId, index) => {
               let position = 'FLEX';
               const pData = players[playerId];
               if (pData) position = pData.position;
@@ -204,6 +220,7 @@ export async function analyzePositionalBenchmarks(
               leagueAgg.set(position, curr);
           });
       });
+      totalLeagueActiveWeeks += activeRostersThisWeek;
   });
 
   // 6. Format Output
@@ -217,20 +234,24 @@ export async function analyzePositionalBenchmarks(
       position: pos,
       totalPoints: myS.points,
       starterCount: myS.count,
-      gamesPlayed: weeks.length,
-      avgPointsPerWeek: myS.points / (weeks.length || 1),
+      gamesPlayed: myWeeksPlayed, // Use actual active weeks
+      avgPointsPerWeek: myS.points / (myWeeksPlayed || 1),
       avgPointsPerStarter: myS.count > 0 ? myS.points / myS.count : 0
     };
 
     // League
     const lAgg = leagueAgg.get(pos) || { points: 0, count: 0 };
-    const avgTotalPointsPerTeam = lAgg.points / (numTeams || 1); // League Total / 12 teams
+    // Avg Points Per Week = Total Points / Total Active Roster-Weeks
+    // Example: 12 teams * 14 weeks = 168 roster-weeks.
+    // If playoff adds 4 teams * 1 week, total = 172.
+    const avgTotalPointsPerTeamWeek = lAgg.points / (totalLeagueActiveWeeks || 1); 
+    
     leagueAverageStats[pos] = {
       position: pos,
-      totalPoints: avgTotalPointsPerTeam,
-      starterCount: lAgg.count / (numTeams || 1),
-      gamesPlayed: weeks.length,
-      avgPointsPerWeek: avgTotalPointsPerTeam / (weeks.length || 1),
+      totalPoints: avgTotalPointsPerTeamWeek * (myWeeksPlayed || 1), // Normalized to user's duration
+      starterCount: lAgg.count / (totalLeagueActiveWeeks || 1),
+      gamesPlayed: myWeeksPlayed, // Normalized comparison
+      avgPointsPerWeek: avgTotalPointsPerTeamWeek,
       avgPointsPerStarter: lAgg.count > 0 ? lAgg.points / lAgg.count : 0
     };
   });
@@ -242,7 +263,7 @@ export async function analyzePositionalBenchmarks(
       totalPOLA: val.totalPOLA,
       weeksStarted: val.weeks,
       avgPOLA: val.totalPOLA / val.weeks
-  })).sort((a, b) => b.totalPOLA - a.totalPOLA); // Sort by highest impact first
+  })).sort((a, b) => b.totalPOLA - a.totalPOLA); 
 
   return {
     leagueId: league.league_id,
