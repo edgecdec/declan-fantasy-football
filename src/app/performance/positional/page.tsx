@@ -139,7 +139,7 @@ export default function PositionalBenchmarksPage() {
   const [aggregateData, setAggregateData] = React.useState<AggregatePositionStats[]>([]);
   const [metric, setMetric] = React.useState<'total' | 'efficiency'>('efficiency');
   const [globalImpacts, setGlobalImpacts] = React.useState<any[]>([]);
-  const [showAllImpacts, setShowAllImpacts] = React.useState(false);
+  const [impactsModalData, setImpactsModalData] = React.useState<any[] | null>(null);
   const [includePlayoffs, setIncludePlayoffs] = React.useState(true);
   const [leagueType, setLeagueType] = React.useState<'all' | 'redraft' | 'dynasty'>('all');
 
@@ -424,10 +424,15 @@ export default function PositionalBenchmarksPage() {
                       </Box>
                     </Box>
                   ))}
-                </Grid>
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
+                                      </Grid>
+                                    </Grid>
+                
+                                    <Box sx={{ mt: 2, textAlign: 'center' }}>
+                                      <Button variant="outlined" size="small" onClick={() => setImpactsModalData(res.playerImpacts)}>
+                                        View All League Players
+                                      </Button>
+                                    </Box>
+                                  </AccordionDetails>          </Accordion>
         </Box>
       </Grid>
     );
@@ -578,7 +583,7 @@ export default function PositionalBenchmarksPage() {
               ))}
               
               <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <Button variant="outlined" size="small" onClick={() => setShowAllImpacts(true)}>
+                <Button variant="outlined" size="small" onClick={() => setImpactsModalData(globalImpacts)}>
                   View All Players
                 </Button>
               </Box>
@@ -609,8 +614,8 @@ export default function PositionalBenchmarksPage() {
 
       {/* All Players Modal */}
       <Modal
-        open={showAllImpacts}
-        onClose={() => setShowAllImpacts(false)}
+        open={!!impactsModalData}
+        onClose={() => setImpactsModalData(null)}
         aria-labelledby="all-impacts-modal"
       >
         <Paper sx={{
@@ -628,14 +633,14 @@ export default function PositionalBenchmarksPage() {
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h5" component="h2">
-              All Player Impacts (Global)
+              Player Impact Details
             </Typography>
-            <IconButton onClick={() => setShowAllImpacts(false)}>
+            <IconButton onClick={() => setImpactsModalData(null)}>
               <CloseIcon />
             </IconButton>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Cumulative Points Over League Average (POLA) across all analyzed leagues.
+            Cumulative Points Over League Average (POLA).
           </Typography>
           
           <TableContainer>
@@ -651,12 +656,12 @@ export default function PositionalBenchmarksPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {globalImpacts.map((p, index) => (
+                {impactsModalData?.map((p, index) => (
                   <TableRow key={p.playerId} hover>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>{p.name}</TableCell>
                     <TableCell>{p.position}</TableCell>
-                    <TableCell align="right">{p.weeks}</TableCell>
+                    <TableCell align="right">{p.weeksStarted || p.weeks}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold', color: p.totalPOLA > 0 ? 'success.main' : 'error.main' }}>
                       {p.totalPOLA > 0 ? '+' : ''}{p.totalPOLA.toFixed(1)}
                     </TableCell>
