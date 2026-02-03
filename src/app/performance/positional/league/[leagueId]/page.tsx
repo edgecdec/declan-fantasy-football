@@ -334,7 +334,8 @@ export default function LeaguePositionalPage() {
                 <Typography variant="h6">League Skill Heatmap</Typography>
               </Box>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-                Comparing each manager's {metric === 'total' ? 'weekly output' : 'starting efficiency'} to the league average. Green = Above Avg, Red = Below Avg.
+                Values represent the average **Fantasy Points Per Game (FPPG)** surplus or deficit for each manager compared to the league average at that position. 
+                {metric === 'efficiency' ? ' (Points per player start)' : ' (Total weekly output)'}
               </Typography>
               
               <TableContainer sx={{ maxHeight: 600 }}>
