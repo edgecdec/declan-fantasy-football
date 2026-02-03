@@ -235,6 +235,10 @@ export default function RosterMedicPage() {
         subtitle="Scan all your leagues for inactive starters, empty roster spots, and missed IR opportunities." 
       />
 
+      <Alert severity="info" sx={{ mb: 4 }}>
+        <strong>Note:</strong> Roster Medic is designed for <strong>in-season use</strong>. During the offseason, many status checks (like injury status or empty starters) may show incorrect or irrelevant warnings.
+      </Alert>
+
       {/* Input Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
