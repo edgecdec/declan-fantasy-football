@@ -69,18 +69,6 @@ type LeagueResultItem = {
   category: 'included' | 'excluded';
 };
 
-type AggregatePositionStats = {
-  position: string;
-  avgUserPoints: number;
-  avgLeaguePoints: number;
-  diffPoints: number;
-  diffPct: number;
-  avgUserEff: number;
-  avgLeagueEff: number;
-  diffEff: number;
-  diffEffPct: number;
-};
-
 // Custom Tooltip Component
 const CustomTooltip = ({ active, payload, label, metric }: any) => {
   if (active && payload && payload.length) {

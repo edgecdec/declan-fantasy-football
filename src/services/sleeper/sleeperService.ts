@@ -41,6 +41,8 @@ export type SleeperRoster = {
     ties: number;
     fpts: number;
     fpts_decimal?: number;
+    fpts_against?: number;
+    fpts_against_decimal?: number;
   };
 };
 
