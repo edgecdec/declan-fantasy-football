@@ -12,7 +12,15 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Paper,
-  Alert
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
+  Tooltip
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useUser } from '@/context/UserContext';
@@ -23,6 +31,13 @@ import SkillProfileChart, { AggregatePositionStats } from '@/components/performa
 import PlayerImpactList, { PlayerImpact } from '@/components/performance/PlayerImpactList';
 
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+type LeagueHeatmapData = {
+  userId: string;
+  displayName: string;
+  avatar: string;
+  stats: Record<string, { diffTotal: number, diffEff: number }>; // Pos -> Diffs
+};
 
 export default function LeaguePositionalPage() {
   const params = useParams();
@@ -39,6 +54,7 @@ export default function LeaguePositionalPage() {
   
   const [aggData, setAggData] = React.useState<AggregatePositionStats[]>([]);
   const [impacts, setImpacts] = React.useState<PlayerImpact[]>([]);
+  const [heatmapData, setHeatmapData] = React.useState<LeagueHeatmapData[]>([]);
   const [metric, setMetric] = React.useState<'total' | 'efficiency'>('efficiency');
 
   React.useEffect(() => {
@@ -52,10 +68,6 @@ export default function LeaguePositionalPage() {
   }, [league, mode, user]);
 
   const fetchLeagueInfo = async () => {
-    // We need to fetch the specific league first to get its details
-    // Sleeper API doesn't have a direct "get league by ID" that is public easily without context?
-    // Actually SleeperService.getLeagueHistory uses `fetch(BASE_URL/league/id)`.
-    // I can assume I can fetch it.
     try {
       const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}`);
       if (res.ok) {
@@ -90,13 +102,10 @@ export default function LeaguePositionalPage() {
         const l = leaguesToAnalyze[i];
         setStatus(`Analyzing ${l.season}...`);
         try {
-          // Check if user was in this league season
-          // We can check rosters or just try analyze and catch error
-          const res = await analyzePositionalBenchmarks(l, user.user_id, true); // Include playoffs
+          const res = await analyzePositionalBenchmarks(l, user.user_id, true);
           results.push(res);
         } catch (e) {
-          // User probably wasn't in the league this year
-          console.log(`Skipping ${l.season} - User not found`);
+          console.log(`Skipping ${l.season}`, e);
         }
         setProgress(((i + 1) / total) * 100);
       }
@@ -115,16 +124,16 @@ export default function LeaguePositionalPage() {
     if (results.length === 0) {
       setAggData([]);
       setImpacts([]);
+      setHeatmapData([]);
       return;
     }
 
-    // 1. Aggregate Skill Profile (Weighted Average)
+    // 1. Aggregate Skill Profile (Current User)
     const sums = {
       user: {} as Record<string, PositionStats>,
       league: {} as Record<string, PositionStats>
     };
 
-    // Init
     VALID_POSITIONS.forEach(pos => {
       sums.user[pos] = { position: pos, totalPoints: 0, starterCount: 0, gamesPlayed: 0, avgPointsPerWeek: 0, avgPointsPerStarter: 0 };
       sums.league[pos] = { position: pos, totalPoints: 0, starterCount: 0, gamesPlayed: 0, avgPointsPerWeek: 0, avgPointsPerStarter: 0 };
@@ -136,7 +145,6 @@ export default function LeaguePositionalPage() {
         const l = res.leagueAverageStats[pos];
 
         if (u && l) {
-          // Sum totals
           sums.user[pos].totalPoints += u.totalPoints;
           sums.user[pos].starterCount += u.starterCount;
           sums.user[pos].gamesPlayed += u.gamesPlayed;
@@ -152,7 +160,6 @@ export default function LeaguePositionalPage() {
       const u = sums.user[pos];
       const l = sums.league[pos];
 
-      // Recompute averages based on accumulated totals
       const avgUserPoints = u.gamesPlayed > 0 ? u.totalPoints / u.gamesPlayed : 0;
       const avgLeaguePoints = l.gamesPlayed > 0 ? l.totalPoints / l.gamesPlayed : 0;
       
@@ -167,14 +174,8 @@ export default function LeaguePositionalPage() {
 
       return {
         position: pos,
-        avgUserPoints,
-        avgLeaguePoints,
-        diffPoints,
-        diffPct,
-        avgUserEff,
-        avgLeagueEff,
-        diffEff,
-        diffEffPct
+        avgUserPoints, avgLeaguePoints, diffPoints, diffPct,
+        avgUserEff, avgLeagueEff, diffEff, diffEffPct
       };
     });
 
@@ -197,11 +198,83 @@ export default function LeaguePositionalPage() {
       name: val.name,
       position: val.pos,
       totalPOLA: val.totalPOLA,
-      weeks: val.weeks,
+      weeksStarted: val.weeks,
       avgPOLA: val.totalPOLA / (val.weeks || 1)
     })).sort((a, b) => b.totalPOLA - a.totalPOLA);
 
     setImpacts(impactList);
+
+    // 3. Aggregate Heatmap Data (All Users)
+    const userAggr = new Map<string, {
+      seasons: number,
+      meta: { displayName: string, avatar: string },
+      posSums: Record<string, { sumDiffTotal: number, sumDiffEff: number }>
+    }>();
+
+    results.forEach(res => {
+      const lStats = res.leagueAverageStats;
+      const allRosters = res.allRosterStats || {}; // Safety check if older API logic cached
+      const meta = res.rosterMeta || {};
+
+      Object.keys(allRosters).forEach(uid => {
+        if (!userAggr.has(uid)) {
+          userAggr.set(uid, {
+            seasons: 0,
+            meta: meta[uid] || { displayName: 'Unknown', avatar: '' },
+            posSums: {}
+          });
+          VALID_POSITIONS.forEach(p => {
+            userAggr.get(uid)!.posSums[p] = { sumDiffTotal: 0, sumDiffEff: 0 };
+          });
+        }
+
+        const ua = userAggr.get(uid)!;
+        // Update meta if more recent season (results usually pushed newest to oldest? No, loop pushed oldest to newest if history fetched that way. 
+        // Let's assume we want latest. We can update meta every time.)
+        if (meta[uid]) ua.meta = meta[uid];
+        ua.seasons++;
+
+        const uStats = allRosters[uid];
+        VALID_POSITIONS.forEach(pos => {
+          const u = uStats[pos];
+          const l = lStats[pos];
+          if (u && l) {
+             const diffTotal = u.avgPointsPerWeek - l.avgPointsPerWeek;
+             const diffEff = u.avgPointsPerStarter - l.avgPointsPerStarter;
+             ua.posSums[pos].sumDiffTotal += diffTotal;
+             ua.posSums[pos].sumDiffEff += diffEff;
+          }
+        });
+      });
+    });
+
+    const heatmap: LeagueHeatmapData[] = Array.from(userAggr.entries()).map(([uid, val]) => {
+      const stats: Record<string, { diffTotal: number, diffEff: number }> = {};
+      VALID_POSITIONS.forEach(pos => {
+        const s = val.posSums[pos];
+        stats[pos] = {
+          diffTotal: s.sumDiffTotal / val.seasons,
+          diffEff: s.sumDiffEff / val.seasons
+        };
+      });
+      return {
+        userId: uid,
+        displayName: val.meta.displayName,
+        avatar: val.meta.avatar,
+        stats
+      };
+    });
+
+    // Sort by "Sum of Efficiency Diffs" to put best drafters at top?
+    // Or alphabetical?
+    // Let's sort by Total Efficiency Diff across all positions
+    heatmap.sort((a, b) => {
+       const sumA = VALID_POSITIONS.reduce((acc, p) => acc + a.stats[p].diffEff, 0);
+       const sumB = VALID_POSITIONS.reduce((acc, p) => acc + b.stats[p].diffEff, 0);
+       return sumB - sumA;
+    });
+
+    setHeatmapData(heatmap);
   };
 
   if (!league) return <LinearProgress />;
@@ -253,9 +326,71 @@ export default function LeaguePositionalPage() {
           <Grid size={{ xs: 12, lg: 4 }}>
             <PlayerImpactList 
               impacts={impacts} 
-              maxItems={8} // Show more since it's a detail page
+              maxItems={8}
               title={mode === 'current' ? "Season Impact" : "All-Time Legends & Busts"}
             />
+          </Grid>
+
+          {/* Heatmap Section */}
+          <Grid size={{ xs: 12 }}>
+            <Paper sx={{ p: 3, overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h6">League Skill Heatmap</Typography>
+                {/* We reuse the metric state for the heatmap toggle too */}
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                Comparing each manager's {metric === 'total' ? 'weekly output' : 'starting efficiency'} to the league average. Green = Above Avg, Red = Below Avg.
+              </Typography>
+              
+              <TableContainer sx={{ maxHeight: 600 }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ bgcolor: 'background.paper', zIndex: 3 }}>Manager</TableCell>
+                      {VALID_POSITIONS.map(p => (
+                        <TableCell key={p} align="center" sx={{ bgcolor: 'background.paper', fontWeight: 'bold' }}>{p}</TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {heatmapData.map(m => (
+                      <TableRow key={m.userId} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar src={`https://sleepercdn.com/avatars/${m.avatar}`} sx={{ width: 24, height: 24 }} />
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>{m.displayName}</Typography>
+                          </Box>
+                        </TableCell>
+                        {VALID_POSITIONS.map(p => {
+                          const val = metric === 'total' ? m.stats[p].diffTotal : m.stats[p].diffEff;
+                          
+                          // Color logic
+                          // Efficiency: +/- 3 pts is huge. +/- 0.5 is noise.
+                          // Total: +/- 10 pts is huge.
+                          const range = metric === 'total' ? 10 : 3;
+                          let bg = 'transparent';
+                          let color = 'inherit';
+                          
+                          if (val > 0) {
+                             const intensity = Math.min(val / range, 1);
+                             bg = `rgba(76, 175, 80, ${intensity * 0.4})`;
+                          } else {
+                             const intensity = Math.min(Math.abs(val) / range, 1);
+                             bg = `rgba(244, 67, 54, ${intensity * 0.4})`;
+                          }
+
+                          return (
+                            <TableCell key={p} align="center" sx={{ bgcolor: bg, color }}>
+                              {val > 0 ? '+' : ''}{val.toFixed(1)}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
           </Grid>
         </Grid>
       )}
