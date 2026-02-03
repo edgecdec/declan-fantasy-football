@@ -111,6 +111,11 @@ export default function SmartTable<T>({
 
         const rowValue = String(getNestedValue(row, col.id));
 
+        if (col.filterVariant === 'text') {
+           const searchText = (filterValue[0] || '').toLowerCase();
+           if (searchText && !rowValue.toLowerCase().includes(searchText)) return false;
+        }
+
         if (col.filterVariant === 'multi-select' || col.filterVariant === 'select') {
           if (!filterValue.includes(rowValue)) return false;
         }
@@ -156,6 +161,20 @@ export default function SmartTable<T>({
                   value={selected}
                   onChange={(val) => handleColumnFilterChange(col.id, val)}
                   minWidth={150}
+                />
+              );
+            }
+
+            if (col.filterVariant === 'text') {
+              return (
+                <TextField
+                  key={col.id}
+                  label={`Filter ${col.label}`}
+                  variant="outlined"
+                  size="small"
+                  value={selected[0] || ''}
+                  onChange={(e) => handleColumnFilterChange(col.id, [e.target.value])}
+                  sx={{ minWidth: 150 }}
                 />
               );
             }
