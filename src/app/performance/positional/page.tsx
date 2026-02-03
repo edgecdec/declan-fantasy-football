@@ -60,6 +60,9 @@ import UserSearchInput from '@/components/common/UserSearchInput';
 
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
+const MAX_YEAR = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+const YEARS = Array.from({ length: MAX_YEAR - 2017 + 1 }, (_, i) => (MAX_YEAR - i).toString());
+
 type LeagueResultItem = {
   league: SleeperLeague;
   result: LeagueBenchmarkResult;
@@ -459,7 +462,7 @@ export default function PositionalBenchmarksPage() {
           <FormControl sx={{ minWidth: 100 }}>
             <InputLabel>Year</InputLabel>
             <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
-              {['2025', '2024', '2023'].map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+              {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
             </Select>
           </FormControl>
 

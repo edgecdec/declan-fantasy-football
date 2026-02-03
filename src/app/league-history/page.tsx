@@ -28,6 +28,9 @@ import {
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import PageHeader from '@/components/common/PageHeader';
 
+const MAX_YEAR = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+const YEARS = Array.from({ length: MAX_YEAR - 2017 + 1 }, (_, i) => (MAX_YEAR - i).toString());
+
 // --- Types ---
 type MemberHistory = {
   userId: string;
@@ -341,6 +344,12 @@ export default function LeagueHistoryPage() {
               renderInput={(params) => <TextField {...params} label="Sleeper Username" sx={{ minWidth: 200 }} />}
               disabled={loading && leagues.length === 0}
             />
+            <FormControl sx={{ minWidth: 100 }}>
+              <InputLabel>Year</InputLabel>
+              <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
+                {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+              </Select>
+            </FormControl>
             <Button 
               variant="contained" 
               onClick={handleFetchLeagues} 

@@ -14,7 +14,11 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Chip,
-  Stack
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { 
   LineChart, 
@@ -50,6 +54,9 @@ const COLORS = [
   '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#d0ed57', 
   '#a4de6c', '#8dd1e1', '#83a6ed', '#8e4585', '#ff0000'
 ];
+
+const MAX_YEAR = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+const YEARS = Array.from({ length: MAX_YEAR - 2017 + 1 }, (_, i) => (MAX_YEAR - i).toString());
 
 const filterOptions = createFilterOptions({
   matchFrom: 'any',
@@ -147,7 +154,13 @@ export default function TrendsPage() {
         if (r) myRosterIds.set(l.league_id, r.roster_id);
       });
 
-      const WEEKS = Array.from({length: 18}, (_, i) => i + 1);
+      const numWeeks = parseInt(year) < 2021 ? 16 : 18; // 17 games = 18 weeks (2021+). Pre-2021 was 16 games (17 weeks).
+      // Actually, Sleeper API supports up to 17 weeks for pre-2021. 
+      // 2021+: 18 weeks.
+      // Let's set it safely.
+      const maxWeeks = parseInt(year) < 2021 ? 17 : 18;
+      
+      const WEEKS = Array.from({length: maxWeeks}, (_, i) => i + 1);
       const newRawHistory: Map<string, WeeklyStats>[] = [];
       const globalPlayerCounts = new Map<string, number>(); // PlayerID -> Total Weeks Owned
 
@@ -159,8 +172,8 @@ export default function TrendsPage() {
           leagues,
           week,
           (c, t) => {
-            const base = 10 + (i / 18) * 90;
-            const step = (c / t) * (90 / 18);
+            const base = 10 + (i / maxWeeks) * 90;
+            const step = (c / t) * (90 / maxWeeks);
             setProgress(base + step);
           }
         );
@@ -266,13 +279,21 @@ export default function TrendsPage() {
         title="Exposure Trends" 
         subtitle="Visualize how your player ownership has changed throughout the season."
         action={
-          <Button 
-            variant="contained" 
-            onClick={startAnalysis} 
-            disabled={loading || !user}
-          >
-            {loading ? 'Scanning History...' : 'Generate Graph'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 100 }}>
+              <InputLabel>Year</InputLabel>
+              <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
+                {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Button 
+              variant="contained" 
+              onClick={startAnalysis} 
+              disabled={loading || !user}
+            >
+              {loading ? 'Scanning...' : 'Generate Graph'}
+            </Button>
+          </Box>
         }
       />
 
