@@ -34,6 +34,7 @@ import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import playerData from '../../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
+import YearSelector from '@/components/common/YearSelector';
 
 // --- Types ---
 type WeeklyStats = {
@@ -54,9 +55,6 @@ const COLORS = [
   '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#d0ed57', 
   '#a4de6c', '#8dd1e1', '#83a6ed', '#8e4585', '#ff0000'
 ];
-
-const MAX_YEAR = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-const YEARS = Array.from({ length: MAX_YEAR - 2017 + 1 }, (_, i) => (MAX_YEAR - i).toString());
 
 const filterOptions = createFilterOptions({
   matchFrom: 'any',
@@ -280,12 +278,12 @@ export default function TrendsPage() {
         subtitle="Visualize how your player ownership has changed throughout the season."
         action={
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 100 }}>
-              <InputLabel>Year</InputLabel>
-              <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
-                {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <YearSelector 
+              userId={user?.user_id} 
+              selectedYear={year} 
+              onChange={setYear} 
+              disabled={loading} 
+            />
             <Button 
               variant="contained" 
               onClick={startAnalysis} 

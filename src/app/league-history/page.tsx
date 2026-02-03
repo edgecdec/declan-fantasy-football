@@ -27,9 +27,7 @@ import {
 } from '@mui/material';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import PageHeader from '@/components/common/PageHeader';
-
-const MAX_YEAR = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-const YEARS = Array.from({ length: MAX_YEAR - 2017 + 1 }, (_, i) => (MAX_YEAR - i).toString());
+import YearSelector from '@/components/common/YearSelector';
 
 // --- Types ---
 type MemberHistory = {
@@ -134,6 +132,7 @@ function H2HMatrix({ members, mode }: { members: MemberHistory[], mode: 'record'
 
 export default function LeagueHistoryPage() {
   const [username, setUsername] = React.useState('');
+  const [userId, setUserId] = React.useState<string | undefined>(undefined);
   const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
   const [year, setYear] = React.useState('2025');
   
@@ -175,6 +174,8 @@ export default function LeagueHistoryPage() {
       const userRes = await SleeperService.getUser(username);
       if (!userRes) throw new Error('User not found');
       
+      setUserId(userRes.user_id);
+
       const newSaved = [username, ...savedUsernames.filter(u => u !== username)].slice(0, 5);
       setSavedUsernames(newSaved);
       localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
@@ -344,12 +345,12 @@ export default function LeagueHistoryPage() {
               renderInput={(params) => <TextField {...params} label="Sleeper Username" sx={{ minWidth: 200 }} />}
               disabled={loading && leagues.length === 0}
             />
-            <FormControl sx={{ minWidth: 100 }}>
-              <InputLabel>Year</InputLabel>
-              <Select value={year} label="Year" onChange={(e) => setYear(e.target.value)} disabled={loading}>
-                {YEARS.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <YearSelector 
+              userId={userId} 
+              selectedYear={year} 
+              onChange={setYear} 
+              disabled={loading} 
+            />
             <Button 
               variant="contained" 
               onClick={handleFetchLeagues} 

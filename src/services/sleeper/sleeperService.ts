@@ -168,6 +168,34 @@ export const SleeperService = {
     return false;
   },
 
+  async getActiveSeasons(userId: string): Promise<string[]> {
+    const cacheKey = `active_seasons_${userId}`;
+    const cached = getCached<string[]>(cacheKey);
+    if (cached) return cached;
+
+    const startYear = 2017;
+    const currentYear = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+    const yearsToCheck = Array.from({ length: currentYear - startYear + 1 }, (_, i) => (currentYear - i).toString());
+
+    // Check all years in parallel
+    const results = await Promise.all(yearsToCheck.map(async (year) => {
+      try {
+        const leagues = await this.getLeagues(userId, year);
+        return leagues.length > 0 ? year : null;
+      } catch {
+        return null;
+      }
+    }));
+
+    const activeSeasons = results.filter((y): y is string => y !== null);
+    
+    // If no seasons found (e.g. API error or new user), return at least current year
+    if (activeSeasons.length === 0) activeSeasons.push(currentYear.toString());
+
+    setCached(cacheKey, activeSeasons);
+    return activeSeasons;
+  },
+
   async getWinnersBracket(leagueId: string): Promise<SleeperBracketMatch[]> {
     const cacheKey = `bracket_winners_${leagueId}`;
     const cached = getCached<SleeperBracketMatch[]>(cacheKey);
