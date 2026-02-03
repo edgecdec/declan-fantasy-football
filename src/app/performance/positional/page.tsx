@@ -48,12 +48,10 @@ const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 type AggregatePositionStats = {
   position: string;
-  // Total Output Stats
   avgUserPoints: number;
   avgLeaguePoints: number;
   diffPoints: number;
   diffPct: number;
-  // Efficiency Stats
   avgUserEff: number;
   avgLeagueEff: number;
   diffEff: number;
@@ -61,15 +59,11 @@ type AggregatePositionStats = {
 };
 
 // Custom Tooltip Component
-// ... (omitted for brevity, just inserting metadata before export default)
-
-// Custom Tooltip Component
-const CustomTooltip = ({ active, payload, label, metric }: any) => {
+const CustomTooltip = ({ active, payload, metric }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload as AggregatePositionStats;
     const isTotal = metric === 'total';
     
-    // Select values based on metric
     const userVal = isTotal ? data.avgUserPoints : data.avgUserEff;
     const leagueVal = isTotal ? data.avgLeaguePoints : data.avgLeagueEff;
     const diffVal = isTotal ? data.diffPoints : data.diffEff;
@@ -123,7 +117,8 @@ export default function PositionalBenchmarksPage() {
   
   const [results, setResults] = React.useState<LeagueBenchmarkResult[]>([]);
   const [aggregateData, setAggregateData] = React.useState<AggregatePositionStats[]>([]);
-  const [metric, setMetric] = React.useState<'total' | 'efficiency'>('total');
+  const [metric, setMetric] = React.useState<'total' | 'efficiency'>('efficiency');
+  const [globalImpacts, setGlobalImpacts] = React.useState<any[]>([]);
 
   // Init
   React.useEffect(() => {
@@ -185,6 +180,7 @@ export default function PositionalBenchmarksPage() {
 
       setResults(batchResults);
       calculateAggregates(batchResults);
+      calculateGlobalImpacts(batchResults);
 
     } catch (e) {
       console.error(e);
@@ -192,6 +188,27 @@ export default function PositionalBenchmarksPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateGlobalImpacts = (data: LeagueBenchmarkResult[]) => {
+    const impactMap = new Map<string, { totalPOLA: number, weeks: number, name: string, pos: string }>();
+
+    data.forEach(res => {
+      res.playerImpacts.forEach(p => {
+        const curr = impactMap.get(p.playerId) || { totalPOLA: 0, weeks: 0, name: p.name, pos: p.position };
+        curr.totalPOLA += p.totalPOLA;
+        curr.weeks += p.weeksStarted;
+        impactMap.set(p.playerId, curr);
+      });
+    });
+
+    const sorted = Array.from(impactMap.entries()).map(([id, val]) => ({
+      playerId: id,
+      ...val,
+      avgPOLA: val.totalPOLA / val.weeks
+    })).sort((a, b) => b.totalPOLA - a.totalPOLA);
+
+    setGlobalImpacts(sorted);
   };
 
   const calculateAggregates = (data: LeagueBenchmarkResult[]) => {
@@ -220,7 +237,6 @@ export default function PositionalBenchmarksPage() {
 
     const aggData: AggregatePositionStats[] = VALID_POSITIONS.map(pos => {
         const c = counts[pos] || 1;
-        
         const avgUserPoints = sums.total.user[pos] / c;
         const avgLeaguePoints = sums.total.league[pos] / c;
         const diffPoints = avgUserPoints - avgLeaguePoints;
@@ -233,14 +249,8 @@ export default function PositionalBenchmarksPage() {
 
         return {
             position: pos,
-            avgUserPoints,
-            avgLeaguePoints,
-            diffPoints,
-            diffPct,
-            avgUserEff,
-            avgLeagueEff,
-            diffEff,
-            diffEffPct
+            avgUserPoints, avgLeaguePoints, diffPoints, diffPct,
+            avgUserEff, avgLeagueEff, diffEff, diffEffPct
         };
     });
 
@@ -254,11 +264,7 @@ export default function PositionalBenchmarksPage() {
         subtitle="Compare your positional scoring output against league averages to identify roster strengths and weaknesses."
         action={
           <Link href="/performance/positional/history" passHref>
-            <Button
-              variant="outlined"
-              startIcon={<HistoryIcon />}
-              sx={{ height: 40 }}
-            >
+            <Button variant="outlined" startIcon={<HistoryIcon />} sx={{ height: 40 }}>
               Historical Analysis
             </Button>
           </Link>
@@ -275,13 +281,7 @@ export default function PositionalBenchmarksPage() {
               {['2025', '2024', '2023'].map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
             </Select>
           </FormControl>
-          <Button 
-            variant="contained" 
-            size="large"
-            onClick={handleAnalyze}
-            disabled={loading || !username}
-            sx={{ height: 56 }}
-          >
+          <Button variant="contained" size="large" onClick={handleAnalyze} disabled={loading || !username} sx={{ height: 56 }}>
             {loading ? 'Analyzing...' : 'Analyze'}
           </Button>
         </Box>
@@ -293,51 +293,96 @@ export default function PositionalBenchmarksPage() {
         )}
       </Paper>
 
-      {/* Aggregate Chart */}
+      {/* Aggregate Stats Section */}
       {!loading && aggregateData.length > 0 && (
-        <Paper sx={{ p: 3, mb: 4, bgcolor: '#1e293b' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Box>
-                <Typography variant="h5" gutterBottom color="white">Overall "Skill Profile"</Typography>
-                <Typography variant="body2" color="rgba(255,255,255,0.7)">
-                    Your average {metric === 'total' ? 'scoring surplus/deficit' : 'efficiency gap'} vs league average across all leagues.
-                </Typography>
-            </Box>
-            
-            <ToggleButtonGroup
-                value={metric}
-                exclusive
-                onChange={(_, v) => v && setMetric(v)}
-                size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
-            >
-                <ToggleButton value="total" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
-                    Total Output
-                </ToggleButton>
-                <ToggleButton value="efficiency" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
-                    Efficiency
-                </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-          
-          <Box sx={{ height: 400, width: '100%' }}>
-            <ResponsiveContainer>
-              <BarChart data={aggregateData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" horizontal={false} />
-                <XAxis type="number" stroke="#888" unit="%" />
-                <YAxis dataKey="position" type="category" stroke="#fff" width={50} />
-                <Tooltip content={<CustomTooltip metric={metric} />} />
-                <ReferenceLine x={0} stroke="#fff" />
-                <Bar dataKey={metric === 'total' ? 'diffPct' : 'diffEffPct'} name="% Diff">
-                  {aggregateData.map((entry, index) => {
-                    const val = metric === 'total' ? entry.diffPct : entry.diffEffPct;
-                    return <Cell key={`cell-${index}`} fill={val > 0 ? '#66bb6a' : '#ef5350'} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        </Paper>
+        <Grid container spacing={4} sx={{ mb: 4 }}>
+          {/* Chart */}
+          <Grid size={{ xs: 12, lg: 8 }}>
+            <Paper sx={{ p: 3, height: '100%', bgcolor: '#1e293b' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box>
+                    <Typography variant="h5" gutterBottom color="white">Overall "Skill Profile"</Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.7)">
+                        Your average {metric === 'total' ? 'scoring surplus/deficit' : 'efficiency gap'} across all leagues.
+                    </Typography>
+                </Box>
+                
+                <ToggleButtonGroup
+                    value={metric}
+                    exclusive
+                    onChange={(_, v) => v && setMetric(v)}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+                >
+                    <ToggleButton value="total" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
+                        Total Output
+                    </ToggleButton>
+                    <ToggleButton value="efficiency" sx={{ color: 'white', '&.Mui-selected': { bgcolor: 'primary.main', color: 'white' } }}>
+                        Efficiency
+                    </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              
+              <Box sx={{ height: 400, width: '100%' }}>
+                <ResponsiveContainer>
+                  <BarChart data={aggregateData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" horizontal={false} />
+                    <XAxis type="number" stroke="#888" unit="%" />
+                    <YAxis dataKey="position" type="category" stroke="#fff" width={50} />
+                    <Tooltip content={<CustomTooltip metric={metric} />} />
+                    <ReferenceLine x={0} stroke="#fff" />
+                    <Bar dataKey={metric === 'total' ? 'diffPct' : 'diffEffPct'} name="% Diff">
+                      {aggregateData.map((entry, index) => {
+                        const val = metric === 'total' ? entry.diffPct : entry.diffEffPct;
+                        return <Cell key={`cell-${index}`} fill={val > 0 ? '#66bb6a' : '#ef5350'} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          {/* Global Impact (MVPs) */}
+          <Grid size={{ xs: 12, lg: 4 }}>
+            <Paper sx={{ p: 3, height: '100%' }}>
+              <Typography variant="h6" gutterBottom>Portfolio MVPs & LVPs</Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                Players who gained/lost you the most points vs position average across all leagues.
+              </Typography>
+              
+              <Typography variant="subtitle2" color="success.main" gutterBottom sx={{ mt: 2 }}>Top Contributors (Carriers)</Typography>
+              {globalImpacts.slice(0, 4).map((p) => (
+                <Box key={p.playerId} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, p: 1, borderLeft: '4px solid #66bb6a', bgcolor: 'background.default' }}>
+                  <Box>
+                    <Typography variant="body2" fontWeight="bold">{p.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{p.position} • {p.weeks} starts</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" fontWeight="bold" color="#66bb6a">+{p.totalPOLA.toFixed(1)}</Typography>
+                    <Typography variant="caption" color="text.secondary">+{p.avgPOLA.toFixed(1)} / wk</Typography>
+                  </Box>
+                </Box>
+              ))}
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle2" color="error.main" gutterBottom>Biggest Anchors</Typography>
+              {[...globalImpacts].reverse().slice(0, 4).map((p) => (
+                <Box key={p.playerId} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, p: 1, borderLeft: '4px solid #ef5350', bgcolor: 'background.default' }}>
+                  <Box>
+                    <Typography variant="body2" fontWeight="bold">{p.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{p.position} • {p.weeks} starts</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" fontWeight="bold" color="#ef5350">{p.totalPOLA.toFixed(1)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{p.avgPOLA.toFixed(1)} / wk</Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Paper>
+          </Grid>
+        </Grid>
       )}
 
       {/* Individual Leagues */}
@@ -353,18 +398,11 @@ export default function PositionalBenchmarksPage() {
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={4}>
-                      {/* Chart 1: Total Output */}
                       <Grid size={{ xs: 12, md: 6 }}>
                         <Typography variant="subtitle1" gutterBottom align="center">Average Weekly Output</Typography>
                         <Box sx={{ height: 300 }}>
                           <ResponsiveContainer>
-                            <BarChart 
-                              data={VALID_POSITIONS.map(pos => ({
-                                pos,
-                                You: res.userStats[pos].avgPointsPerWeek,
-                                Avg: res.leagueAverageStats[pos].avgPointsPerWeek
-                              }))}
-                            >
+                            <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos].avgPointsPerWeek, Avg: res.leagueAverageStats[pos].avgPointsPerWeek }))}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="pos" />
                               <YAxis />
@@ -376,19 +414,11 @@ export default function PositionalBenchmarksPage() {
                           </ResponsiveContainer>
                         </Box>
                       </Grid>
-
-                      {/* Chart 2: Efficiency */}
                       <Grid size={{ xs: 12, md: 6 }}>
                         <Typography variant="subtitle1" gutterBottom align="center">Efficiency (Points Per Start)</Typography>
                         <Box sx={{ height: 300 }}>
                           <ResponsiveContainer>
-                            <BarChart 
-                              data={VALID_POSITIONS.map(pos => ({
-                                pos,
-                                You: res.userStats[pos].avgPointsPerStarter,
-                                Avg: res.leagueAverageStats[pos].avgPointsPerStarter
-                              }))}
-                            >
+                            <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos].avgPointsPerStarter, Avg: res.leagueAverageStats[pos].avgPointsPerStarter }))}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="pos" />
                               <YAxis />
@@ -403,11 +433,9 @@ export default function PositionalBenchmarksPage() {
                     </Grid>
 
                     <Divider sx={{ my: 3 }} />
-                    
-                    <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Player Impact (Points Over League Avg)</Typography>
+                    <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>League Player Impact (Points Over League Avg)</Typography>
                     <Grid container spacing={4}>
-                      {/* Top Contributors */}
-                      <Grid item xs={12} md={6}>
+                      <Grid size={{ xs: 12, md: 6 }}>
                         <Typography variant="body2" color="text.secondary" gutterBottom>Top Contributors (Carriers)</Typography>
                         {res.playerImpacts.slice(0, 5).map((p) => (
                           <Box key={p.playerId} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, p: 1, bgcolor: 'rgba(76, 175, 80, 0.1)', borderRadius: 1 }}>
@@ -422,9 +450,7 @@ export default function PositionalBenchmarksPage() {
                           </Box>
                         ))}
                       </Grid>
-
-                      {/* Underperformers */}
-                      <Grid item xs={12} md={6}>
+                      <Grid size={{ xs: 12, md: 6 }}>
                         <Typography variant="body2" color="text.secondary" gutterBottom>Underperformers (Anchors)</Typography>
                         {[...res.playerImpacts].reverse().slice(0, 5).map((p) => (
                           <Box key={p.playerId} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, p: 1, bgcolor: 'rgba(239, 83, 80, 0.1)', borderRadius: 1 }}>
