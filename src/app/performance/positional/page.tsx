@@ -239,10 +239,13 @@ export default function PositionalBenchmarksPage() {
       })
       .forEach(item => {
         item.result.playerImpacts.forEach(p => {
-          const curr = impactMap.get(p.playerId) || { totalPOLA: 0, weeks: 0, name: p.name, pos: p.position };
-          curr.totalPOLA += p.totalPOLA;
-          curr.weeks += p.weeksStarted;
-          impactMap.set(p.playerId, curr);
+          // Only count MY impacts for the portfolio view
+          if (p.ownerId === user?.user_id) {
+            const curr = impactMap.get(p.playerId) || { totalPOLA: 0, weeks: 0, name: p.name, pos: p.position };
+            curr.totalPOLA += p.totalPOLA;
+            curr.weeks += p.weeksStarted;
+            impactMap.set(p.playerId, curr);
+          }
         });
       });
 
@@ -284,12 +287,13 @@ export default function PositionalBenchmarksPage() {
         const u = res.userStats[pos];
         const l = res.leagueAverageStats[pos];
         
-        if (l.avgPointsPerWeek > 0) {
-          sums.total.user[pos] += u.avgPointsPerWeek;
-          sums.total.league[pos] += l.avgPointsPerWeek;
+        const lVal = l?.avgPointsPerWeek || 0;
+        if (lVal > 0) {
+          sums.total.user[pos] += (u?.avgPointsPerWeek || 0);
+          sums.total.league[pos] += lVal;
           
-          sums.efficiency.user[pos] += u.avgPointsPerStarter;
-          sums.efficiency.league[pos] += l.avgPointsPerStarter;
+          sums.efficiency.user[pos] += (u?.avgPointsPerStarter || 0);
+          sums.efficiency.league[pos] += (l?.avgPointsPerStarter || 0);
           
           counts[pos]++;
         }
