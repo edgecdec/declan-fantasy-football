@@ -67,6 +67,47 @@ export type SleeperBracketMatch = {
   t2_from?: { w?: number; l?: number } | null;
 };
 
+export type SleeperDraft = {
+  draft_id: string;
+  league_id: string;
+  season: string;
+  status: string; // "pre_draft", "drafting", "complete"
+  type: string; // "snake", "linear"
+  settings: {
+    rounds: number;
+    slots_bn: number;
+    slots_flex: number;
+    slots_rb: number;
+    slots_wr: number;
+    slots_te: number;
+    slots_qb: number;
+    slots_k: number;
+    slots_def: number;
+    teams: number;
+    pick_time: number;
+  };
+  metadata: {
+    name: string;
+    description: string;
+  };
+};
+
+export type SleeperDraftPick = {
+  pick_no: number;
+  round: number;
+  draft_slot: number;
+  player_id: string;
+  picked_by: string;
+  roster_id: number;
+  is_keeper: boolean | null;
+  metadata: {
+    first_name: string;
+    last_name: string;
+    position: string;
+    team: string;
+  };
+};
+
 // Cache keys
 const CACHE_PREFIX = 'sleeper_cache_';
 const CACHE_DURATION_MS = 1000 * 60 * 15; // 15 minutes
@@ -228,6 +269,53 @@ export const SleeperService = {
       return data;
     } catch (e) {
       console.error(`Error fetching losers bracket for league ${leagueId}`, e);
+      return [];
+    }
+  },
+
+  async getDrafts(userId: string, year: string): Promise<SleeperDraft[]> {
+    const cacheKey = `drafts_${userId}_${year}`;
+    const cached = getCached<SleeperDraft[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/user/${userId}/drafts/nfl/${year}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      setCached(cacheKey, data);
+      return data;
+    } catch (e) {
+      console.error('Error fetching drafts', e);
+      return [];
+    }
+  },
+
+  async getDraft(draftId: string): Promise<SleeperDraft | null> {
+    const cacheKey = `draft_${draftId}`;
+    const cached = getCached<SleeperDraft>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/draft/${draftId}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      setCached(cacheKey, data);
+      return data;
+    } catch (e) {
+      console.error(`Error fetching draft ${draftId}`, e);
+      return null;
+    }
+  },
+
+  async getDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
+    // Live data - no cache for picks
+    try {
+      const res = await fetch(`${BASE_URL}/draft/${draftId}/picks`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      console.error(`Error fetching draft picks ${draftId}`, e);
       return [];
     }
   },
