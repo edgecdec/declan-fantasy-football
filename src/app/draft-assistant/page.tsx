@@ -1,13 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { Container, Typography, Box, Paper, Button, Alert, List, ListItem, ListItemText, ListItemButton, Chip, Divider, LinearProgress } from '@mui/material';
+import { Container, Typography, Box, Paper, Button, Alert, List, ListItem, ListItemText, ListItemButton, Chip, Divider, LinearProgress, Grid } from '@mui/material';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import YearSelector from '@/components/common/YearSelector';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import DraftBoard from '@/components/draft/DraftBoard';
+import BestAvailable from '@/components/draft/BestAvailable';
 
 export default function DraftAssistantPage() {
   const { user, fetchUser } = useUser();
@@ -185,7 +186,16 @@ export default function DraftAssistantPage() {
 
           {refreshing && <LinearProgress sx={{ mb: 2 }} />}
 
-          <DraftBoard draft={selectedDraft} picks={picks} />
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, lg: 9 }}>
+              <DraftBoard draft={selectedDraft} picks={picks} />
+            </Grid>
+            <Grid size={{ xs: 12, lg: 3 }}>
+              <Box sx={{ height: 600 }}>
+                <BestAvailable draft={selectedDraft} picks={picks} />
+              </Box>
+            </Grid>
+          </Grid>
         </Box>
       )}
     </Container>
