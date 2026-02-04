@@ -27,6 +27,7 @@ import { SleeperService } from '@/services/sleeper/sleeperService';
 import { analyzeLeague } from '@/services/stats/expectedWins';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import LuckSummaryCard from '@/components/analytics/LuckSummaryCard';
 
 // Min year for Sleeper
 const MIN_YEAR = 2017;
@@ -39,6 +40,8 @@ type YearlyStats = {
   totalActual: number;
   totalExpected: number;
   totalOpportunities: number;
+  totalPF: number;
+  totalPA: number;
   leaguesCount: number;
 };
 
@@ -114,6 +117,8 @@ export default function LuckTrendsPage() {
           let yearActual = 0;
           let yearExpected = 0;
           let yearOpp = 0;
+          let yearPF = 0;
+          let yearPA = 0;
           let count = 0;
 
           // 2. Analyze leagues in chunks
@@ -127,6 +132,8 @@ export default function LuckTrendsPage() {
                          yearActual += stats.userStats.actualWins;
                          yearExpected += stats.userStats.expectedWins;
                          yearOpp += stats.userStats.totalOpportunities;
+                         yearPF += stats.userStats.pointsFor;
+                         yearPA += stats.userStats.pointsAgainst;
                          count++;
                      }
                  } catch (e) {
@@ -141,6 +148,8 @@ export default function LuckTrendsPage() {
                   totalActual: yearActual,
                   totalExpected: yearExpected,
                   totalOpportunities: yearOpp,
+                  totalPF: yearPF,
+                  totalPA: yearPA,
                   actualPct: parseFloat(((yearActual / yearOpp) * 100).toFixed(1)),
                   expectedPct: parseFloat(((yearExpected / yearOpp) * 100).toFixed(1)),
                   luck: yearActual - yearExpected,
@@ -212,7 +221,30 @@ export default function LuckTrendsPage() {
       </Paper>
 
       {history.length > 0 ? (
-        <Paper sx={{ p: 3, height: 600 }}>
+        <>
+          {/* Historical Totals Dashboard */}
+          {(() => {
+            const grandTotal = history.reduce((acc, curr) => ({
+              actual: acc.actual + curr.totalActual,
+              expected: acc.expected + curr.totalExpected,
+              opp: acc.opp + curr.totalOpportunities,
+              pf: acc.pf + curr.totalPF,
+              pa: acc.pa + curr.totalPA
+            }), { actual: 0, expected: 0, opp: 0, pf: 0, pa: 0 });
+
+            return (
+              <LuckSummaryCard
+                actualWins={grandTotal.actual}
+                expectedWins={grandTotal.expected}
+                totalOpportunities={grandTotal.opp}
+                pointsFor={grandTotal.pf}
+                pointsAgainst={grandTotal.pa}
+                showAdvanced={true}
+              />
+            );
+          })()}
+
+          <Paper sx={{ p: 3, height: 600 }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={history} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#444" />
@@ -255,6 +287,7 @@ export default function LuckTrendsPage() {
              </Typography>
           </Box>
         </Paper>
+        </>
       ) : (
         !loading && (
           <Alert severity="info">

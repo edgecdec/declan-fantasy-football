@@ -43,6 +43,7 @@ import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster } from '@/ser
 import { analyzeLeague, TeamStats } from '@/services/stats/expectedWins';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import LuckSummaryCard from '@/components/analytics/LuckSummaryCard';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -56,78 +57,6 @@ type LeagueData = {
 };
 
 // --- Helper Components ---
-
-function SummaryCard({ data, showAdvanced }: { data: LeagueData[], showAdvanced: boolean }) {
-  const active = data.filter(d => d.category === 'included' && d.status === 'complete');
-  
-  const totalActual = active.reduce((sum, d) => sum + (d.userStats?.actualWins || 0), 0);
-  const totalExpected = active.reduce((sum, d) => sum + (d.userStats?.expectedWins || 0), 0);
-  const totalOpportunities = active.reduce((sum, d) => sum + (d.userStats?.totalOpportunities || 0), 0);
-  
-  const diff = totalActual - totalExpected;
-
-  const totalPF = active.reduce((sum, d) => sum + (d.userStats?.pointsFor || 0), 0);
-  const totalPA = active.reduce((sum, d) => sum + (d.userStats?.pointsAgainst || 0), 0);
-  const pointsDiff = totalPF - totalPA;
-
-  const actualPct = totalOpportunities > 0 ? (totalActual / totalOpportunities) * 100 : 0;
-  const expectedPct = totalOpportunities > 0 ? (totalExpected / totalOpportunities) * 100 : 0;
-
-  return (
-    <Card sx={{ mb: 4, bgcolor: '#0d47a1', color: 'white', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 4 }}>
-      <CardContent>
-        <Grid container spacing={4} textAlign="center">
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Actual</Typography>
-            <Typography variant="h3" fontWeight="bold">
-              {totalActual.toFixed(0)} <Typography component="span" variant="h5" sx={{ color: 'rgba(255,255,255,0.5)' }}>Wins</Typography>
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>Win Rate: {actualPct.toFixed(1)}%</Typography>
-          </Grid>
-          
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Expected</Typography>
-            <Typography variant="h3" fontWeight="bold">
-              {totalExpected.toFixed(1)} <Typography component="span" variant="h5" sx={{ color: 'rgba(255,255,255,0.5)' }}>Wins</Typography>
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>Exp. Win Rate: {expectedPct.toFixed(1)}%</Typography>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Luck</Typography>
-            <Typography variant="h3" fontWeight="bold" sx={{ color: diff > 0 ? '#66bb6a' : '#ef5350' }}>
-              {diff > 0 ? '+' : ''}{diff.toFixed(1)}
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>Wins vs Expected</Typography>
-          </Grid>
-
-          {showAdvanced && (
-            <>
-              <Grid size={{ xs: 12 }}><Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)' }} /></Grid>
-              
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Points For</Typography>
-                <Typography variant="h4" fontWeight="bold">{totalPF.toLocaleString()}</Typography>
-              </Grid>
-              
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Points Against</Typography>
-                <Typography variant="h4" fontWeight="bold">{totalPA.toLocaleString()}</Typography>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 4 }}>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>Point Diff</Typography>
-                <Typography variant="h4" fontWeight="bold" sx={{ color: pointsDiff > 0 ? '#66bb6a' : '#ef5350' }}>
-                  {pointsDiff > 0 ? '+' : ''}{pointsDiff.toLocaleString()}
-                </Typography>
-              </Grid>
-            </>
-          )}
-        </Grid>
-      </CardContent>
-    </Card>
-  );
-}
 
 function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData, userId: string, onToggle: () => void, showAdvanced: boolean }) {
   const { league, status, userStats: stats, standings, category } = item;
@@ -451,7 +380,26 @@ export default function ExpectedWinsPage() {
         {analyzing && <LinearProgress variant="determinate" value={progress} sx={{ mt: 3 }} />}
       </Paper>
 
-      <SummaryCard data={leagueData} showAdvanced={showAdvanced} />
+      {(() => {
+        const activeLeagues = leagueData.filter(d => d.category === 'included' && d.status === 'complete');
+        const totals = {
+          actual: activeLeagues.reduce((sum, d) => sum + (d.userStats?.actualWins || 0), 0),
+          expected: activeLeagues.reduce((sum, d) => sum + (d.userStats?.expectedWins || 0), 0),
+          opp: activeLeagues.reduce((sum, d) => sum + (d.userStats?.totalOpportunities || 0), 0),
+          pf: activeLeagues.reduce((sum, d) => sum + (d.userStats?.pointsFor || 0), 0),
+          pa: activeLeagues.reduce((sum, d) => sum + (d.userStats?.pointsAgainst || 0), 0),
+        };
+        return (
+          <LuckSummaryCard 
+            actualWins={totals.actual}
+            expectedWins={totals.expected}
+            totalOpportunities={totals.opp}
+            pointsFor={totals.pf}
+            pointsAgainst={totals.pa}
+            showAdvanced={showAdvanced}
+          />
+        );
+      })()}
 
       {leagueData.some(d => d.category === 'included') && (
         <Box sx={{ mb: 4 }}>
