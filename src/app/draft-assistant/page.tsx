@@ -11,7 +11,8 @@ import { SleeperService, SleeperDraft } from '@/services/sleeper/sleeperService'
 export default function DraftAssistantPage() {
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
+  // Drafts happen early, so default to actual current year (e.g. Feb 2026 = 2026 season)
+  const [year, setYear] = React.useState(String(new Date().getFullYear()));
   
   const [loading, setLoading] = React.useState(false);
   const [drafts, setDrafts] = React.useState<SleeperDraft[]>([]);

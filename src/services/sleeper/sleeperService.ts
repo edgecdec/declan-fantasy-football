@@ -217,7 +217,8 @@ export const SleeperService = {
     if (cached) return cached;
 
     const startYear = 2017;
-    const currentYear = new Date().getMonth() < 5 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+    // Always check up to current year (and maybe next year if late in season, but current is fine for now)
+    const currentYear = new Date().getFullYear();
     const yearsToCheck = Array.from({ length: currentYear - startYear + 1 }, (_, i) => (currentYear - i).toString());
 
     // Check all years in parallel
