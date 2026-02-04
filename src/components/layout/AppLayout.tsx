@@ -36,11 +36,12 @@ import HistoryIcon from '@mui/icons-material/History'; // Legacy
 import BarChartIcon from '@mui/icons-material/BarChart'; // Positional
 import BugReportIcon from '@mui/icons-material/BugReport';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand icon
+import ListAltIcon from '@mui/icons-material/ListAlt'; // Draft Assistant
 import { useUser } from '@/context/UserContext';
 
 const drawerWidth = 240;
 
-const MENU_ITEMS = [
+const BASE_MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
   { text: 'Positional Benchmarks', href: '/performance/positional', icon: <BarChartIcon /> },
@@ -50,6 +51,11 @@ const MENU_ITEMS = [
   { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
+
+// Conditionally add dev-only items
+const MENU_ITEMS = process.env.NODE_ENV === 'development' 
+  ? [...BASE_MENU_ITEMS, { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> }]
+  : BASE_MENU_ITEMS;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useUser();
