@@ -46,6 +46,14 @@ type LeagueHeatmapData = {
 
 type SeasonPlayerImpact = PlayerImpact & { season: string };
 
+const formatWeeks = (weeks?: Record<string, number[]>) => {
+  if (!weeks) return 'No data';
+  return Object.entries(weeks)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([year, w]) => `${year}: Week ${w.sort((a, b) => a - b).join(', ')}`)
+    .join('\n');
+};
+
 export default function LeaguePositionalPage() {
   const params = useParams();
   const router = useRouter();
@@ -449,7 +457,13 @@ export default function LeaguePositionalPage() {
                     label: 'Starts', 
                     numeric: true, 
                     sortable: true,
-                    render: (row) => row.weeksStarted || row.weeks
+                    render: (row) => (
+                      <Tooltip title={<div style={{ whiteSpace: 'pre-line' }}>{formatWeeks(row.startedWeeks)}</div>} arrow>
+                        <span style={{ cursor: 'help', borderBottom: '1px dotted #999' }}>
+                          {row.weeksStarted || row.weeks}
+                        </span>
+                      </Tooltip>
+                    )
                   },
                   { 
                     id: 'totalPOLA', 
@@ -537,7 +551,13 @@ export default function LeaguePositionalPage() {
                 label: 'Starts', 
                 numeric: true, 
                 sortable: true,
-                render: (row) => row.weeksStarted || row.weeks
+                render: (row) => (
+                  <Tooltip title={<div style={{ whiteSpace: 'pre-line' }}>{formatWeeks(row.startedWeeks)}</div>} arrow>
+                    <span style={{ cursor: 'help', borderBottom: '1px dotted #999' }}>
+                      {row.weeksStarted || row.weeks}
+                    </span>
+                  </Tooltip>
+                )
               },
               { 
                 id: 'totalPOLA', 
