@@ -35,6 +35,7 @@ import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleepe
 import playerData from '../../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import YearSelector from '@/components/common/YearSelector';
+import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
 // --- Types ---
 type WeeklyStats = {
@@ -334,8 +335,13 @@ export default function TrendsPage() {
                     label={pos} 
                     onClick={() => selectPosition(pos)} 
                     variant="outlined"
-                    color="primary"
                     size="small"
+                    sx={{ 
+                      bgcolor: getPositionBgColor(pos, 0.1), 
+                      borderColor: getPositionColor(pos), 
+                      color: getPositionColor(pos), 
+                      fontWeight: 'bold' 
+                    }}
                   />
                 ))}
                 <Chip label="Clear All" onClick={clearSelection} color="error" variant="outlined" size="small" />

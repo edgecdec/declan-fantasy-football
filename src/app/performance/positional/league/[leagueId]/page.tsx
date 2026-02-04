@@ -33,6 +33,7 @@ import PageHeader from '@/components/common/PageHeader';
 import SkillProfileChart, { AggregatePositionStats } from '@/components/performance/SkillProfileChart';
 import PlayerImpactList, { PlayerImpact } from '@/components/performance/PlayerImpactList';
 import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
+import { getPositionColor } from '@/constants/colors';
 
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
@@ -428,7 +429,19 @@ export default function LeaguePositionalPage() {
                 defaultSortOrder="desc"
                 columns={[
                   { id: 'name', label: 'Player', numeric: false, sortable: true, filterVariant: 'text' },
-                  { id: 'position', label: 'Pos', numeric: false, sortable: true, filterVariant: 'multi-select', width: 80 },
+                  { 
+                    id: 'position', 
+                    label: 'Pos', 
+                    numeric: false, 
+                    sortable: true, 
+                    filterVariant: 'multi-select', 
+                    width: 80,
+                    render: (row) => (
+                      <Box component="span" sx={{ color: getPositionColor(row.position), fontWeight: 'bold' }}>
+                        {row.position}
+                      </Box>
+                    )
+                  },
                   { id: 'ownerName', label: 'Manager', numeric: false, sortable: true, filterVariant: 'multi-select' },
                   { id: 'season', label: 'Season', numeric: false, sortable: true, filterVariant: 'multi-select', width: 100 },
                   { 
@@ -517,7 +530,7 @@ export default function LeaguePositionalPage() {
                     <TableCell>{index + 1}</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>{p.name}</TableCell>
                     <TableCell>{p.ownerName}</TableCell>
-                    <TableCell>{p.position}</TableCell>
+                    <TableCell sx={{ color: getPositionColor(p.position), fontWeight: 'bold' }}>{p.position}</TableCell>
                     <TableCell align="right">{p.weeksStarted || p.weeks}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold', color: p.totalPOLA > 0 ? 'success.main' : 'error.main' }}>
                       {p.totalPOLA > 0 ? '+' : ''}{p.totalPOLA.toFixed(1)}

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Box, Paper, Typography, Tooltip, Avatar } from '@mui/material';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
+import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
 type Props = {
   draft: SleeperDraft;
@@ -62,6 +63,10 @@ export default function DraftBoard({ draft, picks }: Props) {
               // Snake Round 2: Slot 12 = Pick 13. Slot 1 = Pick 24.
               // So mapping pick to [r][s] uses pick.draft_slot which Sleeper provides correctly for the column.
               
+              const position = pick?.metadata?.position || 'BENCH';
+              const bgColor = isPicked ? getPositionBgColor(position, 0.2) : 'rgba(255,255,255,0.05)';
+              const borderColor = isPicked ? getPositionColor(position) : 'rgba(255,255,255,0.1)';
+
               return (
                 <Paper 
                   key={slotIdx} 
@@ -71,8 +76,9 @@ export default function DraftBoard({ draft, picks }: Props) {
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'center',
-                    bgcolor: isPicked ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)',
-                    border: isPicked ? '1px solid rgba(76, 175, 80, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                    bgcolor: bgColor,
+                    border: '1px solid',
+                    borderColor: borderColor,
                     position: 'relative'
                   }}
                 >
@@ -85,8 +91,8 @@ export default function DraftBoard({ draft, picks }: Props) {
                       <Typography variant="body2" fontWeight="bold" noWrap title={pick.metadata.first_name + ' ' + pick.metadata.last_name}>
                         {pick.metadata.first_name} {pick.metadata.last_name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {pick.metadata.position} - {pick.metadata.team}
+                      <Typography variant="caption" sx={{ color: getPositionColor(position), fontWeight: 'bold' }}>
+                        {position} <Typography component="span" variant="caption" color="text.secondary">- {pick.metadata.team}</Typography>
                       </Typography>
                     </>
                   ) : (

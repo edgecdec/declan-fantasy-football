@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Paper, Box, Typography, Divider, Button } from '@mui/material';
+import { getPositionColor } from '@/constants/colors';
 
 export type PlayerImpact = {
   playerId: string;
@@ -50,7 +51,8 @@ export default function PlayerImpactList({
               <Box>
                 <Typography variant="body2" fontWeight="bold">{p.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {p.ownerName ? `${p.ownerName} • ` : ''}{p.position} • {p.weeksStarted || p.weeks} starts
+                  {p.ownerName ? `${p.ownerName} • ` : ''}
+                  <Box component="span" sx={{ color: getPositionColor(p.position), fontWeight: 'bold' }}>{p.position}</Box> • {p.weeksStarted || p.weeks} starts
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
@@ -72,7 +74,8 @@ export default function PlayerImpactList({
               <Box>
                 <Typography variant="body2" fontWeight="bold">{p.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {p.ownerName ? `${p.ownerName} • ` : ''}{p.position} • {p.weeksStarted || p.weeks} starts
+                  {p.ownerName ? `${p.ownerName} • ` : ''}
+                  <Box component="span" sx={{ color: getPositionColor(p.position), fontWeight: 'bold' }}>{p.position}</Box> • {p.weeksStarted || p.weeks} starts
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
