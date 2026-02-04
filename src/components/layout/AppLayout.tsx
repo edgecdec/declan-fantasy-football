@@ -23,7 +23,8 @@ import {
   Menu,
   MenuItem as MuiMenuItem,
   Chip,
-  Tooltip
+  Tooltip,
+  Button
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
@@ -164,17 +165,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             />
           </Typography>
 
-          <Tooltip title="Report a Bug">
-            <IconButton
-              component={Link}
-              href="https://github.com/edgecdec/FantasyFootballFullWebsite/issues/new"
-              target="_blank"
-              color="inherit"
-              sx={{ mr: 1 }}
-            >
-              <BugReportIcon />
-            </IconButton>
-          </Tooltip>
+          <Button
+            component={Link}
+            href="https://github.com/edgecdec/FantasyFootballFullWebsite/issues/new"
+            target="_blank"
+            color="inherit"
+            startIcon={<BugReportIcon />}
+            sx={{ 
+              mr: 2, 
+              textTransform: 'none',
+              display: { xs: 'none', sm: 'inline-flex' },
+              opacity: 0.8,
+              '&:hover': { opacity: 1 }
+            }}
+          >
+            Report Bug
+          </Button>
+
+          {/* Mobile Bug Icon */}
+          <IconButton
+            component={Link}
+            href="https://github.com/edgecdec/FantasyFootballFullWebsite/issues/new"
+            target="_blank"
+            color="inherit"
+            sx={{ display: { xs: 'inline-flex', sm: 'none' }, mr: 1 }}
+          >
+            <BugReportIcon />
+          </IconButton>
 
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
