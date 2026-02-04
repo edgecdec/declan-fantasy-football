@@ -17,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body suppressHydrationWarning={true}>
         <GoogleAnalytics gaId="G-KC140X1TPV" />
         <ThemeRegistry>
           <UserProvider>
