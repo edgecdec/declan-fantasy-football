@@ -70,6 +70,14 @@ export default function LuckTrendsPage() {
     }
   }, [user]);
 
+  // Auto-Run
+  React.useEffect(() => {
+    if (username && !loading && history.length === 0) {
+      const t = setTimeout(() => handleAnalyze(), 500);
+      return () => clearTimeout(t);
+    }
+  }, [username]);
+
   const handleAnalyze = async () => {
     if (!username) return;
     setLoading(true);
@@ -208,7 +216,7 @@ export default function LuckTrendsPage() {
             disabled={loading || !username}
             sx={{ height: 56, px: 4 }}
           >
-            {loading ? 'Scanning...' : 'Generate Trend Graph'}
+            {loading ? 'Scanning...' : 'Analyze History'}
           </Button>
         </Box>
         
@@ -291,7 +299,7 @@ export default function LuckTrendsPage() {
       ) : (
         !loading && (
           <Alert severity="info">
-            Enter a username and click &quot;Generate Trend Graph&quot; to see historical performance.
+            Enter a username and click &quot;Analyze History&quot; to see historical performance.
           </Alert>
         )
       )}
