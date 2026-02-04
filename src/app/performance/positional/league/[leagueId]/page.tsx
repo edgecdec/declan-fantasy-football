@@ -511,38 +511,58 @@ export default function LeaguePositionalPage() {
             Cumulative Points Over League Average (POLA).
           </Typography>
           
-          <TableContainer>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Rank</TableCell>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Manager</TableCell>
-                  <TableCell>Pos</TableCell>
-                  <TableCell align="right">Starts</TableCell>
-                  <TableCell align="right">Total Impact</TableCell>
-                  <TableCell align="right">Avg Impact/Wk</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {impacts.map((p, index) => (
-                  <TableRow key={`${p.playerId}-${p.ownerName}`} hover>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>{p.name}</TableCell>
-                    <TableCell>{p.ownerName}</TableCell>
-                    <TableCell sx={{ color: getPositionColor(p.position), fontWeight: 'bold' }}>{p.position}</TableCell>
-                    <TableCell align="right">{p.weeksStarted || p.weeks}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold', color: p.totalPOLA > 0 ? 'success.main' : 'error.main' }}>
-                      {p.totalPOLA > 0 ? '+' : ''}{p.totalPOLA.toFixed(1)}
-                    </TableCell>
-                    <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                      {p.avgPOLA > 0 ? '+' : ''}{p.avgPOLA.toFixed(1)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <SmartTable
+            data={impacts}
+            keyField={(row) => `${row.playerId}-${row.ownerName}`}
+            defaultSortBy="totalPOLA"
+            defaultSortOrder="desc"
+            columns={[
+              { id: 'name', label: 'Player', numeric: false, sortable: true, filterVariant: 'text' },
+              { id: 'ownerName', label: 'Manager', numeric: false, sortable: true, filterVariant: 'multi-select' },
+              { 
+                id: 'position', 
+                label: 'Pos', 
+                numeric: false, 
+                sortable: true, 
+                filterVariant: 'multi-select', 
+                width: 80,
+                render: (row) => (
+                  <Box component="span" sx={{ color: getPositionColor(row.position), fontWeight: 'bold' }}>
+                    {row.position}
+                  </Box>
+                )
+              },
+              { 
+                id: 'weeksStarted', 
+                label: 'Starts', 
+                numeric: true, 
+                sortable: true,
+                render: (row) => row.weeksStarted || row.weeks
+              },
+              { 
+                id: 'totalPOLA', 
+                label: 'Total Impact', 
+                numeric: true, 
+                sortable: true,
+                render: (row) => (
+                  <Box sx={{ color: row.totalPOLA > 0 ? 'success.main' : 'error.main', fontWeight: 'bold' }}>
+                    {row.totalPOLA > 0 ? '+' : ''}{row.totalPOLA.toFixed(1)}
+                  </Box>
+                )
+              },
+              { 
+                id: 'avgPOLA', 
+                label: 'Avg Impact/Wk', 
+                numeric: true, 
+                sortable: true,
+                render: (row) => (
+                  <Box sx={{ color: 'text.secondary' }}>
+                    {row.avgPOLA > 0 ? '+' : ''}{row.avgPOLA.toFixed(1)}
+                  </Box>
+                )
+              }
+            ]}
+          />
         </Paper>
       </Modal>
     </Container>
