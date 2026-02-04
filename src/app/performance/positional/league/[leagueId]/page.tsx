@@ -207,27 +207,34 @@ export default function LeaguePositionalPage() {
     results.forEach(res => {
       res.playerImpacts.forEach(p => {
         const key = `${p.ownerId}_${p.playerId}`;
-        const curr = impactMap.get(key) || { 
-            totalPOLA: 0, 
-            weeks: 0, 
-            name: p.name, 
-            pos: p.position,
-            ownerName: p.ownerName,
-            startedWeeks: {}
-        };
+        
+        let curr = impactMap.get(key);
+        if (!curr) {
+            curr = { 
+                totalPOLA: 0, 
+                weeks: 0, 
+                name: p.name, 
+                pos: p.position,
+                ownerName: p.ownerName,
+                startedWeeks: {}
+            };
+            impactMap.set(key, curr);
+        }
+        
         curr.totalPOLA += p.totalPOLA;
         curr.weeks += (p.weeksStarted || 0);
         
         if (p.startedWeeks) {
           Object.entries(p.startedWeeks).forEach(([year, weeks]) => {
-            if (!curr.startedWeeks[year]) {
-              curr.startedWeeks[year] = [];
+            if (!curr!.startedWeeks) curr!.startedWeeks = {};
+            if (!curr!.startedWeeks[year]) {
+              curr!.startedWeeks[year] = [];
             }
-            curr.startedWeeks[year] = Array.from(new Set([...curr.startedWeeks[year], ...weeks]));
+            const existing = curr!.startedWeeks[year];
+            const incoming = weeks || [];
+            curr!.startedWeeks[year] = Array.from(new Set([...existing, ...incoming]));
           });
         }
-
-        impactMap.set(key, curr);
       });
     });
 
