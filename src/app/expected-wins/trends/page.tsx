@@ -18,7 +18,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceLine
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -31,6 +32,7 @@ import LuckSummaryCard from '@/components/analytics/LuckSummaryCard';
 
 // Min year for Sleeper
 const MIN_YEAR = 2017;
+const AVERAGE_WIN_PCT = 50;
 
 type YearlyStats = {
   year: string;
@@ -269,6 +271,13 @@ export default function LuckTrendsPage() {
                 formatter={(val: any) => `${val}%`}
               />
               <Legend />
+              
+              <ReferenceLine
+                y={AVERAGE_WIN_PCT}
+                stroke="#999"
+                strokeDasharray="6 4"
+                label={{ value: 'Average', position: 'right', fill: '#999', fontSize: 12 }}
+              />
               
               <Line 
                 type="monotone" 

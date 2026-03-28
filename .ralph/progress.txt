@@ -7,3 +7,9 @@
 - Change was 1 line: check `myStats.pointsFor > 0` before returning userStats.
 - All consumers already guard with `if (stats.userStats)`, so no other changes needed.
 - Lessons: Nova Act browser tests with long-loading pages (multiple Sleeper API calls) need generous wait times or polling. The `time.sleep(45)` wasn't enough for the trends page which fetches ~8 years of data. Consider using Playwright's `waitForSelector` on chart elements instead of fixed sleeps.
+
+## TASK-002: Add 50% average reference line to luck trends chart (2026-03-28)
+- Added Recharts `ReferenceLine` at `y={50}` with gray dashed stroke and "Average" label to the trends LineChart.
+- Used named constant `AVERAGE_WIN_PCT = 50` instead of magic number.
+- Imported `ReferenceLine` from recharts alongside existing chart components.
+- Lessons: Nova Act page.content() may not find SVG text labels via simple string search due to SVG rendering. Checking for unique attributes like `strokeDasharray` values is more reliable for verifying SVG elements. The Playwright `CancelledError` exceptions in Nova Act output are cosmetic/cleanup noise, not test failures.

@@ -9,6 +9,24 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: On /expected-wins/trends, user 'edgecdec' shows 2020 with 0% actual win rate and ~50% expected win rate. This is caused by a league where the user scored 0 total points (likely a test league or a league where the regular season never happened). The matchup data exists with 0-point entries, so totalOpportunities > 0 passes the current filter, and expected wins calculate to ~50% because ties with other 0-point teams count as 0.5. Fix: In src/services/stats/expectedWins.ts, after calculating a user's stats in analyzeLeague(), treat a team with 0 total pointsFor as having no valid data — return userStats as undefined so the league is excluded from aggregation. This fix will apply globally to all pages using analyzeLeague() (the main expected-wins page, trends, and league-history views). Verify by checking that 2020 no longer appears in the trends chart for edgecdec."
+    },
+    {
+      "id": "TASK-002",
+      "title": "Add 50% average reference line to luck trends chart",
+      "spec": "specs/code-style.md",
+      "priority": 2,
+      "status": "done",
+      "dependencies": ["TASK-001"],
+      "description": "On /expected-wins/trends, add a horizontal dashed line at 50% on the Y axis to indicate where the average player would be. Use Recharts ReferenceLine component with y={50}, a gray stroke, dashed strokeDasharray, and a label like 'Average'. This gives visual context for whether the user is performing above or below the league median over time."
+    },
+    {
+      "id": "TASK-003",
+      "title": "Show Draft Assistant for edgecdec user instead of dev-only",
+      "spec": "specs/code-style.md",
+      "priority": 3,
+      "status": "open",
+      "dependencies": [],
+      "description": "In src/components/layout/AppLayout.tsx, the Draft Assistant nav item is currently gated behind process.env.NODE_ENV === 'development'. Change this so it is instead shown when the logged-in Sleeper user is 'edgecdec'. Use the existing useUser() hook to get the current user and check user.username === 'edgecdec'. The MENU_ITEMS list should be computed dynamically (e.g. via useMemo) rather than at module scope, since it now depends on runtime user state. Remove the NODE_ENV check entirely."
     }
   ]
 }
