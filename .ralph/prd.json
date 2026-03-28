@@ -27,6 +27,15 @@
       "status": "done",
       "dependencies": [],
       "description": "In src/components/layout/AppLayout.tsx, the Draft Assistant nav item is currently gated behind process.env.NODE_ENV === 'development'. Change this so it is instead shown when the logged-in Sleeper user is 'edgecdec'. Use the existing useUser() hook to get the current user and check user.username === 'edgecdec'. The MENU_ITEMS list should be computed dynamically (e.g. via useMemo) rather than at module scope, since it now depends on runtime user state. Remove the NODE_ENV check entirely."
+    },
+    {
+      "id": "TASK-004",
+      "title": "Ensure 50% reference line is always visible on luck trends chart",
+      "spec": "specs/code-style.md",
+      "priority": 4,
+      "status": "done",
+      "dependencies": ["TASK-002"],
+      "description": "Bug: The 50% dashed reference line added in TASK-002 is not visible when all data points are above or below 50%, because the YAxis domain is set to auto and Recharts clips the chart to the data range. Fix: In src/app/expected-wins/trends/page.tsx, change the YAxis domain so it always includes 50. For example, use a domain function like domain={[dataMin => Math.min(dataMin, 48), dataMax => Math.max(dataMax, 52)]} to ensure the 50% line is always within the visible area with a small buffer. Do NOT hardcode 0-100 — the axis should still auto-scale to the data, just guaranteed to include the 50% mark."
     }
   ]
 }

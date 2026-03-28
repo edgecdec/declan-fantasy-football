@@ -19,3 +19,8 @@
 - **Status**: Done
 - **Changes**: Replaced `NODE_ENV === 'development'` gate with `user?.username === 'edgecdec'` check in AppLayout.tsx. Moved MENU_ITEMS from module-level constant to `useMemo` inside the component since it now depends on runtime user state.
 - **Lessons**: MUI Drawer renders both mobile (temporary) and desktop (permanent) variants simultaneously, so locators matching nav links will find 2 elements. Use `.count()` or `.first` in Playwright assertions instead of strict single-element checks.
+
+## TASK-004: Ensure 50% reference line is always visible on luck trends chart (2026-03-28)
+- **Status**: Done
+- **Changes**: Changed YAxis `domain` from `['auto', 'auto']` to use domain functions: `[(dataMin) => Math.min(dataMin, 48), (dataMax) => Math.max(dataMax, 52)]`. This ensures the 50% reference line is always within the visible chart area with a 2% buffer, while still auto-scaling to the actual data range.
+- **Lessons**: Recharts `domain={['auto', 'auto']}` clips to the data range, hiding ReferenceLine elements outside that range. Domain functions allow dynamic min/max that guarantee specific values are included. The fix was a single line change — minimal and focused.

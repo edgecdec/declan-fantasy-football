@@ -262,7 +262,7 @@ export default function LuckTrendsPage() {
               <YAxis 
                 stroke="#888" 
                 label={{ value: 'Win %', angle: -90, position: 'insideLeft' }} 
-                domain={['auto', 'auto']}
+                domain={[(dataMin: number) => Math.min(dataMin, 48), (dataMax: number) => Math.max(dataMax, 52)]}
               />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#333', border: 'none' }}
