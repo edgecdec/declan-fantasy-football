@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ralph
+.ralph/.server-env
+/tmp/ralph-*-logs/
