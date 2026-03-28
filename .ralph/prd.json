@@ -105,9 +105,18 @@
       "title": "Separate mock drafts from real league drafts in draft list",
       "spec": "specs/code-style.md",
       "priority": 12,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "On /draft-assistant, the draft list shows all drafts including mock drafts which clutter the view. Mock drafts are drafts whose league never became a real active league (no regular season games played, or the league status is 'pre_draft'/'drafting' with no matchup data). When fetching drafts in src/app/draft-assistant/page.tsx, for each draft use its league_id to check if the league actually had a real season — fetch the league via SleeperService and check if status is 'in_season' or 'complete', or if settings indicate it was a real league. Show real league drafts first in the list. Mock drafts should be collapsed into a separate section at the bottom labeled 'Mock Drafts' that is collapsed by default (use MUI Accordion or a show/hide toggle). This keeps the main list focused on drafts that matter."
+    },
+    {
+      "id": "TASK-013",
+      "title": "Add football-themed maintenance page shown during deploys",
+      "spec": "specs/code-style.md",
+      "priority": 13,
+      "status": "open",
+      "dependencies": [],
+      "description": "Create a maintenance.html file in the project root that is shown by nginx when the app is down (during deploys/restarts). Follow the same pattern as MarchMadness: a simple standalone HTML page with inline CSS, no external dependencies. Use meta http-equiv refresh with content=10 to auto-retry every 10 seconds. Make it football-themed — use a 🏈 emoji as the icon, dark background (#121212), title 'Declanalytics', message like 'Halftime! We're making some updates.' with a subtitle 'This page will automatically refresh.' Keep it clean and minimal. Then SSH to the server and update the nginx config at /etc/nginx/sites-enabled/fantasyfootball.edgecdec.com to add: error_page 502 503 504 /maintenance.html; and location = /maintenance.html { root /var/www/FantasyFootball; internal; } — matching the pattern used by marchmadness.edgecdec.com. Run nginx -t and systemctl reload nginx to apply."
     }
   ]
 }

@@ -96,3 +96,12 @@
 - Clicking the same header deselects the filter, restoring the full grid
 - Deleted unused TeamFilter.tsx component
 - Lessons: When replacing a UI element with inline behavior, ensure the interactive element (headers) remains visible in all states so users can toggle back. The `focusedTeam === null &&` guard on grid rows is a clean way to conditionally hide the body while keeping headers.
+
+## TASK-012: Separate mock drafts from real league drafts in draft list
+- **Date**: 2026-03-28
+- **Status**: Done
+- **Summary**: After fetching drafts, each draft's league is fetched in parallel to check if status is 'in_season', 'complete', or 'playoffs'. Real league drafts shown first in a Paper list; mock drafts collapsed into an MUI Accordion at the bottom labeled "Mock Drafts (N)". Accordion auto-expands if there are no real drafts.
+- **Lessons**:
+  - Deduplicating league_ids before fetching avoids redundant API calls when multiple drafts share a league.
+  - Extracted DraftListItem as a small component to avoid duplicating the list item JSX between real and mock sections.
+  - Nova Act confirmed "Mock Drafts (4)" section visible for edgecdec in 2026, meaning 4 drafts were classified as mocks (leagues not yet in_season/complete).
