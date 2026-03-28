@@ -127,3 +127,9 @@
 - Root cause: Sleeper's `GET /user/{userId}/drafts/nfl/{year}` API does not return all drafts. The draft for league 1206336001794920448 (Graham's Football Fantasy, season 2025) was missing from the user-level endpoint despite the user being in the league and the draft existing at the league level.
 - Fix: After fetching user-level drafts, also fetch the user's leagues for that year, then call `getLeagueDrafts()` for each real league to find any drafts missed by the user-level API. Merge results using a Map keyed by draft_id to deduplicate.
 - Lessons: Sleeper's user-level drafts API is unreliable for dynasty/renewed leagues — always cross-reference with league-level draft endpoints. When testing with Nova Act, ensure the year selector is set correctly (defaults to current year, not the year of the data you're looking for).
+
+## TASK-016: Fix snake/3RR draft board player assignment (2026-03-28)
+- Root cause: The grid columns are indexed by draft_slot (1-N), but column headers and traded pick lookups assumed draft_slot === roster_id. The Sleeper API has a slot_to_roster_id mapping on the draft object that maps draft_slot → roster_id, and these are NOT the same.
+- Fix: Added slot_to_roster_id to SleeperDraft type. Built a slotToRosterId map in DraftBoard and passed it to DraftGrid. Column headers now use getRosterId(draftSlot) to look up the correct roster_id for display names. Traded pick ownership lookups also use the correct roster_id.
+- Key lesson: The league drafts endpoint (GET /league/{id}/drafts) returns slot_to_roster_id as null. Only the individual draft endpoint (GET /draft/{id}) returns it. Had to add a getDraft() call after selecting the best draft.
+- Lesson: draft_slot is the position in the draft order (1st pick, 2nd pick, etc.), NOT the roster_id. Always use slot_to_roster_id to convert between them.

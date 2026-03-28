@@ -67,12 +67,14 @@ export default function LeagueDraftPage() {
           return;
         }
 
-        setSelectedDraft(best);
-
-        const [fetchedPicks, draftTradedPicks] = await Promise.all([
+        // Fetch full draft object to get slot_to_roster_id (league drafts endpoint omits it)
+        const [fullDraft, fetchedPicks, draftTradedPicks] = await Promise.all([
+          SleeperService.getDraft(best.draft_id),
           SleeperService.getDraftPicks(best.draft_id),
           SleeperService.getDraftTradedPicks(best.draft_id),
         ]);
+
+        setSelectedDraft(fullDraft || best);
 
         if (cancelled) return;
 

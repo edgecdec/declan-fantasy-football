@@ -141,7 +141,7 @@
       "title": "Fix snake/3RR draft board player assignment — players mapped to wrong cells",
       "spec": "specs/code-style.md",
       "priority": 16,
-      "status": "in_progress",
+      "status": "done",
       "dependencies": ["TASK-009"],
       "description": "Bug: In snake drafts, the DraftBoard displays the correct pick numbers per team column but assigns the WRONG players to cells. Example: draft 1268841650294099968 (PharmacyBX) — edgecdec picked Justin Jefferson (1st), Ashton Jeanty (2nd), Brock Bowers (3rd), Jayden Daniels (4th) but the board shows Drake London and George Kittle in the 2nd and 4th slots. The issue is that the pick-to-cell mapping is wrong: the code correctly calculates which pick NUMBER belongs in each cell for snake order, but when it looks up which player was taken at that pick, it's using the wrong index or mapping. The picks array from Sleeper is ordered by pick_no (1, 2, 3...). Each pick has pick_no, roster_id, and player_id. The fix: when placing picks into the grid, use pick_no (the global sequential pick number) to find the correct pick from the array, NOT the array index or some derived position. For each cell in the grid, calculate what pick_no that cell represents, then find the pick with that pick_no in the picks array and display that player. Verify against draft 1268841650294099968 on Sleeper to confirm correctness."
     },
@@ -162,6 +162,15 @@
       "status": "open",
       "dependencies": [],
       "description": "The Best Available panel on the draft assistant page takes up a fixed 3-column (lg=3) grid slot on the right side, reducing space for the DraftBoard. Make it collapsible: add a toggle button (e.g. a chevron or arrow icon) that slides the panel in/out. When collapsed, the DraftBoard should expand to use the full width (lg=12). When expanded, revert to the current layout (lg=9 board + lg=3 panel). Store the collapsed state in local component state. On smaller screens (md and below), the panel already stacks below — this is mainly for medium-large screens where horizontal space is tight. Use a smooth CSS transition for the slide effect."
+    },
+    {
+      "id": "TASK-019",
+      "title": "Fix draft slot to user mapping — use draft_order from Sleeper draft object",
+      "spec": "specs/code-style.md",
+      "priority": 19,
+      "status": "open",
+      "dependencies": ["TASK-008"],
+      "description": "Bug: On /draft-assistant/1206336001794920448, users are mapped to the wrong draft slots. The correct order is pullmanguy=slot 1, egruis=slot 2, edgecdec=slot 3, junebugge=slot 4, but the board shows them incorrectly. The Sleeper draft object has a 'draft_order' field which is a mapping of user_id -> draft_slot (1-indexed position). This is the authoritative source for who picks in which slot. The current code is likely using roster_id ordering or array index instead of draft_order. Fix: fetch the full draft object via GET /draft/{draft_id}, read the draft_order map, and use it to assign users to columns. The SleeperDraft type may need to be extended to include draft_order. CRITICAL: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/ and study src/backend/api/draft.py — specifically how it reads draft_order and slot_to_roster_id to correctly map users to pick positions. The draft_order maps user_id->slot, and you also need the rosters to map roster_id->owner_id to connect picks (which use roster_id) to the correct column. Verify against the real Sleeper draft page for draft 1206336001794920448. The specific draft ID to compare against is 1206336001803288576 (https://sleeper.com/draft/nfl/1206336001803288576) — fetch this draft's picks and draft_order from the Sleeper API and confirm our board matches exactly."
     }
   ]
 }

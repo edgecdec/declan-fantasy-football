@@ -10,16 +10,19 @@ type Props = {
   grid: (SleeperDraftPick | null)[][];
   ownershipMap: Map<string, number>;
   rosterOwnerMap: Map<number, string>;
+  slotToRosterId: Map<number, number>;
   currentUserRosterId: number | null;
   getSlotOrder: (round: number, teams: number, draftType: string) => number[];
   focusedTeam: number | null;
   onSelectTeam: (rosterId: number | null) => void;
 };
 
-export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, currentUserRosterId, getSlotOrder, focusedTeam, onSelectTeam }: Props) {
+export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, slotToRosterId, currentUserRosterId, getSlotOrder, focusedTeam, onSelectTeam }: Props) {
   const teams = draft.settings.teams;
   const rounds = draft.settings.rounds;
   const draftType = draft.type || 'snake';
+
+  const getRosterId = (draftSlot: number) => slotToRosterId.get(draftSlot) ?? draftSlot;
 
   return (
     <Box sx={{ overflowX: 'auto', width: '100%' }}>
@@ -27,7 +30,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, c
         {/* Header Row */}
         <Box sx={{ textAlign: 'center', p: 1, fontWeight: 'bold' }}>Rd</Box>
         {Array.from({ length: teams }, (_, i) => {
-          const rosterId = i + 1;
+          const draftSlot = i + 1;
+          const rosterId = getRosterId(draftSlot);
           const isFocused = focusedTeam === rosterId;
           return (
             <Box
@@ -58,9 +62,10 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, c
 
               {Array.from({ length: teams }, (_, colIdx) => {
                 const draftSlot = colIdx + 1;
+                const rosterId = getRosterId(draftSlot);
                 const pick = grid[roundIdx][colIdx];
-                const actualOwnerId = ownershipMap.get(`${round}-${draftSlot}`);
-                const isTraded = actualOwnerId !== undefined && actualOwnerId !== draftSlot;
+                const actualOwnerId = ownershipMap.get(`${round}-${rosterId}`);
+                const isTraded = actualOwnerId !== undefined && actualOwnerId !== rosterId;
                 const isTradedToCurrentUser = isTraded && currentUserRosterId !== null && actualOwnerId === currentUserRosterId;
 
                 const isPicked = !!pick;

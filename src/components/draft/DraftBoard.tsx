@@ -23,6 +23,16 @@ function buildPickOwnershipMap(tradedPicks: SleeperTradedPick[]): Map<string, nu
   return map;
 }
 
+function buildSlotToRosterIdMap(draft: SleeperDraft): Map<number, number> {
+  const map = new Map<number, number>();
+  if (draft.slot_to_roster_id) {
+    for (const [slot, rosterId] of Object.entries(draft.slot_to_roster_id)) {
+      map.set(Number(slot), rosterId);
+    }
+  }
+  return map;
+}
+
 function isReversedRound(round: number, draftType: string): boolean {
   if (draftType === 'linear') return false;
   return round % 2 === 0;
@@ -38,6 +48,7 @@ export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwner
   const rounds = draft.settings.rounds;
   const draftType = draft.type || 'snake';
   const ownershipMap = React.useMemo(() => buildPickOwnershipMap(tradedPicks), [tradedPicks]);
+  const slotToRosterId = React.useMemo(() => buildSlotToRosterIdMap(draft), [draft]);
   const [focusedTeam, setFocusedTeam] = React.useState<number | null>(null);
 
   const currentUserRosterId = React.useMemo(() => {
@@ -48,6 +59,7 @@ export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwner
     return null;
   }, [currentUserId, rosterIdToOwnerIdMap]);
 
+  // Grid indexed by [round][draft_slot - 1]
   const grid: (SleeperDraftPick | null)[][] = Array.from({ length: rounds }, () =>
     Array(teams).fill(null)
   );
@@ -57,6 +69,11 @@ export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwner
     if (r >= 0 && r < rounds && s >= 0 && s < teams) grid[r][s] = pick;
   });
 
+  // Resolve roster_id for a draft_slot, falling back to slot number if no mapping
+  const getRosterId = React.useCallback((draftSlot: number) => {
+    return slotToRosterId.get(draftSlot) ?? draftSlot;
+  }, [slotToRosterId]);
+
   const focusedSlots = React.useMemo(() => {
     if (focusedTeam === null) return [];
     const slots: { round: number; pickNumber: number; pick: SleeperDraftPick | null; isTraded: boolean; originalOwnerName?: string }[] = [];
@@ -65,20 +82,21 @@ export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwner
       const slotOrder = getSlotOrder(round, teams, draftType);
       for (let colIdx = 0; colIdx < slotOrder.length; colIdx++) {
         const draftSlot = slotOrder[colIdx];
-        const actualOwnerId = ownershipMap.get(`${round}-${draftSlot}`);
-        const ownerId = actualOwnerId ?? draftSlot;
+        const rosterId = getRosterId(draftSlot);
+        const actualOwnerId = ownershipMap.get(`${round}-${rosterId}`);
+        const ownerId = actualOwnerId ?? rosterId;
         if (ownerId === focusedTeam) {
-          const isTraded = actualOwnerId !== undefined && actualOwnerId !== draftSlot;
-          slots.push({ round, pickNumber: r * teams + colIdx + 1, pick: grid[r][draftSlot - 1], isTraded, originalOwnerName: isTraded ? rosterOwnerMap.get(draftSlot) : undefined });
+          const isTraded = actualOwnerId !== undefined && actualOwnerId !== rosterId;
+          slots.push({ round, pickNumber: r * teams + colIdx + 1, pick: grid[r][draftSlot - 1], isTraded, originalOwnerName: isTraded ? rosterOwnerMap.get(rosterId) : undefined });
         }
       }
     }
     return slots;
-  }, [focusedTeam, rounds, teams, draftType, ownershipMap, grid, rosterOwnerMap]);
+  }, [focusedTeam, rounds, teams, draftType, ownershipMap, grid, rosterOwnerMap, getRosterId]);
 
   return (
     <Box>
-      <DraftGrid draft={draft} grid={grid} ownershipMap={ownershipMap} rosterOwnerMap={rosterOwnerMap} currentUserRosterId={currentUserRosterId} getSlotOrder={getSlotOrder} focusedTeam={focusedTeam} onSelectTeam={setFocusedTeam} />
+      <DraftGrid draft={draft} grid={grid} ownershipMap={ownershipMap} rosterOwnerMap={rosterOwnerMap} slotToRosterId={slotToRosterId} currentUserRosterId={currentUserRosterId} getSlotOrder={getSlotOrder} focusedTeam={focusedTeam} onSelectTeam={setFocusedTeam} />
       {focusedTeam !== null && (
         <TeamPicksList slots={focusedSlots} teamName={rosterOwnerMap.get(focusedTeam) || `Team ${focusedTeam}`} />
       )}

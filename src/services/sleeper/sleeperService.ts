@@ -74,6 +74,7 @@ export type SleeperDraft = {
   season: string;
   status: string; // "pre_draft", "drafting", "complete"
   type: string; // "snake", "linear"
+  slot_to_roster_id?: Record<string, number> | null;
   settings: {
     rounds: number;
     slots_bn: number;
