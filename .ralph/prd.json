@@ -195,7 +195,7 @@
       "title": "Change team focus to fade other teams instead of hiding them",
       "spec": "specs/code-style.md",
       "priority": 23,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-010", "TASK-011"],
       "description": "When clicking a team column header to focus on them, the current behavior changes the board layout entirely (hiding or restructuring other teams). Instead, keep the full board layout exactly the same but fade all non-focused team picks to ~10% opacity. The focused team's picks remain at full opacity. This preserves the board structure so you can still see context while the focused team's picks pop out visually. Apply the opacity transition with a smooth CSS transition (e.g. 0.3s ease). When no team is focused (clicking the same header again to deselect), all picks return to full opacity."
     }

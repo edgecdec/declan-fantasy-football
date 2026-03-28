@@ -60,7 +60,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
         })}
 
         {/* Draft Rounds */}
-        {focusedTeam === null && (() => {
+        {(() => {
           let userPickIdx = 0;
           return grid.map((_row, roundIdx) => {
           const round = roundIdx + 1;
@@ -94,6 +94,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                 const pickNumber = roundIdx * teams + snakePosition + 1;
 
                 const pickDelay = isCurrentUserPick ? userPickIdx++ : 0;
+                const isFocusedTeamPick = focusedTeam !== null && effectiveOwnerId === focusedTeam;
+                const fadeOpacity = focusedTeam !== null && !isFocusedTeamPick ? 0.1 : 1;
 
                 const cellContent = (
                   <>
@@ -142,6 +144,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                         borderRadius: 1,
                         overflow: 'hidden',
                         height: 80,
+                        opacity: fadeOpacity,
+                        transition: 'opacity 0.3s ease',
                         '&::before': {
                           content: '""',
                           position: 'absolute',
@@ -178,6 +182,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                       border: isTradedToCurrentUser ? '2px solid' : '1px solid',
                       borderColor,
                       position: 'relative',
+                      opacity: fadeOpacity,
+                      transition: 'opacity 0.3s ease',
                     }}
                   >
                     {cellContent}

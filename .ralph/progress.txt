@@ -168,3 +168,12 @@
 - Each cell gets a staggered `animation-delay` based on pick index (`-pickDelay * 0.5s`) so they don't all spin in sync.
 - Extracted cell content into a shared `cellContent` JSX variable to avoid duplicating the pick display logic between rainbow-wrapped and normal cells.
 - Lesson: When testing with Nova Act, setting localStorage directly and reloading is more reliable than trying to interact with sidebar inputs. Also, the correct Sleeper user_id matters — using the wrong one means currentUserRosterId is null and no rainbow borders appear.
+
+## TASK-023: Change team focus to fade other teams instead of hiding them
+- Date: 2026-03-28
+- Changed DraftGrid to always render the full grid (removed `focusedTeam === null &&` guard)
+- Added `opacity` and `transition: opacity 0.3s ease` to both rainbow-highlighted and regular cells
+- Non-focused team picks fade to 10% opacity; focused team stays at full opacity
+- Removed TeamPicksList rendering from DraftBoard since the full grid is now always visible
+- Cleaned up unused imports (TeamPicksList) and dead code (focusedSlots memo, getRosterId callback) from DraftBoard
+- Lesson: When changing UI behavior from "hide" to "fade", the key is removing conditional rendering guards and adding CSS opacity instead — minimal code change for a big UX improvement
