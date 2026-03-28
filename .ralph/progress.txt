@@ -114,3 +114,10 @@
   - Don't use sed for multi-line nginx config edits — write the full file to /tmp and copy it. sed inserted stray characters and duplicated blocks across both server blocks.
   - Always verify nginx config with `nginx -t` before reloading.
   - Tested by stopping pm2 process — confirmed nginx serves maintenance.html on 502, then restarted the app.
+
+## TASK-014: Add football emoji favicon to browser tab (2026-03-28)
+- Status: DONE
+- Added SVG emoji favicon via Next.js metadata `icons` field in layout.tsx
+- Removed old favicon.ico from src/app/
+- Used data URI approach: `data:image/svg+xml,<svg>🏈</svg>`
+- Lessons: Next.js metadata `icons` field works cleanly for SVG data URI favicons. Nova Act CSS selectors may not match HTML-encoded attributes — use `.first.get_attribute()` instead of complex CSS selectors for reliable testing.

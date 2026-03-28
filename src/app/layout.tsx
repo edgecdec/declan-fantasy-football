@@ -5,9 +5,12 @@ import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 import AppLayout from '@/components/layout/AppLayout';
 import { UserProvider } from '@/context/UserContext';
 
+const FOOTBALL_FAVICON = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>';
+
 export const metadata: Metadata = {
   title: 'Declanalytics',
   description: 'Advanced fantasy football analytics, tools, and rankings for every manager.',
+  icons: { icon: FOOTBALL_FAVICON },
 };
 
 export default function RootLayout({

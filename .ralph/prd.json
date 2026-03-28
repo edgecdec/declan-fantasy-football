@@ -123,9 +123,18 @@
       "title": "Add football emoji favicon to browser tab",
       "spec": "specs/code-style.md",
       "priority": 14,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Add a 🏈 football emoji as the browser tab favicon. The simplest approach is to add a SVG favicon in src/app/layout.tsx metadata using a data URI: <link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>'/>. Add this via the Next.js metadata icons field or as a direct link tag in the head. Remove or replace the existing favicon.ico if present."
+    },
+    {
+      "id": "TASK-015",
+      "title": "Investigate and fix missing Graham's Football Fantasy 2025 draft",
+      "spec": "specs/code-style.md",
+      "priority": 15,
+      "status": "open",
+      "dependencies": [],
+      "description": "Bug: On /draft-assistant for user edgecdec, the actual 2025 Graham's Football Fantasy draft is missing from the list. The league ID is 1206336001794920448 (visible at https://sleeper.com/leagues/1206336001794920448/matchup). This league had many complicated trades. Investigate why this draft doesn't appear — possible causes: the draft may be associated with a different season year (dynasty leagues carry forward via previous_league_id chains, so the 2025 draft may be under a different league_id that is the current season's version of this league), or the getDrafts call may be filtering it out. Use the Sleeper API to trace the league chain: GET /league/1206336001794920448 to find the current season's league_id via previous_league_id links, then check its drafts. Fix the draft discovery logic so this draft appears. This is critical for verifying traded pick functionality."
     }
   ]
 }
