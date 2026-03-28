@@ -121,3 +121,9 @@
 - Removed old favicon.ico from src/app/
 - Used data URI approach: `data:image/svg+xml,<svg>🏈</svg>`
 - Lessons: Next.js metadata `icons` field works cleanly for SVG data URI favicons. Nova Act CSS selectors may not match HTML-encoded attributes — use `.first.get_attribute()` instead of complex CSS selectors for reliable testing.
+
+## TASK-015: Fix missing Graham's Football Fantasy 2025 draft (2026-03-28)
+- Status: DONE
+- Root cause: Sleeper's `GET /user/{userId}/drafts/nfl/{year}` API does not return all drafts. The draft for league 1206336001794920448 (Graham's Football Fantasy, season 2025) was missing from the user-level endpoint despite the user being in the league and the draft existing at the league level.
+- Fix: After fetching user-level drafts, also fetch the user's leagues for that year, then call `getLeagueDrafts()` for each real league to find any drafts missed by the user-level API. Merge results using a Map keyed by draft_id to deduplicate.
+- Lessons: Sleeper's user-level drafts API is unreliable for dynasty/renewed leagues — always cross-reference with league-level draft endpoints. When testing with Nova Act, ensure the year selector is set correctly (defaults to current year, not the year of the data you're looking for).

@@ -66,18 +66,43 @@ export default function DraftAssistantPage() {
         fetchUser(username);
       }
 
-      const foundDrafts = await SleeperService.getDrafts(currentUser.user_id, year);
+      const [userDrafts, userLeagues] = await Promise.all([
+        SleeperService.getDrafts(currentUser.user_id, year),
+        SleeperService.getLeagues(currentUser.user_id, year),
+      ]);
+
+      // The user-level drafts API can miss drafts from renewed dynasty leagues.
+      // Cross-reference with league-level drafts to find any missing ones.
+      const draftMap = new Map(userDrafts.map(d => [d.draft_id, d]));
+      const realLeagues = userLeagues.filter(l => REAL_LEAGUE_STATUSES.has(l.status));
+      const leagueDraftResults = await Promise.all(
+        realLeagues.map(l => SleeperService.getLeagueDrafts(l.league_id))
+      );
+      for (const drafts of leagueDraftResults) {
+        for (const d of drafts) {
+          if (!draftMap.has(d.draft_id)) draftMap.set(d.draft_id, d);
+        }
+      }
+
+      const foundDrafts = [...draftMap.values()];
       foundDrafts.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
 
-      // Fetch leagues in parallel to classify drafts
-      const uniqueLeagueIds = [...new Set(foundDrafts.map(d => d.league_id))];
-      const leagues = await Promise.all(uniqueLeagueIds.map(id => SleeperService.getLeague(id)));
-      const realLeagueIds = new Set(
-        uniqueLeagueIds.filter((id, i) => leagues[i] && REAL_LEAGUE_STATUSES.has(leagues[i]!.status))
-      );
+      // Classify drafts as real or mock based on league status
+      const allLeagueIds = [...new Set(foundDrafts.map(d => d.league_id))];
+      const realLeagueIdSet = new Set(realLeagues.map(l => l.league_id));
+      // Fetch league info for any draft league_ids not already known
+      const unknownIds = allLeagueIds.filter(id => !realLeagueIdSet.has(id) && !userLeagues.some(l => l.league_id === id));
+      if (unknownIds.length > 0) {
+        const extraLeagues = await Promise.all(unknownIds.map(id => SleeperService.getLeague(id)));
+        for (let i = 0; i < unknownIds.length; i++) {
+          if (extraLeagues[i] && REAL_LEAGUE_STATUSES.has(extraLeagues[i]!.status)) {
+            realLeagueIdSet.add(unknownIds[i]);
+          }
+        }
+      }
 
-      setRealDrafts(foundDrafts.filter(d => realLeagueIds.has(d.league_id)));
-      setMockDrafts(foundDrafts.filter(d => !realLeagueIds.has(d.league_id)));
+      setRealDrafts(foundDrafts.filter(d => realLeagueIdSet.has(d.league_id)));
+      setMockDrafts(foundDrafts.filter(d => !realLeagueIdSet.has(d.league_id)));
     } catch (e) {
       console.error(e);
       alert('Error fetching drafts');
