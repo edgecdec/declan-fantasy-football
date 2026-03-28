@@ -78,7 +78,7 @@
       "title": "Support snake and third-round-reversal draft order in DraftBoard",
       "spec": "specs/code-style.md",
       "priority": 9,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "The DraftBoard currently assumes linear draft order (same pick order every round). Sleeper drafts can be 'snake' (order reverses each round) or 'linear'. Some snake drafts also use third-round reversal (3rd round reverses again so the team picking last in round 1 picks first in round 2 AND first in round 3). The draft type is available in the SleeperDraft object's 'type' field ('snake' or 'linear') and third-round reversal may be in settings. Fix the DraftBoard to correctly calculate pick positions based on draft type: for snake drafts, reverse the column order on even rounds; for third-round reversal, the team with pick N in round 1 gets pick N in round 3 as well (rounds 3,5,7... follow round 1 order, rounds 2,4,6... are reversed). The pick_no from the actual picks data is the source of truth for completed picks — this is mainly needed for projecting upcoming pick slots in pre_draft or drafting states. REFERENCE: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/SleeperLiveDraftRankingsV2 and study src/backend/api/draft.py for the snake/reversal draft order logic. Port to TypeScript."
     },

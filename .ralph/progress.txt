@@ -72,3 +72,12 @@
   - The existing code already had the rosterOwnerMap plumbing in place from TASK-006, but the currentUserRosterId detection was broken (empty loop body with a comment). Always check that loops actually do something.
   - Separating roster_id → display_name (for UI) from roster_id → owner_id (for logic) keeps concerns clean.
   - Sleeper API users have both `display_name` and `username` — always fall back to `username` since `display_name` can be empty.
+
+## TASK-009: Support snake draft order in DraftBoard (2026-03-28)
+- Implemented `isReversedRound()` and `getSlotOrder()` helpers to determine column order per round based on draft type.
+- Snake drafts: even rounds display columns in reverse order so the board reads in actual pick order.
+- Linear drafts: no change (same order every round).
+- Key insight: Sleeper's `draft_slot` on picks is always the team's original slot (1-based), not their position in that round. The visual reordering is purely display-side — we reorder which slot appears in which column position per round.
+- The pick number label in empty slots now correctly reflects the overall pick order (accounting for snake).
+- Third-round reversal: Sleeper API doesn't expose a clear `reversal_round` setting. Standard snake (even rounds reversed) covers the common case. If third-round reversal is needed later, the `isReversedRound` function can be extended.
+- Nova Act test required setting the username first since Draft Assistant is gated to 'edgecdec' user.
