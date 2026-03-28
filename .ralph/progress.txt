@@ -149,3 +149,9 @@
 - Status: done
 - Changes: src/app/draft-assistant/[leagueId]/page.tsx — added panelCollapsed state, toggle IconButton with chevron icons, conditional Grid sizing (lg=12 when collapsed, lg=9/3 when expanded), CSS transitions for smooth animation, hidden on xs/md (panel already stacks below on small screens).
 - Lessons: MUI Grid `size` prop accepts dynamic values — can use ternary for responsive collapse. Fixed-position toggle button with `right` transition creates a smooth slide effect. Nova Act test confirmed collapse/expand works in real browser. No real 2026 drafts exist yet so had to test against a known league ID directly.
+
+## TASK-020: Fix DraftBoard pick labels to show snake position (2026-03-28)
+- The pick label in DraftGrid.tsx was showing `{round}.{draftSlot}` which is the team's fixed slot number, not the actual pick position within the round.
+- In Sleeper's API, `draft_slot` on a pick IS the team's fixed slot (consistent across all rounds), NOT the position within the round. The grid placement `grid[round][draft_slot-1]` was already correct.
+- The fix was minimal: change the label from `draftSlot` to `snakePosition + 1` (already calculated via `slotOrder.indexOf(draftSlot)`).
+- Lesson: The `getSlotOrder` function returns the snake-ordered slots, and `indexOf` gives the 0-based position within the round — this was already computed for the `pickNumber` variable but wasn't used for the label.

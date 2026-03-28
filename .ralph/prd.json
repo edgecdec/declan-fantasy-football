@@ -168,7 +168,7 @@
       "title": "Fix DraftBoard to display picks in snake/3RR column order, not linear",
       "spec": "specs/code-style.md",
       "priority": 20,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-009"],
       "description": "Bug: The DraftBoard is displaying all picks in linear order (1.01, 2.01, 3.01 always in the leftmost column). In a snake draft, each user's picks should appear under THEIR column — e.g. if edgecdec has slot 3, his round 1 pick is in column 3, his round 2 pick is ALSO in column 3 (because snake reverses, so slot 3 in round 1 maps to slot N-2 in round 2 which snakes back to column 3). The pick cells must be placed in the column of the user who OWNS that pick (pre-trade), not in a fixed left-to-right sequential order. For each round, calculate which draft_slot picks in which position based on snake/3RR rules, then place the pick in that slot's column. The pick_no label (e.g. '2.10') should reflect the actual sequential pick number, but the CELL should be in the correct user's column. Verify against draft 1206336001803288576 on Sleeper."
     },
@@ -189,6 +189,15 @@
       "status": "open",
       "dependencies": ["TASK-017"],
       "description": "The current rainbow highlight on the user's picks changes all cells to the same color simultaneously. Instead, use a CSS animated gradient border that slowly rotates/travels around each cell — so at any given moment, different parts of the border are different colors, and the colors smoothly shift position over time. This is the classic 'conic-gradient spinning border' effect. Implementation: use a conic-gradient background on a pseudo-element or wrapper with border-radius, animate the rotation with @keyframes. Each cell should have a slightly different animation-delay so they don't all pulse in sync — use the pick index to offset the delay. The animation should be slow and smooth (around 3-4 second full cycle), not fast or flashy."
+    },
+    {
+      "id": "TASK-023",
+      "title": "Change team focus to fade other teams instead of hiding them",
+      "spec": "specs/code-style.md",
+      "priority": 23,
+      "status": "open",
+      "dependencies": ["TASK-010", "TASK-011"],
+      "description": "When clicking a team column header to focus on them, the current behavior changes the board layout entirely (hiding or restructuring other teams). Instead, keep the full board layout exactly the same but fade all non-focused team picks to ~10% opacity. The focused team's picks remain at full opacity. This preserves the board structure so you can still see context while the focused team's picks pop out visually. Apply the opacity transition with a smooth CSS transition (e.g. 0.3s ease). When no team is focused (clicking the same header again to deselect), all picks return to full opacity."
     }
   ]
 }

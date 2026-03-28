@@ -107,7 +107,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                     }}
                   >
                     <Typography variant="caption" sx={{ position: 'absolute', top: 2, left: 4, opacity: 0.5 }}>
-                      {round}.{draftSlot.toString().padStart(2, '0')}
+                      {round}.{(snakePosition + 1).toString().padStart(2, '0')}
                     </Typography>
 
                     {isTraded && !isPicked && (
