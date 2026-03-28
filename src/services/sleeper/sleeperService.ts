@@ -328,6 +328,23 @@ export const SleeperService = {
     }
   },
 
+  async getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
+    const cacheKey = `league_drafts_${leagueId}`;
+    const cached = CacheService.get<SleeperDraft[]>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/league/${leagueId}/drafts`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session' });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching drafts for league ${leagueId}`, e);
+      return [];
+    }
+  },
+
   async getLeagueUsers(leagueId: string): Promise<SleeperLeagueUser[]> {
     const cacheKey = `league_users_${leagueId}`;
     const cached = CacheService.get<SleeperLeagueUser[]>(cacheKey, 'session');

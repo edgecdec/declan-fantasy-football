@@ -44,3 +44,18 @@
 - Picks traded to the current user get a warning-colored 2px border highlight.
 - Current user's roster_id is determined by matching `picked_by` from existing picks — works for in-progress/complete drafts but won't work for pre-draft with no picks yet. Could improve by matching user_id to roster owner_id directly.
 - Fetched rosters, league users, and traded picks in parallel with existing draft picks + league fetch to minimize load time.
+
+## TASK-007: Add deterministic league-based URLs for draft assistant
+**Date:** 2026-03-28
+**Status:** Done
+
+**Changes:**
+- Created `src/app/draft-assistant/[leagueId]/page.tsx` — dynamic route that auto-fetches league drafts and selects the best one (drafting > paused > pre_draft > complete)
+- Added `getLeagueDrafts(leagueId)` method to `sleeperService.ts` using `/league/{id}/drafts` endpoint
+- Simplified `src/app/draft-assistant/page.tsx` to be search/discovery only — clicking a draft navigates to `/draft-assistant/{league_id}` via `router.push()`
+- Updated `AppLayout.tsx` nav highlighting to use `startsWith` for sub-route matching
+
+**Lessons:**
+- The Sleeper API has a `/league/{id}/drafts` endpoint that wasn't in the service yet — always check the API docs before assuming an endpoint doesn't exist
+- Splitting the page into search (index) + detail ([leagueId]) cleanly separates concerns and removes a lot of state from the index page
+- The `pathname === item.href` nav check needed updating to `startsWith(item.href + '/')` for sub-route highlighting — safe because Home href is `/` so `startsWith('//')` never matches

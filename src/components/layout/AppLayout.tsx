@@ -98,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Divider />
       <List>
         {menuItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <ListItem key={item.text} disablePadding>
               <Link href={item.href} passHref style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>

@@ -60,7 +60,7 @@
       "title": "Add deterministic league-based URLs for draft assistant",
       "spec": "specs/code-style.md",
       "priority": 7,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Currently the draft assistant lives at /draft-assistant with no URL state — selecting a draft is ephemeral. Add a route /draft-assistant/[leagueId] that deep-links directly to a specific league's draft. When a user selects a draft from the list on /draft-assistant, navigate to /draft-assistant/{league_id}. The [leagueId] page should auto-fetch the league's drafts and select the most relevant one (active 'drafting' first, then 'pre_draft', then most recent 'complete'). This allows bookmarking and sharing direct links to a league's draft view. Create src/app/draft-assistant/[leagueId]/page.tsx as a new route. The existing /draft-assistant/page.tsx remains as the search/discovery page."
     }
