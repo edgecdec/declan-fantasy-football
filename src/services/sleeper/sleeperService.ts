@@ -109,6 +109,20 @@ export type SleeperDraftPick = {
   };
 };
 
+export type SleeperTradedPick = {
+  season: string;
+  round: number;
+  roster_id: number;
+  previous_owner_id: number;
+  owner_id: number;
+};
+
+export type SleeperLeagueUser = {
+  user_id: string;
+  display_name: string;
+  avatar: string | null;
+};
+
 export const SleeperService = {
   async getUser(username: string): Promise<SleeperUser | null> {
     const cacheKey = `user_${username.toLowerCase()}`;
@@ -293,6 +307,40 @@ export const SleeperService = {
       return data;
     } catch (e) {
       console.error(`Error fetching draft picks ${draftId}`, e);
+      return [];
+    }
+  },
+
+  async getDraftTradedPicks(draftId: string): Promise<SleeperTradedPick[]> {
+    const cacheKey = `draft_traded_picks_${draftId}`;
+    const cached = CacheService.get<SleeperTradedPick[]>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/draft/${draftId}/traded_picks`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session' });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching traded picks for draft ${draftId}`, e);
+      return [];
+    }
+  },
+
+  async getLeagueUsers(leagueId: string): Promise<SleeperLeagueUser[]> {
+    const cacheKey = `league_users_${leagueId}`;
+    const cached = CacheService.get<SleeperLeagueUser[]>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/league/${leagueId}/users`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session' });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching users for league ${leagueId}`, e);
       return [];
     }
   },

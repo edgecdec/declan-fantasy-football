@@ -45,6 +45,24 @@
       "status": "done",
       "dependencies": [],
       "description": "In dynasty leagues, most players are already rostered from previous seasons and are NOT in the draft pool — only rookies and free agents are draftable. Currently BestAvailable (src/components/draft/BestAvailable.tsx) only filters out players picked in the current draft via the picks array. Fix: When a draft is selected in src/app/draft-assistant/page.tsx, use the draft's league_id to fetch all rosters via SleeperService.getRosters(league_id). Collect every player_id from all rosters' 'players' arrays into a Set of rostered player IDs. Pass this Set (or array) as a new prop 'rosteredPlayerIds' to BestAvailable. In BestAvailable, filter out both drafted picks AND rostered players from the available pool. This should only apply when the league is a dynasty/keeper league — check the league settings (fetch the league via SleeperService.getLeague(league_id) and check if settings.type === 2 for dynasty, or if the draft has keeper picks). If it's a redraft league (type 0), skip the roster fetch since all players are available. Also display a small indicator in the UI (e.g. a Chip or subtitle) showing whether the draft is 'Dynasty' or 'Redraft' so the user knows the filtering is active."
+    },
+    {
+      "id": "TASK-006",
+      "title": "Show traded pick ownership in draft assistant",
+      "spec": "specs/code-style.md",
+      "priority": 6,
+      "status": "done",
+      "dependencies": ["TASK-005"],
+      "description": "In dynasty leagues, draft picks can be traded between owners. The Sleeper API provides GET /league/{league_id}/traded_picks which returns an array of objects with season, round, roster_id (original owner), owner_id (current owner after trade), and previous_owner_id. Similarly GET /draft/{draft_id}/traded_picks returns traded picks for a specific draft. When a draft is selected in the draft assistant, fetch the traded picks data and build a mapping of which roster_id actually owns each pick. Display this in the DraftBoard component — for each pick slot, show the actual owner (not just the original drafter). This is critical for dynasty leagues like 'Graham's Football Fantasy' where edgecdec has acquired extra picks via trades. The user should be able to see at a glance which picks they own across all rounds, including picks traded from other teams. Add a visual indicator (e.g. highlight or badge) on picks owned by the current user that were acquired via trade."
+    },
+    {
+      "id": "TASK-007",
+      "title": "Add deterministic league-based URLs for draft assistant",
+      "spec": "specs/code-style.md",
+      "priority": 7,
+      "status": "open",
+      "dependencies": [],
+      "description": "Currently the draft assistant lives at /draft-assistant with no URL state — selecting a draft is ephemeral. Add a route /draft-assistant/[leagueId] that deep-links directly to a specific league's draft. When a user selects a draft from the list on /draft-assistant, navigate to /draft-assistant/{league_id}. The [leagueId] page should auto-fetch the league's drafts and select the most relevant one (active 'drafting' first, then 'pre_draft', then most recent 'complete'). This allows bookmarking and sharing direct links to a league's draft view. Create src/app/draft-assistant/[leagueId]/page.tsx as a new route. The existing /draft-assistant/page.tsx remains as the search/discovery page."
     }
   ]
 }

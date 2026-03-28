@@ -6,7 +6,7 @@ import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import YearSelector from '@/components/common/YearSelector';
 import { useUser } from '@/context/UserContext';
-import { SleeperService, SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
+import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick, SleeperLeagueUser } from '@/services/sleeper/sleeperService';
 import DraftBoard from '@/components/draft/DraftBoard';
 import BestAvailable from '@/components/draft/BestAvailable';
 
@@ -24,6 +24,8 @@ export default function DraftAssistantPage() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [isDynasty, setIsDynasty] = React.useState(false);
   const [rosteredPlayerIds, setRosteredPlayerIds] = React.useState<Set<string>>(new Set());
+  const [tradedPicks, setTradedPicks] = React.useState<SleeperTradedPick[]>([]);
+  const [rosterOwnerMap, setRosterOwnerMap] = React.useState<Map<number, string>>(new Map());
 
   // Init username
   React.useEffect(() => {
@@ -88,18 +90,35 @@ export default function DraftAssistantPage() {
     setRefreshing(true);
     setIsDynasty(false);
     setRosteredPlayerIds(new Set());
+    setTradedPicks([]);
+    setRosterOwnerMap(new Map());
     try {
-      const [fetchedPicks, league] = await Promise.all([
+      const [fetchedPicks, league, draftTradedPicks, rosters, leagueUsers] = await Promise.all([
         SleeperService.getDraftPicks(draft.draft_id),
         SleeperService.getLeague(draft.league_id),
+        SleeperService.getDraftTradedPicks(draft.draft_id),
+        SleeperService.getRosters(draft.league_id),
+        SleeperService.getLeagueUsers(draft.league_id),
       ]);
       setPicks(fetchedPicks);
+      setTradedPicks(draftTradedPicks);
+
+      // Build roster_id → display_name map
+      const userDisplayNames = new Map<string, string>();
+      for (const u of leagueUsers) {
+        userDisplayNames.set(u.user_id, u.display_name);
+      }
+      const ownerMap = new Map<number, string>();
+      for (const roster of rosters) {
+        const name = userDisplayNames.get(roster.owner_id) || `Team ${roster.roster_id}`;
+        ownerMap.set(roster.roster_id, name);
+      }
+      setRosterOwnerMap(ownerMap);
 
       const dynasty = league?.settings?.type === DYNASTY_LEAGUE_TYPE;
       setIsDynasty(dynasty);
 
       if (dynasty) {
-        const rosters = await SleeperService.getRosters(draft.league_id);
         const ids = new Set<string>();
         for (const roster of rosters) {
           if (roster.players) {
@@ -220,7 +239,7 @@ export default function DraftAssistantPage() {
 
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, lg: 9 }}>
-              <DraftBoard draft={selectedDraft} picks={picks} />
+              <DraftBoard draft={selectedDraft} picks={picks} tradedPicks={tradedPicks} rosterOwnerMap={rosterOwnerMap} currentUserId={user?.user_id} />
             </Grid>
             <Grid size={{ xs: 12, lg: 3 }}>
               <Box sx={{ height: 600 }}>

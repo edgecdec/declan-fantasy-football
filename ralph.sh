@@ -18,10 +18,14 @@ while true; do
   TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
   LOG_FILE="$LOG_DIR/ralph-${COUNT}-${TIMESTAMP}.log"
 
-  OPEN=$(grep -c '"status": "open"' .ralph/prd.json 2>/dev/null || echo 0)
-  IN_PROGRESS=$(grep -c '"status": "in_progress"' .ralph/prd.json 2>/dev/null || echo 0)
-  DONE=$(grep -c '"status": "done"' .ralph/prd.json 2>/dev/null || echo 0)
-  BLOCKED=$(grep -c '"status": "blocked"' .ralph/prd.json 2>/dev/null || echo 0)
+  OPEN=$(grep -c '"status": "open"' .ralph/prd.json 2>/dev/null || true)
+  [ -z "$OPEN" ] && OPEN=0
+  IN_PROGRESS=$(grep -c '"status": "in_progress"' .ralph/prd.json 2>/dev/null || true)
+  [ -z "$IN_PROGRESS" ] && IN_PROGRESS=0
+  DONE=$(grep -c '"status": "done"' .ralph/prd.json 2>/dev/null || true)
+  [ -z "$DONE" ] && DONE=0
+  BLOCKED=$(grep -c '"status": "blocked"' .ralph/prd.json 2>/dev/null || true)
+  [ -z "$BLOCKED" ] && BLOCKED=0
 
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "🔄 Iteration $COUNT — $(date '+%H:%M:%S')"

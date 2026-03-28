@@ -33,3 +33,14 @@
 - Added Dynasty/Redraft chip in the draft header bar for user visibility.
 - Nova Act test confirmed: dynasty draft correctly shows "Dynasty" chip and Best Available panel renders.
 - Lesson: The Sleeper API league `settings.type` field is not on the TypeScript type but accessible via `[key: string]: any` catch-all. Consider adding it explicitly to the type if more league-type logic is needed later.
+
+## TASK-006: Show traded pick ownership in draft assistant (2026-03-28)
+- Added `SleeperTradedPick` and `SleeperLeagueUser` types to sleeperService.ts.
+- Added `getDraftTradedPicks(draftId)` and `getLeagueUsers(leagueId)` methods with session caching.
+- Sleeper `GET /draft/{id}/traded_picks` returns `owner_id` as the current owner (roster_id) after trade, and `roster_id` as the original pick slot owner.
+- Built a `round-roster_id` → `owner_id` map to determine actual pick ownership per slot.
+- DraftBoard header now shows owner display names instead of "Team N".
+- Traded picks on empty slots show a Chip with the new owner's name; picked slots show "via trade → owner" text.
+- Picks traded to the current user get a warning-colored 2px border highlight.
+- Current user's roster_id is determined by matching `picked_by` from existing picks — works for in-progress/complete drafts but won't work for pre-draft with no picks yet. Could improve by matching user_id to roster owner_id directly.
+- Fetched rosters, league users, and traded picks in parallel with existing draft picks + league fetch to minimize load time.
