@@ -87,7 +87,7 @@
       "title": "Add team focus/filter to draft board",
       "spec": "specs/code-style.md",
       "priority": 10,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-006", "TASK-008"],
       "description": "Add a row of clickable team buttons at the top of the DraftBoard showing each team's username (from the roster_id -> username mapping in TASK-008). Clicking a team filters the draft board to only show that team's picks across all rounds, including picks acquired via trade (from TASK-006). Clicking the same team again or an 'All' button deselects the filter and shows the full board. When a team is focused, display their picks in a compact list view showing round, pick number, and the player selected (or 'TBD' if not yet picked). Highlight the focused team's username button with the primary color. This lets users quickly see a specific team's full draft capital at a glance. REFERENCE: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/SleeperLiveDraftRankingsV2 and study the frontend JS and draft API for any team filtering patterns."
     }

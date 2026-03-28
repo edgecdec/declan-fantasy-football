@@ -81,3 +81,10 @@
 - The pick number label in empty slots now correctly reflects the overall pick order (accounting for snake).
 - Third-round reversal: Sleeper API doesn't expose a clear `reversal_round` setting. Standard snake (even rounds reversed) covers the common case. If third-round reversal is needed later, the `isReversedRound` function can be extended.
 - Nova Act test required setting the username first since Draft Assistant is gated to 'edgecdec' user.
+
+## TASK-010: Add team focus/filter to draft board (2026-03-28)
+- Extracted DraftGrid from DraftBoard to keep files under 150 lines after adding new functionality.
+- Created TeamFilter (clickable team buttons with All toggle) and TeamPicksList (compact list view for focused team).
+- focusedSlots computation accounts for traded picks — shows all picks a team owns including acquired ones.
+- The getSlotOrder helper was reused for both the grid and the focused slots computation to keep snake/reversal logic consistent.
+- Nova Act test confirmed: All button exists, compact list appears on team click, full grid returns on All click.
