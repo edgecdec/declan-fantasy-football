@@ -135,6 +135,33 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: On /draft-assistant for user edgecdec, the actual 2025 Graham's Football Fantasy draft is missing from the list. The league ID is 1206336001794920448 (visible at https://sleeper.com/leagues/1206336001794920448/matchup). This league had many complicated trades. Investigate why this draft doesn't appear — possible causes: the draft may be associated with a different season year (dynasty leagues carry forward via previous_league_id chains, so the 2025 draft may be under a different league_id that is the current season's version of this league), or the getDrafts call may be filtering it out. Use the Sleeper API to trace the league chain: GET /league/1206336001794920448 to find the current season's league_id via previous_league_id links, then check its drafts. Fix the draft discovery logic so this draft appears. This is critical for verifying traded pick functionality."
+    },
+    {
+      "id": "TASK-016",
+      "title": "Fix snake/3RR draft board player assignment — players mapped to wrong cells",
+      "spec": "specs/code-style.md",
+      "priority": 16,
+      "status": "in_progress",
+      "dependencies": ["TASK-009"],
+      "description": "Bug: In snake drafts, the DraftBoard displays the correct pick numbers per team column but assigns the WRONG players to cells. Example: draft 1268841650294099968 (PharmacyBX) — edgecdec picked Justin Jefferson (1st), Ashton Jeanty (2nd), Brock Bowers (3rd), Jayden Daniels (4th) but the board shows Drake London and George Kittle in the 2nd and 4th slots. The issue is that the pick-to-cell mapping is wrong: the code correctly calculates which pick NUMBER belongs in each cell for snake order, but when it looks up which player was taken at that pick, it's using the wrong index or mapping. The picks array from Sleeper is ordered by pick_no (1, 2, 3...). Each pick has pick_no, roster_id, and player_id. The fix: when placing picks into the grid, use pick_no (the global sequential pick number) to find the correct pick from the array, NOT the array index or some derived position. For each cell in the grid, calculate what pick_no that cell represents, then find the pick with that pick_no in the picks array and display that player. Verify against draft 1268841650294099968 on Sleeper to confirm correctness."
+    },
+    {
+      "id": "TASK-017",
+      "title": "Add rainbow pulsing highlight to current user's picks on draft board",
+      "spec": "specs/code-style.md",
+      "priority": 17,
+      "status": "open",
+      "dependencies": ["TASK-008"],
+      "description": "On the DraftBoard, highlight all picks belonging to the current user (matched via their roster_id) with a classic animated rainbow border/glow effect. Use a CSS @keyframes animation that cycles through rainbow colors on the border or box-shadow, with a smooth pulsing transition. Apply this to both already-picked cells (showing the player) and upcoming empty cells that belong to the user (including traded picks from TASK-006). This makes it instantly obvious which picks are yours across the entire board. Define the keyframes animation in a style tag or sx prop — do not create a separate CSS file. Keep the animation subtle enough to not be distracting but visible enough to spot at a glance."
+    },
+    {
+      "id": "TASK-018",
+      "title": "Make Best Available panel collapsible on draft assistant page",
+      "spec": "specs/code-style.md",
+      "priority": 18,
+      "status": "open",
+      "dependencies": [],
+      "description": "The Best Available panel on the draft assistant page takes up a fixed 3-column (lg=3) grid slot on the right side, reducing space for the DraftBoard. Make it collapsible: add a toggle button (e.g. a chevron or arrow icon) that slides the panel in/out. When collapsed, the DraftBoard should expand to use the full width (lg=12). When expanded, revert to the current layout (lg=9 board + lg=3 panel). Store the collapsed state in local component state. On smaller screens (md and below), the panel already stacks below — this is mainly for medium-large screens where horizontal space is tight. Use a smooth CSS transition for the slide effect."
     }
   ]
 }

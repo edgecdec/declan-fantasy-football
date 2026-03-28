@@ -56,8 +56,9 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, c
                 {round}
               </Box>
 
-              {slotOrder.map((draftSlot, colIdx) => {
-                const pick = grid[roundIdx][draftSlot - 1];
+              {Array.from({ length: teams }, (_, colIdx) => {
+                const draftSlot = colIdx + 1;
+                const pick = grid[roundIdx][colIdx];
                 const actualOwnerId = ownershipMap.get(`${round}-${draftSlot}`);
                 const isTraded = actualOwnerId !== undefined && actualOwnerId !== draftSlot;
                 const isTradedToCurrentUser = isTraded && currentUserRosterId !== null && actualOwnerId === currentUserRosterId;
@@ -70,7 +71,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, c
                   : isPicked ? getPositionColor(position) : 'rgba(255,255,255,0.1)';
 
                 const ownerName = isTraded ? rosterOwnerMap.get(actualOwnerId) : undefined;
-                const pickNumber = roundIdx * teams + colIdx + 1;
+                const snakePosition = slotOrder.indexOf(draftSlot);
+                const pickNumber = roundIdx * teams + snakePosition + 1;
 
                 return (
                   <Paper
