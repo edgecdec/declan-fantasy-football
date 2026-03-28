@@ -159,7 +159,7 @@
       "title": "Make Best Available panel collapsible on draft assistant page",
       "spec": "specs/code-style.md",
       "priority": 18,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "The Best Available panel on the draft assistant page takes up a fixed 3-column (lg=3) grid slot on the right side, reducing space for the DraftBoard. Make it collapsible: add a toggle button (e.g. a chevron or arrow icon) that slides the panel in/out. When collapsed, the DraftBoard should expand to use the full width (lg=12). When expanded, revert to the current layout (lg=9 board + lg=3 panel). Store the collapsed state in local component state. On smaller screens (md and below), the panel already stacks below — this is mainly for medium-large screens where horizontal space is tight. Use a smooth CSS transition for the slide effect."
     },
@@ -171,6 +171,24 @@
       "status": "open",
       "dependencies": ["TASK-009"],
       "description": "Bug: The DraftBoard is displaying all picks in linear order (1.01, 2.01, 3.01 always in the leftmost column). In a snake draft, each user's picks should appear under THEIR column — e.g. if edgecdec has slot 3, his round 1 pick is in column 3, his round 2 pick is ALSO in column 3 (because snake reverses, so slot 3 in round 1 maps to slot N-2 in round 2 which snakes back to column 3). The pick cells must be placed in the column of the user who OWNS that pick (pre-trade), not in a fixed left-to-right sequential order. For each round, calculate which draft_slot picks in which position based on snake/3RR rules, then place the pick in that slot's column. The pick_no label (e.g. '2.10') should reflect the actual sequential pick number, but the CELL should be in the correct user's column. Verify against draft 1206336001803288576 on Sleeper."
+    },
+    {
+      "id": "TASK-021",
+      "title": "Simplify traded pick label to arrow emoji and new owner username",
+      "spec": "specs/code-style.md",
+      "priority": 21,
+      "status": "open",
+      "dependencies": ["TASK-006", "TASK-008"],
+      "description": "On the DraftBoard, traded picks currently show 'via trade → AggressiveIyAvg' which is too verbose. Change the label to just show the ↔️ emoji followed by the new owner's username, e.g. '↔️ AggressiveIyAvg'. Remove the 'via trade →' text entirely. Keep it compact so it fits in the cell without wrapping."
+    },
+    {
+      "id": "TASK-022",
+      "title": "Improve rainbow highlight to use a traveling gradient effect",
+      "spec": "specs/code-style.md",
+      "priority": 22,
+      "status": "open",
+      "dependencies": ["TASK-017"],
+      "description": "The current rainbow highlight on the user's picks changes all cells to the same color simultaneously. Instead, use a CSS animated gradient border that slowly rotates/travels around each cell — so at any given moment, different parts of the border are different colors, and the colors smoothly shift position over time. This is the classic 'conic-gradient spinning border' effect. Implementation: use a conic-gradient background on a pseudo-element or wrapper with border-radius, animate the rotation with @keyframes. Each cell should have a slightly different animation-delay so they don't all pulse in sync — use the pick index to offset the delay. The animation should be slow and smooth (around 3-4 second full cycle), not fast or flashy."
     }
   ]
 }

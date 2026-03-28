@@ -2,7 +2,9 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { Container, Box, Paper, Typography, Button, Chip, LinearProgress, Grid, Alert } from '@mui/material';
+import { Container, Box, Paper, Typography, Button, Chip, LinearProgress, Grid, Alert, IconButton, Tooltip } from '@mui/material';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
 import BestAvailable from '@/components/draft/BestAvailable';
@@ -42,6 +44,7 @@ export default function LeagueDraftPage() {
   const [rosterOwnerMap, setRosterOwnerMap] = React.useState<Map<number, string>>(new Map());
   const [rosterIdToOwnerIdMap, setRosterIdToOwnerIdMap] = React.useState<Map<number, string>>(new Map());
   const [refreshing, setRefreshing] = React.useState(false);
+  const [panelCollapsed, setPanelCollapsed] = React.useState(false);
 
   React.useEffect(() => {
     if (!leagueId) return;
@@ -193,15 +196,37 @@ export default function LeagueDraftPage() {
         {refreshing && <LinearProgress sx={{ mb: 2 }} />}
 
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, lg: 9 }}>
+          <Grid size={{ xs: 12, lg: panelCollapsed ? 12 : 9 }} sx={{ transition: 'all 0.3s ease' }}>
             <DraftBoard draft={selectedDraft} picks={picks} tradedPicks={tradedPicks} rosterOwnerMap={rosterOwnerMap} rosterIdToOwnerIdMap={rosterIdToOwnerIdMap} currentUserId={user?.user_id} />
           </Grid>
-          <Grid size={{ xs: 12, lg: 3 }}>
-            <Box sx={{ height: 600 }}>
+          <Grid size={{ xs: 12, lg: 3 }} sx={{
+            display: { xs: 'block', lg: panelCollapsed ? 'none' : 'block' },
+            transition: 'all 0.3s ease',
+          }}>
+            <Box sx={{ height: 600, position: 'relative' }}>
               <BestAvailable draft={selectedDraft} picks={picks} rosteredPlayerIds={rosteredPlayerIds} />
             </Box>
           </Grid>
         </Grid>
+        <Tooltip title={panelCollapsed ? 'Show Best Available' : 'Hide Best Available'}>
+          <IconButton
+            onClick={() => setPanelCollapsed(prev => !prev)}
+            sx={{
+              position: 'fixed',
+              right: panelCollapsed ? 16 : 'calc(25% + 8px)',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 1200,
+              bgcolor: 'primary.main',
+              color: 'white',
+              '&:hover': { bgcolor: 'primary.dark' },
+              transition: 'right 0.3s ease',
+              display: { xs: 'none', lg: 'flex' },
+            }}
+          >
+            {panelCollapsed ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
     </Container>
   );

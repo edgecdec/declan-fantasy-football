@@ -143,3 +143,9 @@
   - The effective owner of a pick is `actualOwnerId ?? rosterId` — this cleanly handles both traded and non-traded picks.
   - Nova Act tests can detect CSS-in-JS animations via `getComputedStyle` but it's inconsistent — the animation must be actively applied to elements on the page.
   - Setting localStorage before navigation in Nova Act requires using `page.evaluate()` on the initial page, then navigating via `act()` rather than `page.goto()`.
+
+## TASK-018: Make Best Available panel collapsible on draft assistant page
+- Date: 2026-03-28
+- Status: done
+- Changes: src/app/draft-assistant/[leagueId]/page.tsx — added panelCollapsed state, toggle IconButton with chevron icons, conditional Grid sizing (lg=12 when collapsed, lg=9/3 when expanded), CSS transitions for smooth animation, hidden on xs/md (panel already stacks below on small screens).
+- Lessons: MUI Grid `size` prop accepts dynamic values — can use ternary for responsive collapse. Fixed-position toggle button with `right` transition creates a smooth slide effect. Nova Act test confirmed collapse/expand works in real browser. No real 2026 drafts exist yet so had to test against a known league ID directly.
