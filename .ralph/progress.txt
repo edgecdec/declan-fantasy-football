@@ -1,3 +1,9 @@
 # Ralph Progress Log — Declanalytics
 # Append-only. Each entry should include the task ID, what was done, and lessons learned.
 
+
+## TASK-001: Filter out zero-point leagues from expected wins (2026-03-28)
+- Fix: In `analyzeLeague()`, return `userStats` as `undefined` when `pointsFor === 0`, so zero-point leagues (test leagues, leagues with no real games) are excluded from all downstream aggregation.
+- Change was 1 line: check `myStats.pointsFor > 0` before returning userStats.
+- All consumers already guard with `if (stats.userStats)`, so no other changes needed.
+- Lessons: Nova Act browser tests with long-loading pages (multiple Sleeper API calls) need generous wait times or polling. The `time.sleep(45)` wasn't enough for the trends page which fetches ~8 years of data. Consider using Playwright's `waitForSelector` on chart elements instead of fixed sleeps.

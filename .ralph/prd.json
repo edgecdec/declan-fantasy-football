@@ -1,4 +1,14 @@
 {
   "project": "Declanalytics",
-  "tasks": []
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Filter out zero-point leagues from expected wins and trends calculations",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "done",
+      "dependencies": [],
+      "description": "Bug: On /expected-wins/trends, user 'edgecdec' shows 2020 with 0% actual win rate and ~50% expected win rate. This is caused by a league where the user scored 0 total points (likely a test league or a league where the regular season never happened). The matchup data exists with 0-point entries, so totalOpportunities > 0 passes the current filter, and expected wins calculate to ~50% because ties with other 0-point teams count as 0.5. Fix: In src/services/stats/expectedWins.ts, after calculating a user's stats in analyzeLeague(), treat a team with 0 total pointsFor as having no valid data — return userStats as undefined so the league is excluded from aggregation. This fix will apply globally to all pages using analyzeLeague() (the main expected-wins page, trends, and league-history views). Verify by checking that 2020 no longer appears in the trends chart for edgecdec."
+    }
+  ]
 }

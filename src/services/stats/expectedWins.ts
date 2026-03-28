@@ -118,9 +118,12 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
   const standings = Array.from(rosterMap.values()).sort((a, b) => b.expectedWins - a.expectedWins);
   const myStats = rosterMap.get(myRosterId);
 
+  // Exclude teams with 0 total points (test leagues or leagues with no real games)
+  const validUserStats = myStats && myStats.pointsFor > 0 ? myStats : undefined;
+
   const result = {
     standings,
-    userStats: myStats
+    userStats: validUserStats
   };
 
   // Cache results: Long-lived for complete leagues, short-lived for active ones
