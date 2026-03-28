@@ -105,3 +105,12 @@
   - Deduplicating league_ids before fetching avoids redundant API calls when multiple drafts share a league.
   - Extracted DraftListItem as a small component to avoid duplicating the list item JSX between real and mock sections.
   - Nova Act confirmed "Mock Drafts (4)" section visible for edgecdec in 2026, meaning 4 drafts were classified as mocks (leagues not yet in_season/complete).
+
+## TASK-013: Add football-themed maintenance page shown during deploys
+- Date: 2026-03-28
+- Status: DONE
+- What: Created maintenance.html in project root (football-themed, auto-refresh every 10s, dark background, 🏈 emoji). Updated nginx config on server to serve it on 502/503/504 errors.
+- Lessons:
+  - Don't use sed for multi-line nginx config edits — write the full file to /tmp and copy it. sed inserted stray characters and duplicated blocks across both server blocks.
+  - Always verify nginx config with `nginx -t` before reloading.
+  - Tested by stopping pm2 process — confirmed nginx serves maintenance.html on 502, then restarted the app.

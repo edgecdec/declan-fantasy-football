@@ -114,9 +114,18 @@
       "title": "Add football-themed maintenance page shown during deploys",
       "spec": "specs/code-style.md",
       "priority": 13,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Create a maintenance.html file in the project root that is shown by nginx when the app is down (during deploys/restarts). Follow the same pattern as MarchMadness: a simple standalone HTML page with inline CSS, no external dependencies. Use meta http-equiv refresh with content=10 to auto-retry every 10 seconds. Make it football-themed — use a 🏈 emoji as the icon, dark background (#121212), title 'Declanalytics', message like 'Halftime! We're making some updates.' with a subtitle 'This page will automatically refresh.' Keep it clean and minimal. Then SSH to the server and update the nginx config at /etc/nginx/sites-enabled/fantasyfootball.edgecdec.com to add: error_page 502 503 504 /maintenance.html; and location = /maintenance.html { root /var/www/FantasyFootball; internal; } — matching the pattern used by marchmadness.edgecdec.com. Run nginx -t and systemctl reload nginx to apply."
+    },
+    {
+      "id": "TASK-014",
+      "title": "Add football emoji favicon to browser tab",
+      "spec": "specs/code-style.md",
+      "priority": 14,
+      "status": "open",
+      "dependencies": [],
+      "description": "Add a 🏈 football emoji as the browser tab favicon. The simplest approach is to add a SVG favicon in src/app/layout.tsx metadata using a data URI: <link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>'/>. Add this via the Next.js metadata icons field or as a direct link tag in the head. Remove or replace the existing favicon.ico if present."
     }
   ]
 }
