@@ -155,3 +155,9 @@
 - In Sleeper's API, `draft_slot` on a pick IS the team's fixed slot (consistent across all rounds), NOT the position within the round. The grid placement `grid[round][draft_slot-1]` was already correct.
 - The fix was minimal: change the label from `draftSlot` to `snakePosition + 1` (already calculated via `slotOrder.indexOf(draftSlot)`).
 - Lesson: The `getSlotOrder` function returns the snake-ordered slots, and `indexOf` gives the 0-based position within the round — this was already computed for the `pickNumber` variable but wasn't used for the label.
+
+## TASK-021 — Simplify traded pick label to arrow emoji (2026-03-28)
+- Changed "via trade → username" to "↔️ username" in DraftGrid.tsx line 133.
+- Single line change — replaced the text prefix, kept all other logic (color, font size, conditional rendering) intact.
+- Nova Act test confirmed: no "via trade" text on page, ↔️ emoji present on traded picks.
+- Lesson: Direct league URL (/draft-assistant/{leagueId}) is more reliable for Nova Act tests than navigating through the search UI.

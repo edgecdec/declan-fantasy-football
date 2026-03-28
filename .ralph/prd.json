@@ -177,7 +177,7 @@
       "title": "Simplify traded pick label to arrow emoji and new owner username",
       "spec": "specs/code-style.md",
       "priority": 21,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-006", "TASK-008"],
       "description": "On the DraftBoard, traded picks currently show 'via trade → AggressiveIyAvg' which is too verbose. Change the label to just show the ↔️ emoji followed by the new owner's username, e.g. '↔️ AggressiveIyAvg'. Remove the 'via trade →' text entirely. Keep it compact so it fits in the cell without wrapping."
     },

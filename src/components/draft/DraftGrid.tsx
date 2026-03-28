@@ -130,7 +130,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                         </Typography>
                         {isTraded && (
                           <Typography variant="caption" sx={{ fontSize: '0.6rem', color: isTradedToCurrentUser ? 'warning.main' : 'text.secondary' }}>
-                            via trade → {ownerName || `Team ${actualOwnerId}`}
+                            ↔️ {ownerName || `Team ${actualOwnerId}`}
                           </Typography>
                         )}
                       </>
