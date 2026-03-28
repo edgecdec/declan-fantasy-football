@@ -24,3 +24,12 @@
 - **Status**: Done
 - **Changes**: Changed YAxis `domain` from `['auto', 'auto']` to use domain functions: `[(dataMin) => Math.min(dataMin, 48), (dataMax) => Math.max(dataMax, 52)]`. This ensures the 50% reference line is always within the visible chart area with a 2% buffer, while still auto-scaling to the actual data range.
 - **Lessons**: Recharts `domain={['auto', 'auto']}` clips to the data range, hiding ReferenceLine elements outside that range. Domain functions allow dynamic min/max that guarantee specific values are included. The fix was a single line change — minimal and focused.
+
+## TASK-005: Exclude rostered players from draft assistant in dynasty leagues
+- Date: 2026-03-28
+- Added `getLeague(leagueId)` and `getRosters(leagueId)` to SleeperService — these were missing as standalone methods (only `fetchAllRosters` existed for batch use).
+- Dynasty detection uses `league.settings.type === 2`. Roster fetch is skipped for redraft leagues (type 0) to avoid unnecessary API calls.
+- Passed `rosteredPlayerIds` as a `Set<string>` prop — Set provides O(1) lookup for filtering.
+- Added Dynasty/Redraft chip in the draft header bar for user visibility.
+- Nova Act test confirmed: dynasty draft correctly shows "Dynasty" chip and Best Available panel renders.
+- Lesson: The Sleeper API league `settings.type` field is not on the TypeScript type but accessible via `[key: string]: any` catch-all. Consider adding it explicitly to the type if more league-type logic is needed later.

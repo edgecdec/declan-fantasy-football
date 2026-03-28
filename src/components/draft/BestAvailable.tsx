@@ -12,16 +12,21 @@ const RANKINGS = rankingsData as Player[];
 type Props = {
   draft: SleeperDraft;
   picks: SleeperDraftPick[];
+  rosteredPlayerIds?: Set<string>;
 };
 
-export default function BestAvailable({ draft, picks }: Props) {
+export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props) {
   const [bestAvailable, setBestAvailable] = React.useState<Player[]>([]);
   const [positionFilter, setPositionFilter] = React.useState('ALL');
 
   React.useEffect(() => {
-    // 1. Filter out drafted players
+    // 1. Filter out drafted and rostered players
     const takenIds = new Set(picks.map(p => p.player_id));
-    const available = RANKINGS.filter(p => !takenIds.has(p.player_id));
+    const available = RANKINGS.filter(p => {
+      if (takenIds.has(p.player_id)) return false;
+      if (rosteredPlayerIds?.has(p.player_id)) return false;
+      return true;
+    });
 
     // 2. Prepare Settings
     const settings: LeagueSettings = {
@@ -43,7 +48,7 @@ export default function BestAvailable({ draft, picks }: Props) {
     const calculated = VBDService.calculate(available, settings);
     setBestAvailable(calculated);
 
-  }, [draft, picks]);
+  }, [draft, picks, rosteredPlayerIds]);
 
   const filteredPlayers = React.useMemo(() => {
     if (positionFilter === 'ALL') return bestAvailable;

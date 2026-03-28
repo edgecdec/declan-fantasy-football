@@ -36,6 +36,15 @@
       "status": "done",
       "dependencies": ["TASK-002"],
       "description": "Bug: The 50% dashed reference line added in TASK-002 is not visible when all data points are above or below 50%, because the YAxis domain is set to auto and Recharts clips the chart to the data range. Fix: In src/app/expected-wins/trends/page.tsx, change the YAxis domain so it always includes 50. For example, use a domain function like domain={[dataMin => Math.min(dataMin, 48), dataMax => Math.max(dataMax, 52)]} to ensure the 50% line is always within the visible area with a small buffer. Do NOT hardcode 0-100 — the axis should still auto-scale to the data, just guaranteed to include the 50% mark."
+    },
+    {
+      "id": "TASK-005",
+      "title": "Exclude already-rostered players from draft assistant in dynasty leagues",
+      "spec": "specs/code-style.md",
+      "priority": 5,
+      "status": "done",
+      "dependencies": [],
+      "description": "In dynasty leagues, most players are already rostered from previous seasons and are NOT in the draft pool — only rookies and free agents are draftable. Currently BestAvailable (src/components/draft/BestAvailable.tsx) only filters out players picked in the current draft via the picks array. Fix: When a draft is selected in src/app/draft-assistant/page.tsx, use the draft's league_id to fetch all rosters via SleeperService.getRosters(league_id). Collect every player_id from all rosters' 'players' arrays into a Set of rostered player IDs. Pass this Set (or array) as a new prop 'rosteredPlayerIds' to BestAvailable. In BestAvailable, filter out both drafted picks AND rostered players from the available pool. This should only apply when the league is a dynasty/keeper league — check the league settings (fetch the league via SleeperService.getLeague(league_id) and check if settings.type === 2 for dynasty, or if the draft has keeper picks). If it's a redraft league (type 0), skip the roster fetch since all players are available. Also display a small indicator in the UI (e.g. a Chip or subtitle) showing whether the draft is 'Dynasty' or 'Redraft' so the user knows the filtering is active."
     }
   ]
 }

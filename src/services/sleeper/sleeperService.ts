@@ -297,6 +297,41 @@ export const SleeperService = {
     }
   },
 
+  async getLeague(leagueId: string): Promise<SleeperLeague | null> {
+    const cacheKey = `league_${leagueId}`;
+    const cached = CacheService.get<SleeperLeague>(cacheKey, 'local');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/league/${leagueId}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const ttl = data.status === 'complete' ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 60;
+      CacheService.set(cacheKey, data, { storage: 'local', ttl });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching league ${leagueId}`, e);
+      return null;
+    }
+  },
+
+  async getRosters(leagueId: string): Promise<SleeperRoster[]> {
+    const cacheKey = `rosters_${leagueId}`;
+    const cached = CacheService.get<SleeperRoster[]>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/league/${leagueId}/rosters`);
+      if (!res.ok) return [];
+      const data: SleeperRoster[] = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session', ttl: 1000 * 60 * 15 });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching rosters for league ${leagueId}`, e);
+      return [];
+    }
+  },
+
   async getLeagueHistory(currentLeagueId: string): Promise<SleeperLeague[]> {
     const history: SleeperLeague[] = [];
     let currentId = currentLeagueId;

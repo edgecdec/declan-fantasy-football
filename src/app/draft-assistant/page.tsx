@@ -10,6 +10,8 @@ import { SleeperService, SleeperDraft, SleeperDraftPick } from '@/services/sleep
 import DraftBoard from '@/components/draft/DraftBoard';
 import BestAvailable from '@/components/draft/BestAvailable';
 
+const DYNASTY_LEAGUE_TYPE = 2;
+
 export default function DraftAssistantPage() {
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
@@ -20,6 +22,8 @@ export default function DraftAssistantPage() {
   const [selectedDraft, setSelectedDraft] = React.useState<SleeperDraft | null>(null);
   const [picks, setPicks] = React.useState<SleeperDraftPick[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [isDynasty, setIsDynasty] = React.useState(false);
+  const [rosteredPlayerIds, setRosteredPlayerIds] = React.useState<Set<string>>(new Set());
 
   // Init username
   React.useEffect(() => {
@@ -82,9 +86,28 @@ export default function DraftAssistantPage() {
   const handleSelectDraft = async (draft: SleeperDraft) => {
     setSelectedDraft(draft);
     setRefreshing(true);
+    setIsDynasty(false);
+    setRosteredPlayerIds(new Set());
     try {
-      const fetchedPicks = await SleeperService.getDraftPicks(draft.draft_id);
+      const [fetchedPicks, league] = await Promise.all([
+        SleeperService.getDraftPicks(draft.draft_id),
+        SleeperService.getLeague(draft.league_id),
+      ]);
       setPicks(fetchedPicks);
+
+      const dynasty = league?.settings?.type === DYNASTY_LEAGUE_TYPE;
+      setIsDynasty(dynasty);
+
+      if (dynasty) {
+        const rosters = await SleeperService.getRosters(draft.league_id);
+        const ids = new Set<string>();
+        for (const roster of rosters) {
+          if (roster.players) {
+            for (const pid of roster.players) ids.add(pid);
+          }
+        }
+        setRosteredPlayerIds(ids);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -170,9 +193,18 @@ export default function DraftAssistantPage() {
           <Paper sx={{ p: 2, mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'primary.dark', color: 'white' }}>
             <Box>
               <Typography variant="h5" fontWeight="bold">{selectedDraft.metadata.name || 'Draft'}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                {selectedDraft.draft_id} • {selectedDraft.status}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                  {selectedDraft.draft_id} • {selectedDraft.status}
+                </Typography>
+                <Chip
+                  label={isDynasty ? 'Dynasty' : 'Redraft'}
+                  size="small"
+                  color={isDynasty ? 'secondary' : 'default'}
+                  variant="outlined"
+                  sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}
+                />
+              </Box>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <Button variant="outlined" color="inherit" onClick={fetchPicks} disabled={refreshing}>
@@ -192,7 +224,7 @@ export default function DraftAssistantPage() {
             </Grid>
             <Grid size={{ xs: 12, lg: 3 }}>
               <Box sx={{ height: 600 }}>
-                <BestAvailable draft={selectedDraft} picks={picks} />
+                <BestAvailable draft={selectedDraft} picks={picks} rosteredPlayerIds={rosteredPlayerIds} />
               </Box>
             </Grid>
           </Grid>
