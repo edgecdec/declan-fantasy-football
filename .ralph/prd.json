@@ -24,7 +24,7 @@
       "title": "Show Draft Assistant for edgecdec user instead of dev-only",
       "spec": "specs/code-style.md",
       "priority": 3,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "In src/components/layout/AppLayout.tsx, the Draft Assistant nav item is currently gated behind process.env.NODE_ENV === 'development'. Change this so it is instead shown when the logged-in Sleeper user is 'edgecdec'. Use the existing useUser() hook to get the current user and check user.username === 'edgecdec'. The MENU_ITEMS list should be computed dynamically (e.g. via useMemo) rather than at module scope, since it now depends on runtime user state. Remove the NODE_ENV check entirely."
     }

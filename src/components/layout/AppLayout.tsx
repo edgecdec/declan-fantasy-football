@@ -53,10 +53,7 @@ const BASE_MENU_ITEMS = [
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
 
-// Conditionally add dev-only items
-const MENU_ITEMS = process.env.NODE_ENV === 'development' 
-  ? [...BASE_MENU_ITEMS, { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> }]
-  : BASE_MENU_ITEMS;
+const DRAFT_ASSISTANT_ITEM = { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useUser();
@@ -65,6 +62,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
   
+  const menuItems = React.useMemo(() => 
+    user?.username === 'edgecdec' ? [...BASE_MENU_ITEMS, DRAFT_ASSISTANT_ITEM] : BASE_MENU_ITEMS,
+    [user?.username]
+  );
+
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -95,7 +97,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Toolbar>
       <Divider />
       <List>
-        {MENU_ITEMS.map((item) => {
+        {menuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <ListItem key={item.text} disablePadding>
@@ -151,7 +153,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </IconButton>
           
           <Typography variant="h6" noWrap component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1 }}>
-            {MENU_ITEMS.find(i => i.href === pathname)?.text || 'Declanalytics'}
+            {menuItems.find(i => i.href === pathname)?.text || 'Declanalytics'}
             <Chip 
               label="BETA" 
               color="error" 
