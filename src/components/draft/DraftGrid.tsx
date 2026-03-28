@@ -2,8 +2,19 @@
 
 import * as React from 'react';
 import { Box, Paper, Typography, Chip } from '@mui/material';
+import { keyframes } from '@mui/material/styles';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
+
+const rainbowPulse = keyframes`
+  0% { box-shadow: 0 0 4px 1px rgba(255,0,0,0.6); border-color: rgba(255,0,0,0.8); }
+  17% { box-shadow: 0 0 4px 1px rgba(255,165,0,0.6); border-color: rgba(255,165,0,0.8); }
+  33% { box-shadow: 0 0 4px 1px rgba(255,255,0,0.6); border-color: rgba(255,255,0,0.8); }
+  50% { box-shadow: 0 0 4px 1px rgba(0,200,0,0.6); border-color: rgba(0,200,0,0.8); }
+  67% { box-shadow: 0 0 4px 1px rgba(0,150,255,0.6); border-color: rgba(0,150,255,0.8); }
+  83% { box-shadow: 0 0 4px 1px rgba(160,0,255,0.6); border-color: rgba(160,0,255,0.8); }
+  100% { box-shadow: 0 0 4px 1px rgba(255,0,0,0.6); border-color: rgba(255,0,0,0.8); }
+`;
 
 type Props = {
   draft: SleeperDraft;
@@ -67,6 +78,8 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                 const actualOwnerId = ownershipMap.get(`${round}-${rosterId}`);
                 const isTraded = actualOwnerId !== undefined && actualOwnerId !== rosterId;
                 const isTradedToCurrentUser = isTraded && currentUserRosterId !== null && actualOwnerId === currentUserRosterId;
+                const effectiveOwnerId = actualOwnerId ?? rosterId;
+                const isCurrentUserPick = currentUserRosterId !== null && effectiveOwnerId === currentUserRosterId;
 
                 const isPicked = !!pick;
                 const position = pick?.metadata?.position || 'BENCH';
@@ -84,8 +97,13 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                     key={draftSlot}
                     sx={{
                       p: 1, height: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                      bgcolor: bgColor, border: isTradedToCurrentUser ? '2px solid' : '1px solid',
-                      borderColor, position: 'relative',
+                      bgcolor: bgColor,
+                      border: isCurrentUserPick ? '2px solid' : isTradedToCurrentUser ? '2px solid' : '1px solid',
+                      borderColor: isCurrentUserPick ? undefined : borderColor,
+                      position: 'relative',
+                      ...(isCurrentUserPick && {
+                        animation: `${rainbowPulse} 4s linear infinite`,
+                      }),
                     }}
                   >
                     <Typography variant="caption" sx={{ position: 'absolute', top: 2, left: 4, opacity: 0.5 }}>

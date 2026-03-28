@@ -150,7 +150,7 @@
       "title": "Add rainbow pulsing highlight to current user's picks on draft board",
       "spec": "specs/code-style.md",
       "priority": 17,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-008"],
       "description": "On the DraftBoard, highlight all picks belonging to the current user (matched via their roster_id) with a classic animated rainbow border/glow effect. Use a CSS @keyframes animation that cycles through rainbow colors on the border or box-shadow, with a smooth pulsing transition. Apply this to both already-picked cells (showing the player) and upcoming empty cells that belong to the user (including traded picks from TASK-006). This makes it instantly obvious which picks are yours across the entire board. Define the keyframes animation in a style tag or sx prop — do not create a separate CSS file. Keep the animation subtle enough to not be distracting but visible enough to spot at a glance."
     },
@@ -164,13 +164,13 @@
       "description": "The Best Available panel on the draft assistant page takes up a fixed 3-column (lg=3) grid slot on the right side, reducing space for the DraftBoard. Make it collapsible: add a toggle button (e.g. a chevron or arrow icon) that slides the panel in/out. When collapsed, the DraftBoard should expand to use the full width (lg=12). When expanded, revert to the current layout (lg=9 board + lg=3 panel). Store the collapsed state in local component state. On smaller screens (md and below), the panel already stacks below — this is mainly for medium-large screens where horizontal space is tight. Use a smooth CSS transition for the slide effect."
     },
     {
-      "id": "TASK-019",
-      "title": "Fix draft slot to user mapping — use draft_order from Sleeper draft object",
+      "id": "TASK-020",
+      "title": "Fix DraftBoard to display picks in snake/3RR column order, not linear",
       "spec": "specs/code-style.md",
-      "priority": 19,
+      "priority": 20,
       "status": "open",
-      "dependencies": ["TASK-008"],
-      "description": "Bug: On /draft-assistant/1206336001794920448, users are mapped to the wrong draft slots. The correct order is pullmanguy=slot 1, egruis=slot 2, edgecdec=slot 3, junebugge=slot 4, but the board shows them incorrectly. The Sleeper draft object has a 'draft_order' field which is a mapping of user_id -> draft_slot (1-indexed position). This is the authoritative source for who picks in which slot. The current code is likely using roster_id ordering or array index instead of draft_order. Fix: fetch the full draft object via GET /draft/{draft_id}, read the draft_order map, and use it to assign users to columns. The SleeperDraft type may need to be extended to include draft_order. CRITICAL: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/ and study src/backend/api/draft.py — specifically how it reads draft_order and slot_to_roster_id to correctly map users to pick positions. The draft_order maps user_id->slot, and you also need the rosters to map roster_id->owner_id to connect picks (which use roster_id) to the correct column. Verify against the real Sleeper draft page for draft 1206336001794920448. The specific draft ID to compare against is 1206336001803288576 (https://sleeper.com/draft/nfl/1206336001803288576) — fetch this draft's picks and draft_order from the Sleeper API and confirm our board matches exactly."
+      "dependencies": ["TASK-009"],
+      "description": "Bug: The DraftBoard is displaying all picks in linear order (1.01, 2.01, 3.01 always in the leftmost column). In a snake draft, each user's picks should appear under THEIR column — e.g. if edgecdec has slot 3, his round 1 pick is in column 3, his round 2 pick is ALSO in column 3 (because snake reverses, so slot 3 in round 1 maps to slot N-2 in round 2 which snakes back to column 3). The pick cells must be placed in the column of the user who OWNS that pick (pre-trade), not in a fixed left-to-right sequential order. For each round, calculate which draft_slot picks in which position based on snake/3RR rules, then place the pick in that slot's column. The pick_no label (e.g. '2.10') should reflect the actual sequential pick number, but the CELL should be in the correct user's column. Verify against draft 1206336001803288576 on Sleeper."
     }
   ]
 }
