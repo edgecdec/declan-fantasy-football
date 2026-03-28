@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { Box } from '@mui/material';
 import { SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
-import TeamFilter from '@/components/draft/TeamFilter';
 import TeamPicksList from '@/components/draft/TeamPicksList';
 import DraftGrid from '@/components/draft/DraftGrid';
 
@@ -79,11 +78,9 @@ export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwner
 
   return (
     <Box>
-      <TeamFilter teams={teams} rosterOwnerMap={rosterOwnerMap} focusedTeam={focusedTeam} onSelect={setFocusedTeam} />
-      {focusedTeam !== null ? (
+      <DraftGrid draft={draft} grid={grid} ownershipMap={ownershipMap} rosterOwnerMap={rosterOwnerMap} currentUserRosterId={currentUserRosterId} getSlotOrder={getSlotOrder} focusedTeam={focusedTeam} onSelectTeam={setFocusedTeam} />
+      {focusedTeam !== null && (
         <TeamPicksList slots={focusedSlots} teamName={rosterOwnerMap.get(focusedTeam) || `Team ${focusedTeam}`} />
-      ) : (
-        <DraftGrid draft={draft} grid={grid} ownershipMap={ownershipMap} rosterOwnerMap={rosterOwnerMap} currentUserRosterId={currentUserRosterId} getSlotOrder={getSlotOrder} />
       )}
     </Box>
   );

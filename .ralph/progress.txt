@@ -88,3 +88,11 @@
 - focusedSlots computation accounts for traded picks — shows all picks a team owns including acquired ones.
 - The getSlotOrder helper was reused for both the grid and the focused slots computation to keep snake/reversal logic consistent.
 - Nova Act test confirmed: All button exists, compact list appears on team click, full grid returns on All click.
+
+## TASK-011: Use DraftBoard column headers as team focus buttons (2026-03-28)
+- Removed separate TeamFilter button row component entirely
+- Made DraftGrid column headers clickable with cursor:pointer, hover effect, and primary color highlight when focused
+- When a team is focused, grid body hides and TeamPicksList shows below the headers
+- Clicking the same header deselects the filter, restoring the full grid
+- Deleted unused TeamFilter.tsx component
+- Lessons: When replacing a UI element with inline behavior, ensure the interactive element (headers) remains visible in all states so users can toggle back. The `focusedTeam === null &&` guard on grid rows is a clean way to conditionally hide the body while keeping headers.

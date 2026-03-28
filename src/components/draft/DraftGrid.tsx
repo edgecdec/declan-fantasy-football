@@ -12,9 +12,11 @@ type Props = {
   rosterOwnerMap: Map<number, string>;
   currentUserRosterId: number | null;
   getSlotOrder: (round: number, teams: number, draftType: string) => number[];
+  focusedTeam: number | null;
+  onSelectTeam: (rosterId: number | null) => void;
 };
 
-export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, currentUserRosterId, getSlotOrder }: Props) {
+export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, currentUserRosterId, getSlotOrder, focusedTeam, onSelectTeam }: Props) {
   const teams = draft.settings.teams;
   const rounds = draft.settings.rounds;
   const draftType = draft.type || 'snake';
@@ -24,14 +26,27 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, c
       <Box sx={{ display: 'grid', gridTemplateColumns: `40px repeat(${teams}, minmax(120px, 1fr))`, gap: 1, minWidth: teams * 130 }}>
         {/* Header Row */}
         <Box sx={{ textAlign: 'center', p: 1, fontWeight: 'bold' }}>Rd</Box>
-        {Array.from({ length: teams }, (_, i) => (
-          <Box key={i} sx={{ textAlign: 'center', p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
-            <Typography variant="caption" noWrap>{rosterOwnerMap.get(i + 1) || `Team ${i + 1}`}</Typography>
-          </Box>
-        ))}
+        {Array.from({ length: teams }, (_, i) => {
+          const rosterId = i + 1;
+          const isFocused = focusedTeam === rosterId;
+          return (
+            <Box
+              key={i}
+              onClick={() => onSelectTeam(isFocused ? null : rosterId)}
+              sx={{
+                textAlign: 'center', p: 1, bgcolor: isFocused ? 'primary.main' : 'background.paper',
+                color: isFocused ? 'primary.contrastText' : 'text.primary',
+                borderRadius: 1, cursor: 'pointer', userSelect: 'none',
+                '&:hover': { bgcolor: isFocused ? 'primary.dark' : 'action.hover' },
+              }}
+            >
+              <Typography variant="caption" noWrap>{rosterOwnerMap.get(rosterId) || `Team ${rosterId}`}</Typography>
+            </Box>
+          );
+        })}
 
         {/* Draft Rounds */}
-        {grid.map((row, roundIdx) => {
+        {focusedTeam === null && grid.map((_row, roundIdx) => {
           const round = roundIdx + 1;
           const slotOrder = getSlotOrder(round, teams, draftType);
 

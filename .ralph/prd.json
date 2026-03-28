@@ -90,6 +90,24 @@
       "status": "done",
       "dependencies": ["TASK-006", "TASK-008"],
       "description": "Add a row of clickable team buttons at the top of the DraftBoard showing each team's username (from the roster_id -> username mapping in TASK-008). Clicking a team filters the draft board to only show that team's picks across all rounds, including picks acquired via trade (from TASK-006). Clicking the same team again or an 'All' button deselects the filter and shows the full board. When a team is focused, display their picks in a compact list view showing round, pick number, and the player selected (or 'TBD' if not yet picked). Highlight the focused team's username button with the primary color. This lets users quickly see a specific team's full draft capital at a glance. REFERENCE: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/SleeperLiveDraftRankingsV2 and study the frontend JS and draft API for any team filtering patterns."
+    },
+    {
+      "id": "TASK-011",
+      "title": "Use DraftBoard column headers as team focus buttons instead of separate button row",
+      "spec": "specs/code-style.md",
+      "priority": 11,
+      "status": "done",
+      "dependencies": ["TASK-010"],
+      "description": "TASK-010 added a separate row of team filter buttons above the DraftBoard. Remove that button row entirely. Instead, make the existing column headers in the DraftBoard table itself clickable — each column header already shows the team username, so clicking it should toggle focus on that team (same filtering behavior as TASK-010). Add a cursor pointer and hover effect to the column headers to indicate they are clickable. When a team is focused, highlight that column header with the primary color. Clicking the same header again deselects the filter. This is cleaner and avoids duplicating the team names in a separate ugly button row."
+    },
+    {
+      "id": "TASK-012",
+      "title": "Separate mock drafts from real league drafts in draft list",
+      "spec": "specs/code-style.md",
+      "priority": 12,
+      "status": "open",
+      "dependencies": [],
+      "description": "On /draft-assistant, the draft list shows all drafts including mock drafts which clutter the view. Mock drafts are drafts whose league never became a real active league (no regular season games played, or the league status is 'pre_draft'/'drafting' with no matchup data). When fetching drafts in src/app/draft-assistant/page.tsx, for each draft use its league_id to check if the league actually had a real season — fetch the league via SleeperService and check if status is 'in_season' or 'complete', or if settings indicate it was a real league. Show real league drafts first in the list. Mock drafts should be collapsed into a separate section at the bottom labeled 'Mock Drafts' that is collapsed by default (use MUI Accordion or a show/hide toggle). This keeps the main list focused on drafts that matter."
     }
   ]
 }
