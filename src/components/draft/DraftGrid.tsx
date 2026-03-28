@@ -6,15 +6,14 @@ import { keyframes } from '@mui/material/styles';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
-const rainbowPulse = keyframes`
-  0% { box-shadow: 0 0 4px 1px rgba(255,0,0,0.6); border-color: rgba(255,0,0,0.8); }
-  17% { box-shadow: 0 0 4px 1px rgba(255,165,0,0.6); border-color: rgba(255,165,0,0.8); }
-  33% { box-shadow: 0 0 4px 1px rgba(255,255,0,0.6); border-color: rgba(255,255,0,0.8); }
-  50% { box-shadow: 0 0 4px 1px rgba(0,200,0,0.6); border-color: rgba(0,200,0,0.8); }
-  67% { box-shadow: 0 0 4px 1px rgba(0,150,255,0.6); border-color: rgba(0,150,255,0.8); }
-  83% { box-shadow: 0 0 4px 1px rgba(160,0,255,0.6); border-color: rgba(160,0,255,0.8); }
-  100% { box-shadow: 0 0 4px 1px rgba(255,0,0,0.6); border-color: rgba(255,0,0,0.8); }
+const RAINBOW_CYCLE_SECONDS = 3.5;
+
+const spinGradient = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 `;
+
+const CONIC_GRADIENT = 'conic-gradient(red, orange, yellow, green, dodgerblue, blueviolet, red)';
 
 type Props = {
   draft: SleeperDraft;
@@ -61,7 +60,9 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
         })}
 
         {/* Draft Rounds */}
-        {focusedTeam === null && grid.map((_row, roundIdx) => {
+        {focusedTeam === null && (() => {
+          let userPickIdx = 0;
+          return grid.map((_row, roundIdx) => {
           const round = roundIdx + 1;
           const slotOrder = getSlotOrder(round, teams, draftType);
 
@@ -92,20 +93,10 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                 const snakePosition = slotOrder.indexOf(draftSlot);
                 const pickNumber = roundIdx * teams + snakePosition + 1;
 
-                return (
-                  <Paper
-                    key={draftSlot}
-                    sx={{
-                      p: 1, height: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                      bgcolor: bgColor,
-                      border: isCurrentUserPick ? '2px solid' : isTradedToCurrentUser ? '2px solid' : '1px solid',
-                      borderColor: isCurrentUserPick ? undefined : borderColor,
-                      position: 'relative',
-                      ...(isCurrentUserPick && {
-                        animation: `${rainbowPulse} 4s linear infinite`,
-                      }),
-                    }}
-                  >
+                const pickDelay = isCurrentUserPick ? userPickIdx++ : 0;
+
+                const cellContent = (
+                  <>
                     <Typography variant="caption" sx={{ position: 'absolute', top: 2, left: 4, opacity: 0.5 }}>
                       {round}.{(snakePosition + 1).toString().padStart(2, '0')}
                     </Typography>
@@ -139,12 +130,64 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                         Pick {pickNumber}
                       </Typography>
                     )}
+                  </>
+                );
+
+                if (isCurrentUserPick) {
+                  return (
+                    <Box
+                      key={draftSlot}
+                      sx={{
+                        position: 'relative',
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        height: 80,
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: '-50%', left: '-50%',
+                          width: '200%', height: '200%',
+                          background: CONIC_GRADIENT,
+                          animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
+                          animationDelay: `${-pickDelay * 0.5}s`,
+                        },
+                      }}
+                    >
+                      <Paper
+                        sx={{
+                          position: 'absolute',
+                          inset: '2px',
+                          borderRadius: 'inherit',
+                          bgcolor: bgColor,
+                          p: 1,
+                          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        }}
+                      >
+                        {cellContent}
+                      </Paper>
+                    </Box>
+                  );
+                }
+
+                return (
+                  <Paper
+                    key={draftSlot}
+                    sx={{
+                      p: 1, height: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                      bgcolor: bgColor,
+                      border: isTradedToCurrentUser ? '2px solid' : '1px solid',
+                      borderColor,
+                      position: 'relative',
+                    }}
+                  >
+                    {cellContent}
                   </Paper>
                 );
               })}
             </React.Fragment>
           );
-        })}
+        });
+        })()}
       </Box>
     </Box>
   );

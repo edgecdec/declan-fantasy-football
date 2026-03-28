@@ -161,3 +161,10 @@
 - Single line change — replaced the text prefix, kept all other logic (color, font size, conditional rendering) intact.
 - Nova Act test confirmed: no "via trade" text on page, ↔️ emoji present on traded picks.
 - Lesson: Direct league URL (/draft-assistant/{leagueId}) is more reliable for Nova Act tests than navigating through the search UI.
+
+## TASK-022: Improve rainbow highlight to use traveling conic-gradient border (2026-03-28)
+- Replaced `rainbowPulse` keyframes (uniform color change) with a `spinGradient` rotation animation + conic-gradient pseudo-element technique.
+- Each user pick cell uses a `::before` pseudo-element with `conic-gradient(red, orange, yellow, green, dodgerblue, blueviolet, red)` that rotates via CSS animation, with an inner Paper covering the center to create a 2px animated border effect.
+- Each cell gets a staggered `animation-delay` based on pick index (`-pickDelay * 0.5s`) so they don't all spin in sync.
+- Extracted cell content into a shared `cellContent` JSX variable to avoid duplicating the pick display logic between rainbow-wrapped and normal cells.
+- Lesson: When testing with Nova Act, setting localStorage directly and reloading is more reliable than trying to interact with sidebar inputs. Also, the correct Sleeper user_id matters — using the wrong one means currentUserRosterId is null and no rainbow borders appear.

@@ -186,7 +186,7 @@
       "title": "Improve rainbow highlight to use a traveling gradient effect",
       "spec": "specs/code-style.md",
       "priority": 22,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-017"],
       "description": "The current rainbow highlight on the user's picks changes all cells to the same color simultaneously. Instead, use a CSS animated gradient border that slowly rotates/travels around each cell — so at any given moment, different parts of the border are different colors, and the colors smoothly shift position over time. This is the classic 'conic-gradient spinning border' effect. Implementation: use a conic-gradient background on a pseudo-element or wrapper with border-radius, animate the rotation with @keyframes. Each cell should have a slightly different animation-delay so they don't all pulse in sync — use the pick index to offset the delay. The animation should be slow and smooth (around 3-4 second full cycle), not fast or flashy."
     },
