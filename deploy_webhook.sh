@@ -32,7 +32,7 @@ if [ "$OLD_PKG_HASH" != "$NEW_PKG_HASH" ]; then
 fi
 
 rm -rf .next
-npm run build
+NODE_OPTIONS='--max-old-space-size=1536' npm run build
 
 pm2 restart "$PM2_NAME"
 

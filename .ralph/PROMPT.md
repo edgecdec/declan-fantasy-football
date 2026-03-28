@@ -17,7 +17,7 @@ You are an autonomous coding agent operating within a Ralph Loop. You execute ex
 10. If validation fails: read the error output, fix the issue, re-run validation. Max 3 retry attempts.
 11. If validation passes: `git add -A && git commit -m "TASK-XXX: short description" && git push`.
 12. Verify deployment by polling: `source .ralph/.server-env` then poll every 10 seconds up to 120 seconds: `ssh -i $SSH_KEY $SSH_USER@$SSH_HOST "curl -s -o /dev/null -w '%{http_code}' http://localhost:3004"`. Stop as soon as it returns 200. If it never returns 200 within 120 seconds, check pm2 logs, fix the issue, commit and push the fix, then re-verify.
-13. If the task involved UI changes: write a temporary Nova Act test script at /tmp/test_feature.py to verify the feature works in a real browser against https://fantasy.edgecdec.com. Run with `/opt/homebrew/bin/python3.13 /tmp/test_feature.py`. If the test fails, fix the code, commit, push, re-deploy, re-test. Delete the script after it passes.
+13. If the task involved UI changes: write a temporary Nova Act test script at /tmp/test_feature.py to verify the feature works in a real browser against https://fantasyfootball.edgecdec.com. Run with `/opt/homebrew/bin/python3.13 /tmp/test_feature.py`. If the test fails, fix the code, commit, push, re-deploy, re-test. Delete the script after it passes.
 14. Once verified: update task status to `"done"` in prd.json, append lessons to `.ralph/progress.txt`, then: `git add -A && git commit --amend --no-edit && git push --force-with-lease`.
 15. Terminate the iteration.
 

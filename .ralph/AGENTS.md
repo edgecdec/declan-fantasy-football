@@ -82,7 +82,7 @@ npx next build
 Connection details are stored locally in `.ralph/.server-env` (gitignored). Read that file to get `SSH_KEY`, `SSH_USER`, and `SSH_HOST`.
 
 - Production path: `/var/www/FantasyFootball`
-- Live URL: https://fantasy.edgecdec.com
+- Live URL: https://fantasyfootball.edgecdec.com
 - OS: Ubuntu 24.04, x86_64
 - Process manager: pm2
 - Other apps on same server: jeopardy (:3000), superconnections (:3001), marchmadness (:3002), discord-alt (:3003)

@@ -75,7 +75,7 @@ These are mistakes to avoid. Do not repeat them.
 - Always `git pull` before committing if you suspect the human or another process pushed changes.
 
 ## Nova Act Testing
-After deploying any UI task, write a temporary Nova Act test script to verify the feature works in a real browser against the LIVE site (https://fantasy.edgecdec.com).
+After deploying any UI task, write a temporary Nova Act test script to verify the feature works in a real browser against the LIVE site (https://fantasyfootball.edgecdec.com).
 
 ### Script Pattern
 - Save as `/tmp/test_<feature>.py`
