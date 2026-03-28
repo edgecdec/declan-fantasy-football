@@ -125,3 +125,13 @@ ssh -i $SSH_KEY $SSH_USER@$SSH_HOST "curl -s -o /dev/null -w '%{http_code}' http
 - No auth required — all endpoints are public.
 - Full reference in `docs/SLEEPER_API.md`.
 - Player headshots: `https://sleepercdn.com/content/nfl/players/<player_id>.jpg`
+
+## Draft Assistant Reference Implementation
+
+A previous Python/Flask implementation of the draft assistant exists at `https://github.com/edgecdec/SleeperLiveDraftRankingsV2`. For ANY task related to the draft assistant, clone this repo to `/tmp/SleeperLiveDraftRankingsV2` (if not already there) and study the relevant files before implementing. Key files:
+- `src/backend/api/draft.py` — draft board logic, snake/reversal order, traded pick ownership, team name resolution
+- `src/backend/services/sleeper_api.py` — Sleeper API integration patterns
+- `src/frontend/js/app-simple.js` — frontend draft UI logic
+- `src/backend/services/vbd_calculator.py` — VBD ranking calculations
+
+Port the relevant logic to TypeScript. Do not copy Python code verbatim — adapt it to the existing Next.js/React patterns in this project.

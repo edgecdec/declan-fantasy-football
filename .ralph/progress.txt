@@ -59,3 +59,16 @@
 - The Sleeper API has a `/league/{id}/drafts` endpoint that wasn't in the service yet — always check the API docs before assuming an endpoint doesn't exist
 - Splitting the page into search (index) + detail ([leagueId]) cleanly separates concerns and removes a lot of state from the index page
 - The `pathname === item.href` nav check needed updating to `startsWith(item.href + '/')` for sub-route highlighting — safe because Home href is `/` so `startsWith('//')` never matches
+
+## TASK-008: Display actual usernames instead of 'Team X' throughout draft assistant
+- **Date**: 2026-03-28
+- **Status**: Done
+- **Changes**:
+  - Added `username` field to `SleeperLeagueUser` type for fallback when `display_name` is empty
+  - Updated `[leagueId]/page.tsx` to use `display_name || username` when building roster owner map
+  - Added `rosterIdToOwnerIdMap` (roster_id → user_id) passed to DraftBoard for current user detection
+  - Fixed broken `currentUserRosterId` logic in DraftBoard — was an empty loop, now properly iterates `rosterIdToOwnerIdMap`
+- **Lessons**:
+  - The existing code already had the rosterOwnerMap plumbing in place from TASK-006, but the currentUserRosterId detection was broken (empty loop body with a comment). Always check that loops actually do something.
+  - Separating roster_id → display_name (for UI) from roster_id → owner_id (for logic) keeps concerns clean.
+  - Sleeper API users have both `display_name` and `username` — always fall back to `username` since `display_name` can be empty.

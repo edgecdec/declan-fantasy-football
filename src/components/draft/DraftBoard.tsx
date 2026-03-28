@@ -10,6 +10,7 @@ type Props = {
   picks: SleeperDraftPick[];
   tradedPicks?: SleeperTradedPick[];
   rosterOwnerMap?: Map<number, string>;
+  rosterIdToOwnerIdMap?: Map<number, string>;
   currentUserId?: string;
 };
 
@@ -22,21 +23,19 @@ function buildPickOwnershipMap(tradedPicks: SleeperTradedPick[]): Map<string, nu
   return map;
 }
 
-export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwnerMap = new Map(), currentUserId }: Props) {
+export default function DraftBoard({ draft, picks, tradedPicks = [], rosterOwnerMap = new Map(), rosterIdToOwnerIdMap = new Map(), currentUserId }: Props) {
   const teams = draft.settings.teams;
   const rounds = draft.settings.rounds;
   const ownershipMap = React.useMemo(() => buildPickOwnershipMap(tradedPicks), [tradedPicks]);
 
-  // Find current user's roster_id from rosterOwnerMap
+  // Find current user's roster_id from rosterIdToOwnerIdMap
   const currentUserRosterId = React.useMemo(() => {
     if (!currentUserId) return null;
-    for (const [rosterId, name] of rosterOwnerMap.entries()) {
-      // We need owner_id, not display_name. We'll match via picks instead.
+    for (const [rosterId, ownerId] of rosterIdToOwnerIdMap.entries()) {
+      if (ownerId === currentUserId) return rosterId;
     }
-    // Match from picks: find a pick where picked_by === currentUserId
-    const userPick = picks.find(p => p.picked_by === currentUserId);
-    return userPick?.roster_id ?? null;
-  }, [currentUserId, picks, rosterOwnerMap]);
+    return null;
+  }, [currentUserId, rosterIdToOwnerIdMap]);
 
   const grid: (SleeperDraftPick | null)[][] = Array.from({ length: rounds }, () =>
     Array(teams).fill(null)

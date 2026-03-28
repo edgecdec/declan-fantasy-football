@@ -40,6 +40,7 @@ export default function LeagueDraftPage() {
   const [rosteredPlayerIds, setRosteredPlayerIds] = React.useState<Set<string>>(new Set());
   const [tradedPicks, setTradedPicks] = React.useState<SleeperTradedPick[]>([]);
   const [rosterOwnerMap, setRosterOwnerMap] = React.useState<Map<number, string>>(new Map());
+  const [rosterIdToOwnerIdMap, setRosterIdToOwnerIdMap] = React.useState<Map<number, string>>(new Map());
   const [refreshing, setRefreshing] = React.useState(false);
 
   React.useEffect(() => {
@@ -78,17 +79,20 @@ export default function LeagueDraftPage() {
         setPicks(fetchedPicks);
         setTradedPicks(draftTradedPicks);
 
-        // Build roster_id → display_name map
+        // Build roster_id → display_name map and roster_id → owner_id map
         const userDisplayNames = new Map<string, string>();
         for (const u of leagueUsers) {
-          userDisplayNames.set(u.user_id, u.display_name);
+          userDisplayNames.set(u.user_id, u.display_name || u.username);
         }
         const ownerMap = new Map<number, string>();
+        const ownerIdMap = new Map<number, string>();
         for (const roster of rosters) {
           const name = userDisplayNames.get(roster.owner_id) || `Team ${roster.roster_id}`;
           ownerMap.set(roster.roster_id, name);
+          if (roster.owner_id) ownerIdMap.set(roster.roster_id, roster.owner_id);
         }
         setRosterOwnerMap(ownerMap);
+        setRosterIdToOwnerIdMap(ownerIdMap);
 
         const dynasty = league?.settings?.type === DYNASTY_LEAGUE_TYPE;
         setIsDynasty(dynasty);
@@ -188,7 +192,7 @@ export default function LeagueDraftPage() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, lg: 9 }}>
-            <DraftBoard draft={selectedDraft} picks={picks} tradedPicks={tradedPicks} rosterOwnerMap={rosterOwnerMap} currentUserId={user?.user_id} />
+            <DraftBoard draft={selectedDraft} picks={picks} tradedPicks={tradedPicks} rosterOwnerMap={rosterOwnerMap} rosterIdToOwnerIdMap={rosterIdToOwnerIdMap} currentUserId={user?.user_id} />
           </Grid>
           <Grid size={{ xs: 12, lg: 3 }}>
             <Box sx={{ height: 600 }}>

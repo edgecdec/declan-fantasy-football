@@ -63,6 +63,33 @@
       "status": "done",
       "dependencies": [],
       "description": "Currently the draft assistant lives at /draft-assistant with no URL state — selecting a draft is ephemeral. Add a route /draft-assistant/[leagueId] that deep-links directly to a specific league's draft. When a user selects a draft from the list on /draft-assistant, navigate to /draft-assistant/{league_id}. The [leagueId] page should auto-fetch the league's drafts and select the most relevant one (active 'drafting' first, then 'pre_draft', then most recent 'complete'). This allows bookmarking and sharing direct links to a league's draft view. Create src/app/draft-assistant/[leagueId]/page.tsx as a new route. The existing /draft-assistant/page.tsx remains as the search/discovery page."
+    },
+    {
+      "id": "TASK-008",
+      "title": "Display actual usernames instead of 'Team X' throughout draft assistant",
+      "spec": "specs/code-style.md",
+      "priority": 8,
+      "status": "done",
+      "dependencies": ["TASK-006"],
+      "description": "Throughout the draft assistant (DraftBoard, traded pick labels, pick ownership displays), teams are shown as 'Team X' using roster_id numbers. Instead, fetch the league users via SleeperService (GET /league/{league_id}/users) and rosters to build a mapping of roster_id -> display_name. Use this mapping everywhere a team is referenced — in the DraftBoard column headers, in traded pick annotations like 'via trade → Team 10' (should be 'via trade → username'), and in any pick ownership display. Pass this mapping as a prop or compute it at the page level and pass down. REFERENCE: A previous Python/Flask implementation exists at https://github.com/edgecdec/SleeperLiveDraftRankingsV2 — clone it to /tmp/SleeperLiveDraftRankingsV2 and study src/backend/api/draft.py and src/backend/services/sleeper_api.py for how traded picks, team names, and draft order were handled. Port the relevant logic to TypeScript."
+    },
+    {
+      "id": "TASK-009",
+      "title": "Support snake and third-round-reversal draft order in DraftBoard",
+      "spec": "specs/code-style.md",
+      "priority": 9,
+      "status": "open",
+      "dependencies": [],
+      "description": "The DraftBoard currently assumes linear draft order (same pick order every round). Sleeper drafts can be 'snake' (order reverses each round) or 'linear'. Some snake drafts also use third-round reversal (3rd round reverses again so the team picking last in round 1 picks first in round 2 AND first in round 3). The draft type is available in the SleeperDraft object's 'type' field ('snake' or 'linear') and third-round reversal may be in settings. Fix the DraftBoard to correctly calculate pick positions based on draft type: for snake drafts, reverse the column order on even rounds; for third-round reversal, the team with pick N in round 1 gets pick N in round 3 as well (rounds 3,5,7... follow round 1 order, rounds 2,4,6... are reversed). The pick_no from the actual picks data is the source of truth for completed picks — this is mainly needed for projecting upcoming pick slots in pre_draft or drafting states. REFERENCE: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/SleeperLiveDraftRankingsV2 and study src/backend/api/draft.py for the snake/reversal draft order logic. Port to TypeScript."
+    },
+    {
+      "id": "TASK-010",
+      "title": "Add team focus/filter to draft board",
+      "spec": "specs/code-style.md",
+      "priority": 10,
+      "status": "open",
+      "dependencies": ["TASK-006", "TASK-008"],
+      "description": "Add a row of clickable team buttons at the top of the DraftBoard showing each team's username (from the roster_id -> username mapping in TASK-008). Clicking a team filters the draft board to only show that team's picks across all rounds, including picks acquired via trade (from TASK-006). Clicking the same team again or an 'All' button deselects the filter and shows the full board. When a team is focused, display their picks in a compact list view showing round, pick number, and the player selected (or 'TBD' if not yet picked). Highlight the focused team's username button with the primary color. This lets users quickly see a specific team's full draft capital at a glance. REFERENCE: Clone https://github.com/edgecdec/SleeperLiveDraftRankingsV2 to /tmp/SleeperLiveDraftRankingsV2 and study the frontend JS and draft API for any team filtering patterns."
     }
   ]
 }

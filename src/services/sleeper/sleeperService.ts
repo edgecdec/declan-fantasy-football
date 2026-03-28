@@ -119,6 +119,7 @@ export type SleeperTradedPick = {
 
 export type SleeperLeagueUser = {
   user_id: string;
+  username: string;
   display_name: string;
   avatar: string | null;
 };
