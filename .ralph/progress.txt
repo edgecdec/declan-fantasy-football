@@ -203,3 +203,12 @@
 - Kept the existing positional trends line chart but integrated it into a grid layout alongside the MVP/LVP panel
 - Lesson: Recharts Tooltip formatter type expects `number | undefined`, not just `number` — always handle undefined in formatter callbacks
 - Lesson: The existing history page had duplicate league processing loops (processed leagues twice per year) — the rebuild eliminated this inefficiency by doing a single pass
+
+## TASK-029: Add league-average comparison to historical positional efficiency
+- Date: 2026-03-29
+- Created PositionalHeatmap component (src/components/performance/PositionalHeatmap.tsx) — a color-coded table showing user vs league avg differential per position per season
+- Green cells = above league average, red cells = below, intensity scales with magnitude
+- Added to /performance/positional/history below the existing chart/MVPs section
+- Reuses the same metric toggle (Output/Efficiency) that syncs with the main chart
+- The chart data already had league avg values stored (`${pos}_Avg_${metric}`) from the original implementation — just needed to surface them in a comparison view
+- Lesson: The data was already being collected but not displayed. Always check what data is available before adding new fetches.

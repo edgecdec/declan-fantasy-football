@@ -40,6 +40,7 @@ import PlayerImpactList from '@/components/performance/PlayerImpactList';
 import SmartTable from '@/components/common/SmartTable';
 import StartsTooltip from '@/components/performance/StartsTooltip';
 import { getPositionColor } from '@/constants/colors';
+import PositionalHeatmap from '@/components/performance/PositionalHeatmap';
 
 const MIN_YEAR = 2017;
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
@@ -347,6 +348,13 @@ export default function PositionalHistoryPage() {
             />
           </Grid>
         </Grid>
+      )}
+
+      {/* Positional Edge Heatmap */}
+      {chartData.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <PositionalHeatmap chartData={chartData} metric={metric} onMetricChange={setMetric} />
+        </Box>
       )}
 
       {/* Full List Modal */}

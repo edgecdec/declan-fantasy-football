@@ -240,7 +240,7 @@
       "title": "Add league-average comparison to historical positional efficiency",
       "spec": "specs/code-style.md",
       "priority": 29,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-027"],
       "description": "On /performance/positional/history, show the user's positional efficiency numbers compared to league averages for each season — the same way the current season page does it. For each season and each position (QB, RB, WR, TE), calculate the user's average points scored vs the league average at that position across all their leagues. Display this as a comparison (e.g. user avg vs league avg, or a +/- differential) so users can see which positions they outperformed or underperformed at relative to their competition over time. Ideally show this as a chart or table with seasons on one axis and positions on the other, with color coding (green for above average, red for below). This lets users identify multi-year trends like 'I've consistently been weak at TE' or 'My RBs carried me in 2022-2023'."
     },
