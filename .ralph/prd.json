@@ -213,7 +213,7 @@
       "title": "Show position column in full list view on positional benchmarks page",
       "spec": "specs/code-style.md",
       "priority": 25,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Bug: On /performance/positional, when expanding to the full list view, the player's position (QB, RB, WR, TE, etc.) is not displayed as a column. Add a Position column to the full list table so users can see each player's position. This should be one of the first columns (after rank/name)."
     },

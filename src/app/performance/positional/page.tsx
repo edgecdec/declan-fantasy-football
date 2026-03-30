@@ -236,7 +236,7 @@ export default function PositionalBenchmarksPage() {
       totalPOLA: number, 
       weeks: number, 
       name: string, 
-      pos: string,
+      position: string,
       startedWeeks: Record<string, number[]>
     }>();
 
@@ -257,7 +257,7 @@ export default function PositionalBenchmarksPage() {
                 totalPOLA: 0, 
                 weeks: 0, 
                 name: p.name, 
-                pos: p.position,
+                position: p.position,
                 startedWeeks: {}
               };
               impactMap.set(p.playerId, curr);
