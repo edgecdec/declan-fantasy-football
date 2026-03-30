@@ -237,3 +237,9 @@
 **Lessons**:
 - The minWidth constraint was the main culprit — it forced horizontal scrolling even when the viewport was wide enough. Removing it and reducing column minimums lets the CSS grid naturally fit the viewport.
 - Reducing gap from 1 to 0.5 saves significant horizontal space across 10-12 columns.
+
+## TASK-032: Fix zero-point filtering on /performance/positional/history (2026-03-30)
+- Root cause: Even when all leagues for a year returned null from analyzePositionalBenchmarks (zero-point filtering), the year was still added to yearResults with all-zero values because the code only checked `activeLeagues.length > 0` before building the data point.
+- Fix: After processing all leagues for a year, check `POSITIONS.some(p => agg.count[p] > 0)` — only add the year to chart data if at least one position had valid aggregated data.
+- Lesson: When filtering returns null/undefined from an inner function, the outer aggregation loop must also check whether any data was actually collected before including the time period in results. The `|| 1` fallback on count masked the issue by producing 0/1=0 instead of skipping entirely.
+- Verified: Nova Act test confirmed 2020 no longer appears for edgecdec, and other valid years (2021+) still display correctly.

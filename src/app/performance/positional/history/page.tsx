@@ -196,16 +196,19 @@ export default function PositionalHistoryPage() {
               }));
             }
 
-            // Build year data point
-            const point: YearlyPositionalStats = { year };
-            POSITIONS.forEach(p => {
-              const c = agg.count[p] || 1;
-              point[`${p}_User_total`] = agg.total.user[p] / c;
-              point[`${p}_Avg_total`] = agg.total.avg[p] / c;
-              point[`${p}_User_efficiency`] = agg.efficiency.user[p] / c;
-              point[`${p}_Avg_efficiency`] = agg.efficiency.avg[p] / c;
-            });
-            yearResults.push(point);
+            // Skip year if no leagues had valid data (all returned null / zero-point)
+            const hasData = POSITIONS.some(p => agg.count[p] > 0);
+            if (hasData) {
+              const point: YearlyPositionalStats = { year };
+              POSITIONS.forEach(p => {
+                const c = agg.count[p] || 1;
+                point[`${p}_User_total`] = agg.total.user[p] / c;
+                point[`${p}_Avg_total`] = agg.total.avg[p] / c;
+                point[`${p}_User_efficiency`] = agg.efficiency.user[p] / c;
+                point[`${p}_Avg_efficiency`] = agg.efficiency.avg[p] / c;
+              });
+              yearResults.push(point);
+            }
           }
         } catch (e) {
           console.error(`Error processing ${year}`, e);
