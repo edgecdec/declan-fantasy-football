@@ -249,7 +249,7 @@
       "title": "Add link to view draft on Sleeper from draft assistant page",
       "spec": "specs/code-style.md",
       "priority": 30,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "On the draft assistant page (/draft-assistant/[leagueId]), add a link/button that opens the draft on Sleeper's website. The URL format is https://sleeper.com/draft/nfl/{draft_id}. Place it in the draft header bar (the Paper with the draft name and status) — an icon button or small text link like 'View on Sleeper' with an external link icon (OpenInNew from MUI icons). Opens in a new tab."
     },

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Container, Box, Paper, Typography, Button, Chip, LinearProgress, Grid, Alert, IconButton, Tooltip } from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
 import BestAvailable from '@/components/draft/BestAvailable';
@@ -184,6 +185,15 @@ export default function LeagueDraftPage() {
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
+            <IconButton
+              component="a"
+              href={`https://sleeper.com/draft/nfl/${selectedDraft.draft_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ color: 'white' }}
+            >
+              <OpenInNewIcon />
+            </IconButton>
             <Button variant="outlined" color="inherit" onClick={handleRefresh} disabled={refreshing}>
               Refresh Board
             </Button>

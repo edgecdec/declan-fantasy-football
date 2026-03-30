@@ -212,3 +212,10 @@
 - Reuses the same metric toggle (Output/Efficiency) that syncs with the main chart
 - The chart data already had league avg values stored (`${pos}_Avg_${metric}`) from the original implementation — just needed to surface them in a comparison view
 - Lesson: The data was already being collected but not displayed. Always check what data is available before adding new fetches.
+
+## TASK-030: Add link to view draft on Sleeper from draft assistant page
+- Date: 2026-03-29
+- Added OpenInNew icon button in the draft header bar that links to https://sleeper.com/draft/nfl/{draft_id}
+- Opens in new tab with target="_blank" and rel="noopener noreferrer"
+- Minimal change: one import + one IconButton component added
+- Lessons: Simple UI additions like external links are straightforward — just add the MUI IconButton with component="a" pattern for anchor behavior.
