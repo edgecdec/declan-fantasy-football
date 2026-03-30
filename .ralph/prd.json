@@ -198,6 +198,33 @@
       "status": "done",
       "dependencies": ["TASK-010", "TASK-011"],
       "description": "When clicking a team column header to focus on them, the current behavior changes the board layout entirely (hiding or restructuring other teams). Instead, keep the full board layout exactly the same but fade all non-focused team picks to ~10% opacity. The focused team's picks remain at full opacity. This preserves the board structure so you can still see context while the focused team's picks pop out visually. Apply the opacity transition with a smooth CSS transition (e.g. 0.3s ease). When no team is focused (clicking the same header again to deselect), all picks return to full opacity."
+    },
+    {
+      "id": "TASK-024",
+      "title": "Progressively render positional benchmarks data as each league loads",
+      "spec": "specs/code-style.md",
+      "priority": 24,
+      "status": "done",
+      "dependencies": [],
+      "description": "On /performance/positional, the page currently waits until ALL leagues are processed before showing any data. Instead, update the UI progressively after each league finishes processing — render the charts/tables with whatever data is available so far, and update them as more leagues complete. Show a loading indicator at the top (e.g. LinearProgress bar with a text label like 'Loading league 3 of 8...') that remains visible until all leagues are done. Once complete, replace the loading indicator with a subtle 'All leagues loaded' confirmation or just remove it. The key change is in the page component's data fetching logic: instead of awaiting all results and then setting state once, set state incrementally after each league resolves so React re-renders with partial data."
+    },
+    {
+      "id": "TASK-025",
+      "title": "Show position column in full list view on positional benchmarks page",
+      "spec": "specs/code-style.md",
+      "priority": 25,
+      "status": "open",
+      "dependencies": [],
+      "description": "Bug: On /performance/positional, when expanding to the full list view, the player's position (QB, RB, WR, TE, etc.) is not displayed as a column. Add a Position column to the full list table so users can see each player's position. This should be one of the first columns (after rank/name)."
+    },
+    {
+      "id": "TASK-026",
+      "title": "Add larger page size options (up to 1000) on positional benchmarks full list",
+      "spec": "specs/code-style.md",
+      "priority": 26,
+      "status": "open",
+      "dependencies": [],
+      "description": "On /performance/positional, the full list view pagination only offers small page sizes (10, 25, etc.). Add larger options so the rows per page selector includes 10, 25, 50, 100, 250, 500, and 1000. This lets users view the entire list without excessive pagination. Update the rowsPerPageOptions prop on the MUI TablePagination (or equivalent pagination component) used in this view."
     }
   ]
 }

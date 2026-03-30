@@ -177,3 +177,8 @@
 - Removed TeamPicksList rendering from DraftBoard since the full grid is now always visible
 - Cleaned up unused imports (TeamPicksList) and dead code (focusedSlots memo, getRosterId callback) from DraftBoard
 - Lesson: When changing UI behavior from "hide" to "fade", the key is removing conditional rendering guards and adding CSS opacity instead — minimal code change for a big UX improvement
+
+## TASK-024: Progressively render positional benchmarks data as each league loads
+- Date: 2026-03-29
+- Changes: Modified handleAnalyze() in /performance/positional/page.tsx to call setResults/calculateAggregates/calculateGlobalImpacts after each league resolves instead of once at the end. Removed `!loading` gate from aggregate stats and league list rendering so partial data shows during loading. Updated loading status text to "Loading league X of Y: leagueName".
+- Lessons: The change was minimal — accumulate results into a local array, spread a snapshot into state after each iteration, and remove the `!loading` condition from render gates. No new state variables needed. Progressive rendering is just about moving setState calls inside the loop instead of after it.

@@ -173,6 +173,8 @@ export default function PositionalBenchmarksPage() {
     setLoading(true);
     setProgress(0);
     setResults([]);
+    setAggregateData([]);
+    setGlobalImpacts([]);
     setStatus('Finding leagues...');
 
     try {
@@ -184,32 +186,31 @@ export default function PositionalBenchmarksPage() {
       }
 
       const leagues = await SleeperService.getLeagues(currentUser.user_id, year);
-      // We process ALL leagues initially, but mark some as excluded
       const totalSteps = leagues.length;
-      const batchResults: LeagueResultItem[] = [];
+      const accumulated: LeagueResultItem[] = [];
 
       for (let i = 0; i < totalSteps; i++) {
         const league = leagues[i];
         const isExcluded = SleeperService.shouldIgnoreLeague(league);
-        setStatus(`Analyzing ${league.name}...`);
+        setStatus(`Loading league ${i + 1} of ${totalSteps}: ${league.name}`);
         
         try {
           const res = await analyzePositionalBenchmarks(league, currentUser.user_id, includePlayoffs);
-          batchResults.push({
+          accumulated.push({
             league,
             result: res,
             category: isExcluded ? 'excluded' : 'included'
           });
+          const snapshot = [...accumulated];
+          setResults(snapshot);
+          calculateAggregates(snapshot);
+          calculateGlobalImpacts(snapshot);
         } catch (e) {
           console.warn(`Failed to analyze ${league.name}`, e);
         }
         
         setProgress(((i + 1) / totalSteps) * 100);
       }
-
-      setResults(batchResults);
-      calculateAggregates(batchResults);
-      calculateGlobalImpacts(batchResults);
 
     } catch (e) {
       console.error(e);
@@ -528,7 +529,7 @@ export default function PositionalBenchmarksPage() {
       </Paper>
 
       {/* Aggregate Stats Section */}
-      {!loading && aggregateData.length > 0 && (
+      {aggregateData.length > 0 && (
         <Grid container spacing={4} sx={{ mb: 4 }}>
           {/* Chart */}
           <Grid size={{ xs: 12, lg: 8 }}>
@@ -551,7 +552,7 @@ export default function PositionalBenchmarksPage() {
       )}
 
       {/* Individual Leagues */}
-      {!loading && results.length > 0 && (
+      {results.length > 0 && (
         <Box>
           <Typography variant="h5" gutterBottom sx={{ mt: 4, mb: 2 }}>Included Leagues</Typography>
           <Grid container spacing={3}>
