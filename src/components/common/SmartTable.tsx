@@ -30,6 +30,7 @@ interface SmartTableProps<T> {
   defaultSortBy?: string;
   defaultSortOrder?: 'asc' | 'desc';
   defaultRowsPerPage?: number;
+  rowsPerPageOptions?: number[];
   enableGlobalSearch?: boolean;
   renderDetailPanel?: (row: T) => React.ReactNode;
   noDataMessage?: string;
@@ -52,6 +53,7 @@ export default function SmartTable<T>({
   defaultSortBy,
   defaultSortOrder,
   defaultRowsPerPage,
+  rowsPerPageOptions,
   enableGlobalSearch = true,
   renderDetailPanel,
   noDataMessage
@@ -207,6 +209,7 @@ export default function SmartTable<T>({
         defaultSortBy={defaultSortBy}
         defaultSortOrder={defaultSortOrder}
         defaultRowsPerPage={defaultRowsPerPage}
+        rowsPerPageOptions={rowsPerPageOptions}
         renderDetailPanel={renderDetailPanel}
         noDataMessage={noDataMessage}
       />

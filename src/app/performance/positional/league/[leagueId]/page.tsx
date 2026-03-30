@@ -450,6 +450,7 @@ export default function LeaguePositionalPage() {
                 keyField={(row) => `${row.season}-${row.ownerId}-${row.playerId}`}
                 defaultSortBy="totalPOLA"
                 defaultSortOrder="desc"
+                rowsPerPageOptions={[10, 25, 50, 100, 250, 500, 1000]}
                 columns={[
                   { id: 'name', label: 'Player', numeric: false, sortable: true, filterVariant: 'text' },
                   { 
@@ -541,6 +542,7 @@ export default function LeaguePositionalPage() {
             keyField={(row) => `${row.playerId}-${row.ownerName}`}
             defaultSortBy="totalPOLA"
             defaultSortOrder="desc"
+            rowsPerPageOptions={[10, 25, 50, 100, 250, 500, 1000]}
             columns={[
               { id: 'name', label: 'Player', numeric: false, sortable: true, filterVariant: 'text' },
               { id: 'ownerName', label: 'Manager', numeric: false, sortable: true, filterVariant: 'multi-select' },

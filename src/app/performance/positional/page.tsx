@@ -607,6 +607,7 @@ export default function PositionalBenchmarksPage() {
             keyField="playerId"
             defaultSortBy="totalPOLA"
             defaultSortOrder="desc"
+            rowsPerPageOptions={[10, 25, 50, 100, 250, 500, 1000]}
             columns={[
               { id: 'name', label: 'Player', numeric: false, sortable: true, filterVariant: 'text' },
               { 

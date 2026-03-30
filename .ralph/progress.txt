@@ -188,3 +188,8 @@
 - **Status**: Done
 - **Change**: Renamed `pos` to `position` in the `calculateGlobalImpacts` function's impactMap type and assignment. The SmartTable column already had `id: 'position'` with a proper render function, but the global impacts data was using `pos` as the field name (from the service's internal `val.pos`), causing the column to be empty. The league-level impacts already used `position` correctly — only the aggregated portfolio view was affected.
 - **Lesson**: When data flows through multiple transformation steps (service → page aggregation → component), field names can silently diverge. The SmartTable's `getNestedValue` uses the column `id` to look up data, so field names must match exactly.
+
+## TASK-026: Add larger page size options (up to 1000) on positional benchmarks full list
+- Date: 2026-03-29
+- Changes: Added `rowsPerPageOptions` prop passthrough to SmartTable component, then set `[10, 25, 50, 100, 250, 500, 1000]` on all 3 SmartTable instances across positional benchmarks pages.
+- Lesson: SmartTable was missing the `rowsPerPageOptions` passthrough to DataTable — when adding props to wrapper components, always check if the inner component's props are fully exposed.

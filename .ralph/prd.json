@@ -222,7 +222,7 @@
       "title": "Add larger page size options (up to 1000) on positional benchmarks full list",
       "spec": "specs/code-style.md",
       "priority": 26,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "On /performance/positional, the full list view pagination only offers small page sizes (10, 25, etc.). Add larger options so the rows per page selector includes 10, 25, 50, 100, 250, 500, and 1000. This lets users view the entire list without excessive pagination. Update the rowsPerPageOptions prop on the MUI TablePagination (or equivalent pagination component) used in this view."
     }
