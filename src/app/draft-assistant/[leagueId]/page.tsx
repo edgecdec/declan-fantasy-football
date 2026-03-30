@@ -166,7 +166,7 @@ export default function LeagueDraftPage() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth={false} sx={{ mt: 4, mb: 4 }}>
       <Box>
         <Paper sx={{ p: 2, mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'primary.dark', color: 'white' }}>
           <Box>

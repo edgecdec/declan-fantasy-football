@@ -254,6 +254,15 @@
       "description": "On the draft assistant page (/draft-assistant/[leagueId]), add a link/button that opens the draft on Sleeper's website. The URL format is https://sleeper.com/draft/nfl/{draft_id}. Place it in the draft header bar (the Paper with the draft name and status) — an icon button or small text link like 'View on Sleeper' with an external link icon (OpenInNew from MUI icons). Opens in a new tab."
     },
     {
+      "id": "TASK-031",
+      "title": "Fix draft board not fully visible — allow horizontal scroll and full-width layout",
+      "spec": "specs/code-style.md",
+      "priority": 31,
+      "status": "done",
+      "dependencies": [],
+      "description": "Bug: On /draft-assistant/[leagueId], the full draft board is not visible — columns are cut off and the user can't see all teams. The DraftGrid currently uses gridTemplateColumns with minmax(120px, 1fr) and minWidth of teams*130, which forces horizontal scrolling even when the user zooms out. Fix: remove the minWidth constraint and reduce the column minimum so the grid can shrink to fit the viewport. Use something like minmax(80px, 1fr) so that when zoomed out the entire board fits on screen without scrolling. The cells should use text truncation (noWrap + ellipsis) to handle narrow columns gracefully. The Container wrapping the draft page should also use maxWidth={false} or 'xl' to give maximum available width. The goal is: at normal zoom you see as much as fits with horizontal scroll available, but if you zoom out the whole board fits on one screen."
+    },
+    {
       "id": "TASK-028",
       "title": "Apply zero-point league filtering across all pages in the application",
       "spec": "specs/anti-patterns.md",

@@ -227,3 +227,13 @@
 - For leagueHistory.ts, zero-point rosters are excluded from the rosterToUser map so their matchups/stats aren't processed
 - Lesson: When a service function needs to signal "skip this data", returning null and having callers check is cleaner than throwing errors
 - Lesson: The zero-point check uses roster.settings.fpts which is the integer part — must also add fpts_decimal/100 for accuracy
+
+## TASK-031: Fix draft board not fully visible — allow horizontal scroll and full-width layout
+**Date**: 2026-03-30
+**Status**: Done
+**Changes**:
+- DraftGrid.tsx: Removed `minWidth: teams * 130` constraint, reduced column minimum from `120px` to `80px`, reduced gap from 1 to 0.5, added `overflow: hidden` + `textOverflow: ellipsis` to player name and position text
+- [leagueId]/page.tsx: Changed Container `maxWidth="xl"` to `maxWidth={false}` for full-width layout
+**Lessons**:
+- The minWidth constraint was the main culprit — it forced horizontal scrolling even when the viewport was wide enough. Removing it and reducing column minimums lets the CSS grid naturally fit the viewport.
+- Reducing gap from 1 to 0.5 saves significant horizontal space across 10-12 columns.

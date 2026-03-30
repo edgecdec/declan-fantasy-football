@@ -36,7 +36,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
 
   return (
     <Box sx={{ overflowX: 'auto', width: '100%' }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: `40px repeat(${teams}, minmax(120px, 1fr))`, gap: 1, minWidth: teams * 130 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `40px repeat(${teams}, minmax(80px, 1fr))`, gap: 0.5 }}>
         {/* Header Row */}
         <Box sx={{ textAlign: 'center', p: 1, fontWeight: 'bold' }}>Rd</Box>
         {Array.from({ length: teams }, (_, i) => {
@@ -115,10 +115,10 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
 
                     {isPicked ? (
                       <>
-                        <Typography variant="body2" fontWeight="bold" noWrap title={pick.metadata.first_name + ' ' + pick.metadata.last_name}>
+                        <Typography variant="body2" fontWeight="bold" noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }} title={pick.metadata.first_name + ' ' + pick.metadata.last_name}>
                           {pick.metadata.first_name} {pick.metadata.last_name}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: getPositionColor(position), fontWeight: 'bold' }}>
+                        <Typography variant="caption" noWrap sx={{ color: getPositionColor(position), fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {position} <Typography component="span" variant="caption" color="text.secondary">- {pick.metadata.team}</Typography>
                         </Typography>
                         {isTraded && (
