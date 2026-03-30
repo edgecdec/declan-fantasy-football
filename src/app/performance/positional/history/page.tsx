@@ -152,6 +152,7 @@ export default function PositionalHistoryPage() {
               await Promise.all(chunk.map(async (league) => {
                 try {
                   const res = await analyzePositionalBenchmarks(league, currentUser!.user_id);
+                  if (!res) return; // Skip zero-point leagues
 
                   // Aggregate chart data
                   POSITIONS.forEach(p => {

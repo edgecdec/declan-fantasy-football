@@ -407,11 +407,15 @@ export default function PerformancePage() {
 
       try {
         const result = await analyzeLeague(league, userId);
-        setLeagueData(prev => prev.map(d => 
-          d.league.league_id === league.league_id 
-            ? { ...d, status: 'complete', result } 
-            : d
-        ));
+        if (!result) {
+          setLeagueData(prev => prev.map(d => d.league.league_id === league.league_id ? { ...d, status: 'complete', category: 'excluded' } : d));
+        } else {
+          setLeagueData(prev => prev.map(d => 
+            d.league.league_id === league.league_id 
+              ? { ...d, status: 'complete', result } 
+              : d
+          ));
+        }
       } catch (e) {
         setLeagueData(prev => prev.map(d => d.league.league_id === league.league_id ? { ...d, status: 'error' } : d));
       }
@@ -428,6 +432,7 @@ export default function PerformancePage() {
     const myRoster = rosters.find(r => r.owner_id === userId);
 
     if (!myRoster) throw new Error("User not in league");
+    if (SleeperService.isZeroPointRoster(myRoster)) return null;
 
     const [winnersBracket, losersBracket, usersRes] = await Promise.all([
       SleeperService.getWinnersBracket(league.league_id),

@@ -158,6 +158,7 @@ export default function PortfolioPage() {
         batchLeagues.forEach(league => {
           const userRoster = rosterMap.get(league.league_id);
           if (!userRoster) return;
+          if (SleeperService.isZeroPointRoster(userRoster)) return;
 
           let players: string[] = [];
           let starters: string[] = [];

@@ -41,7 +41,7 @@ export async function analyzePositionalBenchmarks(
   league: SleeperLeague,
   userId: string,
   includePlayoffs: boolean = true
-): Promise<LeagueBenchmarkResult> {
+): Promise<LeagueBenchmarkResult | null> {
   const cacheKey = `analysis_positional_${league.league_id}_${userId}_${includePlayoffs}`;
   const cached = CacheService.get<LeagueBenchmarkResult>(cacheKey, 'local');
   if (cached) return cached;
@@ -69,6 +69,10 @@ export async function analyzePositionalBenchmarks(
   
   const rostersData = await rostersRes.json();
   const usersData = await usersRes.json();
+
+  // Skip league if user scored 0 total points (test league or season never played)
+  const userRoster = rostersData.find((r: any) => r.owner_id === userId);
+  if (userRoster && SleeperService.isZeroPointRoster(userRoster)) return null;
   
   // Map RosterID -> UserID and Meta
   const rosterToUser = new Map<number, string>();

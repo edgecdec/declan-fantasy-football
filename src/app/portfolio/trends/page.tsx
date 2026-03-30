@@ -151,7 +151,7 @@ export default function TrendsPage() {
       const myRosterIds = new Map<string, number>();
       leagues.forEach(l => {
         const r = rosterMap.get(l.league_id);
-        if (r) myRosterIds.set(l.league_id, r.roster_id);
+        if (r && !SleeperService.isZeroPointRoster(r)) myRosterIds.set(l.league_id, r.roster_id);
       });
 
       const numWeeks = parseInt(year) < 2021 ? 16 : 18; // 17 games = 18 weeks (2021+). Pre-2021 was 16 games (17 weeks).

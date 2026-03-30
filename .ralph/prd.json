@@ -258,7 +258,7 @@
       "title": "Apply zero-point league filtering across all pages in the application",
       "spec": "specs/anti-patterns.md",
       "priority": 28,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-027"],
       "description": "In TASK-001, we fixed the expected-wins trends page to ignore leagues where the user scored 0 total points (test leagues or seasons that never happened). This same filtering needs to be applied everywhere in the application that processes league data across seasons. Audit ALL pages and services that iterate over a user's leagues: /performance/positional, /performance/positional/history, /performance, /portfolio, /portfolio/trends, /medic, /league-history, and any service functions that aggregate across leagues. Wherever a league's data is processed for a user, check if the user's total points scored is 0 and skip that league. The fix in TASK-001 was done in src/services/stats/expectedWins.ts by returning userStats as undefined when pointsFor is 0 — apply the same principle in other services (positionalBenchmarks.ts, leagueHistory.ts, etc.) or create a shared utility function like shouldSkipUserInLeague(pointsFor) that all services can use. Verify by checking that edgecdec's 2020 data does not appear on any page."
     }

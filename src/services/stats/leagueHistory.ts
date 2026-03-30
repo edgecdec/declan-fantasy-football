@@ -78,6 +78,7 @@ export async function analyzeLeagueHistory(
     // Init Members for this season
     rosters.forEach((r: SleeperRoster) => {
       if (!r.owner_id) return;
+      if (SleeperService.isZeroPointRoster(r)) return; // Skip zero-point rosters
       rosterToUser.set(r.roster_id, r.owner_id);
       userToRoster.set(r.owner_id, r.roster_id);
 

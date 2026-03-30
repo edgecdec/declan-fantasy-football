@@ -114,6 +114,7 @@ export default function LeaguePositionalPage() {
         setStatus(`Analyzing ${l.season}...`);
         try {
           const res = await analyzePositionalBenchmarks(l, user.user_id, true);
+          if (!res) continue; // Skip zero-point leagues
           results.push(res);
           res.playerImpacts.forEach(p => historyImpacts.push({ ...p, season: l.season }));
         } catch (e) {

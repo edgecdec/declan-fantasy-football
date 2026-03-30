@@ -196,6 +196,7 @@ export default function PositionalBenchmarksPage() {
         
         try {
           const res = await analyzePositionalBenchmarks(league, currentUser.user_id, includePlayoffs);
+          if (!res) continue; // Skip zero-point leagues
           accumulated.push({
             league,
             result: res,

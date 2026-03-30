@@ -219,3 +219,11 @@
 - Opens in new tab with target="_blank" and rel="noopener noreferrer"
 - Minimal change: one import + one IconButton component added
 - Lessons: Simple UI additions like external links are straightforward — just add the MUI IconButton with component="a" pattern for anchor behavior.
+
+## TASK-028: Apply zero-point league filtering across all pages (2026-03-29)
+- Added `isZeroPointRoster(roster)` utility to SleeperService for shared zero-point detection
+- Applied filtering in 8 files: positionalBenchmarks.ts (return null), leagueHistory.ts (skip roster), performance/page.tsx (return null), portfolio/page.tsx, portfolio/trends/page.tsx, medic/page.tsx, positional/page.tsx, positional/history/page.tsx, positional/league/[leagueId]/page.tsx
+- Changed `analyzePositionalBenchmarks` return type to `LeagueBenchmarkResult | null` — callers skip null results
+- For leagueHistory.ts, zero-point rosters are excluded from the rosterToUser map so their matchups/stats aren't processed
+- Lesson: When a service function needs to signal "skip this data", returning null and having callers check is cleaner than throwing errors
+- Lesson: The zero-point check uses roster.settings.fpts which is the integer part — must also add fpts_decimal/100 for accuracy

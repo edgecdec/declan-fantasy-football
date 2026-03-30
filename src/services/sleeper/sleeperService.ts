@@ -177,6 +177,12 @@ export const SleeperService = {
     }
   },
 
+  /** Returns true if the roster has 0 total points (test league or season never played) */
+  isZeroPointRoster(roster: SleeperRoster): boolean {
+    const totalPoints = roster.settings.fpts + (roster.settings.fpts_decimal || 0) / 100;
+    return totalPoints === 0;
+  },
+
   shouldIgnoreLeague(league: SleeperLeague): boolean {
     // 1. Settings-based Exclusion
     if (league.settings.type === 3) return true; // Guillotine / Elimination

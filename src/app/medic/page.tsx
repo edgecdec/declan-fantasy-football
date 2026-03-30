@@ -121,6 +121,7 @@ export default function RosterMedicPage() {
       leagues.forEach(league => {
         const roster = rosterMap.get(league.league_id);
         if (!roster) return;
+        if (SleeperService.isZeroPointRoster(roster)) return;
 
         const issues: MedicIssue[] = [];
         
