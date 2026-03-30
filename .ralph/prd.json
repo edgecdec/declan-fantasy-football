@@ -225,6 +225,42 @@
       "status": "done",
       "dependencies": [],
       "description": "On /performance/positional, the full list view pagination only offers small page sizes (10, 25, etc.). Add larger options so the rows per page selector includes 10, 25, 50, 100, 250, 500, and 1000. This lets users view the entire list without excessive pagination. Update the rowsPerPageOptions prop on the MUI TablePagination (or equivalent pagination component) used in this view."
+    },
+    {
+      "id": "TASK-027",
+      "title": "Rebuild positional history page with all-time season data",
+      "spec": "specs/code-style.md",
+      "priority": 27,
+      "status": "done",
+      "dependencies": [],
+      "description": "On /performance/positional/history, show all-time Portfolio MVPs and LVPs — not just the current season. Currently the positional benchmarks page only shows MVPs (most valuable players) and LVPs (least valuable players) for the current season. The history page should aggregate this data across ALL seasons (back to 2017) so users can see which players they've relied on the most (or been burned by the most) over their entire fantasy career. Fetch each season's leagues and positional data, accumulate player impact stats across all years, and rank them to produce all-time MVP and LVP lists. Show the number of seasons/leagues each player appeared in and their cumulative impact. Load progressively as each season completes (same pattern as TASK-024)."
+    },
+    {
+      "id": "TASK-029",
+      "title": "Add league-average comparison to historical positional efficiency",
+      "spec": "specs/code-style.md",
+      "priority": 29,
+      "status": "open",
+      "dependencies": ["TASK-027"],
+      "description": "On /performance/positional/history, show the user's positional efficiency numbers compared to league averages for each season — the same way the current season page does it. For each season and each position (QB, RB, WR, TE), calculate the user's average points scored vs the league average at that position across all their leagues. Display this as a comparison (e.g. user avg vs league avg, or a +/- differential) so users can see which positions they outperformed or underperformed at relative to their competition over time. Ideally show this as a chart or table with seasons on one axis and positions on the other, with color coding (green for above average, red for below). This lets users identify multi-year trends like 'I've consistently been weak at TE' or 'My RBs carried me in 2022-2023'."
+    },
+    {
+      "id": "TASK-030",
+      "title": "Add link to view draft on Sleeper from draft assistant page",
+      "spec": "specs/code-style.md",
+      "priority": 30,
+      "status": "open",
+      "dependencies": [],
+      "description": "On the draft assistant page (/draft-assistant/[leagueId]), add a link/button that opens the draft on Sleeper's website. The URL format is https://sleeper.com/draft/nfl/{draft_id}. Place it in the draft header bar (the Paper with the draft name and status) — an icon button or small text link like 'View on Sleeper' with an external link icon (OpenInNew from MUI icons). Opens in a new tab."
+    },
+    {
+      "id": "TASK-028",
+      "title": "Apply zero-point league filtering across all pages in the application",
+      "spec": "specs/anti-patterns.md",
+      "priority": 28,
+      "status": "open",
+      "dependencies": ["TASK-027"],
+      "description": "In TASK-001, we fixed the expected-wins trends page to ignore leagues where the user scored 0 total points (test leagues or seasons that never happened). This same filtering needs to be applied everywhere in the application that processes league data across seasons. Audit ALL pages and services that iterate over a user's leagues: /performance/positional, /performance/positional/history, /performance, /portfolio, /portfolio/trends, /medic, /league-history, and any service functions that aggregate across leagues. Wherever a league's data is processed for a user, check if the user's total points scored is 0 and skip that league. The fix in TASK-001 was done in src/services/stats/expectedWins.ts by returning userStats as undefined when pointsFor is 0 — apply the same principle in other services (positionalBenchmarks.ts, leagueHistory.ts, etc.) or create a shared utility function like shouldSkipUserInLeague(pointsFor) that all services can use. Verify by checking that edgecdec's 2020 data does not appear on any page."
     }
   ]
 }

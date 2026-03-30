@@ -193,3 +193,13 @@
 - Date: 2026-03-29
 - Changes: Added `rowsPerPageOptions` prop passthrough to SmartTable component, then set `[10, 25, 50, 100, 250, 500, 1000]` on all 3 SmartTable instances across positional benchmarks pages.
 - Lesson: SmartTable was missing the `rowsPerPageOptions` passthrough to DataTable — when adding props to wrapper components, always check if the inner component's props are fully exposed.
+
+## TASK-027: Rebuild positional history page with all-time season data
+- Date: 2026-03-30
+- Rebuilt /performance/positional/history to aggregate all-time MVP/LVP data across all seasons (2017-present)
+- Added progressive loading: chart and impact lists update after each season completes
+- Added seasons/leagues count columns to the all-time impact data
+- Reused existing PlayerImpactList, SmartTable, StartsTooltip components
+- Kept the existing positional trends line chart but integrated it into a grid layout alongside the MVP/LVP panel
+- Lesson: Recharts Tooltip formatter type expects `number | undefined`, not just `number` — always handle undefined in formatter callbacks
+- Lesson: The existing history page had duplicate league processing loops (processed leagues twice per year) — the rebuild eliminated this inefficiency by doing a single pass
