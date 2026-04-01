@@ -16,8 +16,8 @@ import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
-import { calculateDraftEfficiency, aggregateManagerDraftEfficiency } from '@/services/stats/draftEfficiency';
-import { DraftPickEfficiency, ManagerDraftEfficiency, LogCurveCoefficients } from '@/types/draftEfficiency';
+import { calculateDraftEfficiency, aggregateManagerDraftEfficiency, fetchHistoricalDraftEfficiency } from '@/services/stats/draftEfficiency';
+import { DraftPickEfficiency, ManagerDraftEfficiency, LogCurveCoefficients, HistoricalDraftData, HistoricalPickAverage, SeasonDraftSummary } from '@/types/draftEfficiency';
 import { getPositionColor } from '@/constants/colors';
 
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
@@ -107,6 +107,9 @@ export default function DraftEfficiencyPage() {
   const [sortBy, setSortBy] = React.useState<SortField>('totalEfficiency');
   const [sortDir, setSortDir] = React.useState<SortDir>('desc');
   const [draftName, setDraftName] = React.useState('');
+  const [showHistorical, setShowHistorical] = React.useState(false);
+  const [historicalData, setHistoricalData] = React.useState<HistoricalDraftData | null>(null);
+  const [historicalLoading, setHistoricalLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!leagueId) return;
@@ -153,6 +156,25 @@ export default function DraftEfficiencyPage() {
     return () => { cancelled = true; };
   }, [leagueId, user?.user_id]);
 
+  // Load historical data when toggled on
+  React.useEffect(() => {
+    if (!showHistorical || !user?.user_id || historicalData) return;
+    let cancelled = false;
+    setHistoricalLoading(true);
+
+    fetchHistoricalDraftEfficiency(
+      user.user_id,
+      leagueId,
+      (partial) => { if (!cancelled) setHistoricalData(partial); },
+    ).then((final) => {
+      if (!cancelled) { setHistoricalData(final); setHistoricalLoading(false); }
+    }).catch(() => {
+      if (!cancelled) setHistoricalLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [showHistorical, user?.user_id, leagueId, historicalData]);
+
   const filteredPicks = React.useMemo(
     () => posFilter.length ? picks.filter(p => posFilter.includes(p.position)) : picks,
     [picks, posFilter]
@@ -177,6 +199,19 @@ export default function DraftEfficiencyPage() {
     const maxPick = picks.length > 0 ? Math.max(...picks.map(p => p.pickNumber)) : 0;
     return buildCurveData(curve, maxPick);
   }, [curve, picks]);
+
+  const historicalCurveData = React.useMemo(() => {
+    if (!showHistorical || !historicalData) return [];
+    return historicalData.averagesByPick.map(h => ({
+      pickNumber: h.pickNumber,
+      historicalAvg: h.avgEfficiency,
+    }));
+  }, [showHistorical, historicalData]);
+
+  const filteredSeasonSummaries = React.useMemo(() => {
+    if (!historicalData) return [];
+    return historicalData.seasonSummaries;
+  }, [historicalData]);
 
   const handleSort = (field: SortField) => {
     setSortDir(prev => sortBy === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc');
@@ -212,7 +247,7 @@ export default function DraftEfficiencyPage() {
         <Button component={Link} href={`/draft-assistant/${leagueId}`} variant="outlined">Back to Draft</Button>
       } />
 
-      {/* Position Filter */}
+      {/* Position Filter & Historical Toggle */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="body2" color="text.secondary">Filter by position:</Typography>
         <ToggleButtonGroup value={posFilter} onChange={handlePosFilter} size="small">
@@ -222,6 +257,16 @@ export default function DraftEfficiencyPage() {
             </ToggleButton>
           ))}
         </ToggleButtonGroup>
+        <ToggleButtonGroup
+          value={showHistorical ? ['historical'] : []}
+          onChange={() => setShowHistorical(prev => !prev)}
+          size="small"
+        >
+          <ToggleButton value="historical" sx={{ px: 2 }}>
+            📊 Historical
+          </ToggleButton>
+        </ToggleButtonGroup>
+        {historicalLoading && <Typography variant="caption" color="text.secondary">Loading historical data...</Typography>}
       </Box>
 
       {/* Scatter Plot */}
@@ -237,6 +282,18 @@ export default function DraftEfficiencyPage() {
             <YAxis label={{ value: 'Total Efficiency', angle: -90, position: 'insideLeft' }} />
             <ReferenceLine y={0} stroke="#666" strokeDasharray="4 4" />
             <Line dataKey="expected" stroke="#ff9800" strokeWidth={2} dot={false} name="Expected (log fit)" />
+            {showHistorical && historicalCurveData.length > 0 && (
+              <Line
+                data={historicalCurveData}
+                dataKey="historicalAvg"
+                stroke="#9e9e9e"
+                strokeWidth={2}
+                strokeDasharray="6 3"
+                dot={false}
+                opacity={0.5}
+                name="Historical Avg"
+              />
+            )}
             <Scatter
               data={filteredPicks}
               dataKey="totalEfficiency"
@@ -258,6 +315,12 @@ export default function DraftEfficiencyPage() {
             <Box sx={{ width: 16, height: 2, bgcolor: '#ff9800' }} />
             <Typography variant="caption">Expected (log fit)</Typography>
           </Box>
+          {showHistorical && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 16, height: 2, bgcolor: '#9e9e9e', opacity: 0.5 }} />
+              <Typography variant="caption">Historical Avg</Typography>
+            </Box>
+          )}
         </Box>
       </Paper>
 
@@ -338,6 +401,46 @@ export default function DraftEfficiencyPage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* Historical Season Summaries */}
+      {showHistorical && filteredSeasonSummaries.length > 0 && (
+        <Paper sx={{ p: 2, mt: 3 }}>
+          <Typography variant="h6" gutterBottom>Your Draft Efficiency by Season</Typography>
+          {historicalLoading && <LinearProgress sx={{ mb: 1 }} />}
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Season</TableCell>
+                  <TableCell>League</TableCell>
+                  <TableCell>Total Efficiency</TableCell>
+                  <TableCell>Avg / Pick</TableCell>
+                  <TableCell>Picks</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredSeasonSummaries.map((s) => (
+                  <TableRow key={`${s.season}-${s.leagueId}`}>
+                    <TableCell>{s.season}</TableCell>
+                    <TableCell>
+                      <Link href={`/draft-assistant/${s.leagueId}/efficiency`} style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        {s.leagueName}
+                      </Link>
+                    </TableCell>
+                    <TableCell sx={{ color: s.totalEfficiency > 0 ? 'success.main' : s.totalEfficiency < 0 ? 'error.main' : 'text.primary' }}>
+                      {s.totalEfficiency > 0 ? '+' : ''}{s.totalEfficiency}
+                    </TableCell>
+                    <TableCell sx={{ color: s.avgPerPick > 0 ? 'success.main' : s.avgPerPick < 0 ? 'error.main' : 'text.primary' }}>
+                      {s.avgPerPick > 0 ? '+' : ''}{s.avgPerPick}
+                    </TableCell>
+                    <TableCell>{s.pickCount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
     </Container>
   );
 }

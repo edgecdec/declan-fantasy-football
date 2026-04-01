@@ -402,9 +402,37 @@
       "title": "Build historical draft efficiency analysis across all seasons",
       "spec": "specs/code-style.md",
       "priority": 46,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-043"],
-      "description": "Create a page at src/app/draft-assistant/history/page.tsx (or /draft-assistant/[leagueId]/efficiency/history if scoped to a league chain). For the current user, scan all seasons (2017 to present) and all their leagues per season. Run the draft efficiency calculation from TASK-043 for each draft. Aggregate the results by pick number across all drafts — for each pick slot (1st overall, 2nd overall, etc.), average the efficiency across all years/leagues. Display two things: (1) A line chart showing average efficiency by pick number across all years, with individual season lines as faded background and the all-time average as a bold line. This reveals historical trends like 'pick 3 has historically been the best value spot' or 'late round picks have gotten more efficient over time'. (2) A per-season comparison table showing the user's total draft efficiency per year, sortable, so they can see if their drafting has improved over time. Support position filtering (same ToggleButtonGroup pattern as TASK-045) to see trends by position — e.g. 'has drafting RBs early gotten worse over the years?'. Load progressively as each season completes."
+      "description": "On the draft efficiency page from TASK-045 (/draft-assistant/[leagueId]/efficiency), add a 'Historical' toggle alongside the position filters. When toggled on, scan all the user's leagues across all seasons (2017 to present), run the draft efficiency calculation from TASK-043 for each draft, and aggregate results by pick number — averaging efficiency across all years/leagues for each pick slot. Overlay this as a second dataset on the existing scatter plot: the current league's picks stay as dots, and the historical average by pick number appears as a faded line behind them. This lets the user compare their current draft against historical norms. Also add a per-season row to the manager leaderboard showing the user's total draft efficiency per year so they can see if their drafting has improved. Support the same position filtering. Load the historical data progressively as each season completes — the current league data shows immediately, historical loads in the background."
+    },
+    {
+      "id": "TASK-047",
+      "title": "Show full-season efficiency for traded players regardless of team changes",
+      "spec": "specs/code-style.md",
+      "priority": 47,
+      "status": "open",
+      "dependencies": ["TASK-038"],
+      "description": "On the trade evaluator page, the efficiency calculation currently only counts weeks a player started on the receiving team. Add a second efficiency column showing the player's TOTAL efficiency across all teams for the rest of the season after the trade — every week they started for anyone, not just the team that acquired them. This gives a fuller picture of the player's actual value. Display both: 'Team Eff' (weeks on the traded-to team only, existing behavior) and 'Total Eff' (all starts across all teams post-trade). The trade verdict/comparison should use Total Eff since that reflects the true value of the asset that was traded. Total Eff shows the full picture of what each side gave up and received."
+    },
+    {
+      "id": "TASK-048",
+      "title": "Include playoff weeks in trade efficiency calculations",
+      "spec": "specs/code-style.md",
+      "priority": 48,
+      "status": "open",
+      "dependencies": ["TASK-034"],
+      "description": "The trade efficiency calculator currently only processes regular season weeks. Extend it to also include playoff weeks. Use the league's settings.playoff_week_start to determine where playoffs begin, then fetch matchup data for playoff weeks as well (up to week 18 or the league's final week). Players who contributed during the playoffs should have those weeks counted in their efficiency totals. This matters because a trade made late in the season is often specifically to win in the playoffs — ignoring playoff data undervalues those trades."
+    }
+    },
+    {
+      "id": "TASK-049",
+      "title": "Add fantasy football trivia with reveal button during loading states",
+      "spec": "specs/code-style.md",
+      "priority": 49,
+      "status": "open",
+      "dependencies": [],
+      "description": "Update the maintenance.html page (from TASK-013) to include fantasy football trivia while the user waits for the deploy to finish. Add a trivia section below the 'Halftime' message with a random question displayed on each page load/refresh. Include a 'Reveal Answer' button that shows the answer when clicked. Since maintenance.html is a standalone HTML file with no framework, implement this with inline JavaScript: define an array of ~20 trivia objects ({question, answer}), pick one at random on load, wire up the reveal button. The page already auto-refreshes every 10 seconds, so each refresh shows a new question. Trivia should be fantasy-football-specific — draft strategy, historical records, fun stats. Examples: Q: 'Which undrafted RB had the most fantasy points in a single season?' A: 'Priest Holmes, 2002 — 370.6 PPR points'. Q: 'What pick number has historically produced the most fantasy MVPs?' Come up with 20 varied questions covering draft strategy, historical fantasy performances, positional scarcity, sleeper picks, bust rates, etc. Keep the styling consistent with the existing dark theme."
     }
   ]
 }

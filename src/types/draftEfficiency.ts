@@ -38,3 +38,24 @@ export type ManagerDraftEfficiency = {
   pickCount: number;
   positionBreakdown: Record<string, PositionBreakdown>;
 };
+
+export type HistoricalPickAverage = {
+  pickNumber: number;
+  avgEfficiency: number;
+  sampleCount: number;
+};
+
+export type SeasonDraftSummary = {
+  season: string;
+  leagueName: string;
+  leagueId: string;
+  draftId: string;
+  totalEfficiency: number;
+  avgPerPick: number;
+  pickCount: number;
+};
+
+export type HistoricalDraftData = {
+  averagesByPick: HistoricalPickAverage[];
+  seasonSummaries: SeasonDraftSummary[];
+};

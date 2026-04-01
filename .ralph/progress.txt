@@ -368,3 +368,13 @@
   - Color-coded efficiency values (green positive, red negative)
 - Added "Efficiency" button with BarChart icon to draft assistant [leagueId] page header
 - Lessons: Recharts ComposedChart works well for overlaying scatter + line data. The Scatter component needs a custom shape prop to color dots individually. For the rainbow row highlight, the absolute positioning approach from DraftGrid works but is tricky in table rows — simpler approaches may be better for tables.
+
+## TASK-046: Build historical draft efficiency analysis across all seasons
+- Date: 2026-03-31
+- Added `fetchHistoricalDraftEfficiency` to draftEfficiency.ts — scans all user seasons, runs calculateDraftEfficiency for each league's completed draft, aggregates pick averages and per-season summaries.
+- Added HistoricalPickAverage, SeasonDraftSummary, HistoricalDraftData types.
+- Updated efficiency page with Historical toggle button, faded dashed line on scatter plot for historical average, and per-season summary table below the manager leaderboard.
+- Progressive loading: onSeasonComplete callback fires after each season so UI updates incrementally.
+- Position filtering is done at UI level (service fetches all data, UI filters). Cache key doesn't include position filter to avoid redundant fetches.
+- Lesson: Keep service functions position-agnostic and filter at the UI layer — avoids cache invalidation complexity and redundant API calls.
+- Lesson: When testing with Nova Act, navigate directly to known URLs rather than relying on the bot to find drafts (2026 has no real drafts yet).
