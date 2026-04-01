@@ -340,3 +340,12 @@
   2. FAAB: Was already working — the parsing in tradeAnalyzer.ts and rendering in the trades page were correct.
   3. Re-trade asterisks: Fixed `departureWeek` bug — previously when a player was never started (`weeklyBreakdown.length === 0`), `lastStartedWeek` defaulted to `tradeWeek` which made `departureWeek` non-null, showing a false asterisk. Fixed by only computing `departureWeek` when the player was actually started at least once.
 - Lesson: When checking if a feature "works", the data flow matters — the parsing can be correct but the resolution/enrichment step may be missing. Always trace the full pipeline from API → service → type → UI.
+
+## TASK-043: Create draft efficiency calculation service (2026-03-31)
+- Created `src/types/draftEfficiency.ts` with types: DraftPickEfficiency, LogCurveCoefficients, DraftEfficiencyResult, ManagerDraftEfficiency, PositionBreakdown.
+- Created `src/services/stats/draftEfficiency.ts` with two exported functions:
+  - `calculateDraftEfficiency(leagueId, draftId, season)` — evaluates every draft pick's positional efficiency across all regular season weeks, tracking which teams started the player and whether they changed teams. Computes a logarithmic best-fit curve (y = a*ln(x) + b) via least squares regression.
+  - `aggregateManagerDraftEfficiency(picks, positionFilter?)` — groups picks by drafter, calculates total/avg efficiency per manager with position breakdown. Supports optional position filtering.
+- Reused existing patterns from tradeEfficiency.ts: same `starters_points` casting, same positional average calculation, same player data import pattern.
+- Key design decision: player efficiency is tracked across ALL teams they started for (not just the drafting team), with `changedTeams` flag indicating mid-season movement. This matches the task spec requirement.
+- Lesson: The `starters_points` field from Sleeper API is not in the TypeScript type but exists on the response — existing codebase uses `as Record<string, unknown>` cast pattern consistently.

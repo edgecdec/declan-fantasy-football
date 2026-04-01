@@ -369,6 +369,33 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: On /league-history/1206336001794920448/trades, three features from previous tasks are not working despite being marked done: (1) TASK-037: Draft picks traded should show as line items (e.g. '2025 Round 1 Pick → 1.03: Justin Jefferson') and FAAB amounts should display — neither is visible. (2) TASK-038: Players who were re-traded should have an asterisk (*) with a tooltip showing when they left — not visible. Read the current code in src/services/stats/tradeAnalyzer.ts and the trades page component. Check if the draft_picks and waiver_budget fields from Sleeper transactions are being parsed and passed to the UI. Check if the asterisk/tooltip logic was actually implemented. Fix whatever is missing. Test against league 1206336001794920448 which has trades with draft picks. Verify all three features are visually present on the page."
+    },
+    {
+      "id": "TASK-043",
+      "title": "Create draft efficiency calculation service",
+      "spec": "specs/code-style.md",
+      "priority": 43,
+      "status": "done",
+      "dependencies": [],
+      "description": "Create src/services/stats/draftEfficiency.ts with a function calculateDraftEfficiency(leagueId, draftId, season). For every player picked in the draft: (1) Fetch weekly matchup data for all regular season weeks. (2) For each week, find the player in ANY team's starters array (not just the team that drafted them — if they were traded, still count their production). (3) Calculate the league average points at that player's position for that week (average across all starters at that position league-wide). (4) Player's weekly efficiency = their points minus the positional league average. (5) Sum across all weeks started to get total efficiency. (6) Track which team(s) the player was on (note if they changed teams mid-season). Return an array of DraftPickEfficiency objects: { pickNumber, round, draftSlot, playerId, playerName, position, team, totalEfficiency, weeksStarted, avgEfficiencyPerWeek, draftedByRosterId, draftedByUsername, changedTeams: boolean }. Also compute a logarithmic best-fit curve across all picks: expectedEfficiency = a * ln(pickNumber) + b, using least squares regression on the pick data. Return the curve coefficients alongside the pick data."
+    },
+    {
+      "id": "TASK-044",
+      "title": "Create per-manager draft efficiency aggregation with position filtering",
+      "spec": "specs/code-style.md",
+      "priority": 44,
+      "status": "open",
+      "dependencies": ["TASK-043"],
+      "description": "Add a function aggregateManagerDraftEfficiency() to src/services/stats/draftEfficiency.ts. Takes the array of DraftPickEfficiency from TASK-043 and groups by drafter (draftedByRosterId). For each manager, calculate: total draft efficiency (sum of all their picks' efficiency), average efficiency per pick, number of picks, and a breakdown by position. Support filtering by one or more positions — e.g. show only RB+WR efficiency to see who drafted skill positions best. Return an array of ManagerDraftEfficiency objects: { rosterId, username, totalEfficiency, avgPerPick, pickCount, positionBreakdown: Record<string, { total, count, avg }> }. Sort by totalEfficiency descending by default."
+    },
+    {
+      "id": "TASK-045",
+      "title": "Create Draft Efficiency page with scatter plot and value curve",
+      "spec": "specs/code-style.md",
+      "priority": 45,
+      "status": "open",
+      "dependencies": ["TASK-043", "TASK-044"],
+      "description": "Create a new page at src/app/draft-assistant/[leagueId]/efficiency/page.tsx. The page has two main sections: (1) SCATTER PLOT — Using Recharts ScatterChart, plot every draft pick as a dot: X axis = pick number (1 to total picks), Y axis = total efficiency. Color dots by position (use existing getPositionColor). Highlight the current user's picks with a larger dot size or outline. Overlay the logarithmic best-fit curve from TASK-043 as a Line on the same chart using ReferenceLine or a computed Line series — picks above the curve are steals, below are busts. On hover, show a tooltip with player name, position, team, pick number (e.g. '1.03'), total efficiency, weeks started, and whether they changed teams. (2) MANAGER LEADERBOARD TABLE — Below the chart, show a sortable table of all managers ranked by total draft efficiency. Columns: Rank, Manager, Total Efficiency, Avg Per Pick, Picks, and a mini breakdown showing their best/worst position. Add a position filter (MUI ToggleButtonGroup with ALL, QB, RB, WR, TE, FLEX) that filters BOTH the scatter plot and the leaderboard — so you can see 'who drafted RBs best?' by clicking RB. Add a link to this page from the draft assistant view for each league. Use the current user's rainbow highlight on their row in the leaderboard."
     }
   ]
 }
