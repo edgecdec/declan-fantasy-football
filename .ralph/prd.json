@@ -411,7 +411,7 @@
       "title": "Show full-season efficiency for traded players regardless of team changes",
       "spec": "specs/code-style.md",
       "priority": 47,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-038"],
       "description": "On the trade evaluator page, the efficiency calculation currently only counts weeks a player started on the receiving team. Add a second efficiency column showing the player's TOTAL efficiency across all teams for the rest of the season after the trade — every week they started for anyone, not just the team that acquired them. This gives a fuller picture of the player's actual value. Display both: 'Team Eff' (weeks on the traded-to team only, existing behavior) and 'Total Eff' (all starts across all teams post-trade). The trade verdict/comparison should use Total Eff since that reflects the true value of the asset that was traded. Total Eff shows the full picture of what each side gave up and received."
     },

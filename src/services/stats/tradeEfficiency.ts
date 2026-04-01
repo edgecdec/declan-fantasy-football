@@ -88,19 +88,30 @@ function evaluateSidePlayers(
     if (!position) continue;
 
     const weeklyBreakdown: PlayerWeekEfficiency[] = [];
+    let totalSeasonEff = 0;
+    let totalSeasonWeeks = 0;
 
     for (let w = tradeWeek + 1; w <= totalWeeks; w++) {
       const weekMatchups = allMatchups.get(w) || [];
-      const roster = weekMatchups.find((m) => m.roster_id === side.rosterId);
-      if (!roster?.starters?.length) continue;
 
-      const starterIdx = roster.starters.indexOf(playerId);
-      if (starterIdx === -1) continue;
+      // Check all rosters for total season efficiency
+      for (const m of weekMatchups) {
+        if (!m.starters?.length) continue;
+        const starterIdx = m.starters.indexOf(playerId);
+        if (starterIdx === -1) continue;
+        const pts = (m as Record<string, unknown>).starters_points as number[] | undefined;
+        const points = pts?.[starterIdx] ?? 0;
+        const leagueAvg = getAvg(w, position);
+        const eff = points - leagueAvg;
+        totalSeasonEff += eff;
+        totalSeasonWeeks++;
 
-      const pts = (roster as Record<string, unknown>).starters_points as number[] | undefined;
-      const points = pts?.[starterIdx] ?? 0;
-      const leagueAvg = getAvg(w, position);
-      weeklyBreakdown.push({ week: w, points, leagueAvg, efficiency: points - leagueAvg });
+        // Also track team-specific efficiency for the receiving team
+        if (m.roster_id === side.rosterId) {
+          weeklyBreakdown.push({ week: w, points, leagueAvg, efficiency: eff });
+        }
+        break; // Player can only be on one roster per week
+      }
     }
 
     const totalEff = weeklyBreakdown.reduce((s, wb) => s + wb.efficiency, 0);
@@ -118,10 +129,12 @@ function evaluateSidePlayers(
       weeksStarted: weeklyBreakdown.length,
       totalEfficiency: totalEff,
       avgEfficiency: weeklyBreakdown.length > 0 ? totalEff / weeklyBreakdown.length : 0,
+      totalSeasonEfficiency: totalSeasonEff,
+      totalSeasonWeeksStarted: totalSeasonWeeks,
       weeklyBreakdown,
       departureWeek,
     });
-    result.totalEfficiency += totalEff;
+    result.totalEfficiency += totalSeasonEff;
   }
 
   return result;

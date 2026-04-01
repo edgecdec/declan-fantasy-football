@@ -12,6 +12,8 @@ export type PlayerTradeEfficiency = {
   weeksStarted: number;
   totalEfficiency: number;
   avgEfficiency: number;
+  totalSeasonEfficiency: number;
+  totalSeasonWeeksStarted: number;
   weeklyBreakdown: PlayerWeekEfficiency[];
   departureWeek: number | null;
 };

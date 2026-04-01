@@ -42,7 +42,7 @@ function EfficiencyValue({ value }: { value: number }) {
 }
 
 function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
-  const { sorted, order, orderBy, handleSort } = useTableSort(side.players, 'totalEfficiency');
+  const { sorted, order, orderBy, handleSort } = useTableSort(side.players, 'totalSeasonEfficiency');
   const hasAssets = side.players.length > 0 || (side.draftPicks ?? []).length > 0 || (side.faabItems ?? []).length > 0;
   return (
     <Box sx={{ flex: 1, minWidth: 250 }}>
@@ -61,7 +61,14 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 <TableSortLabel active={orderBy === 'weeksStarted'} direction={orderBy === 'weeksStarted' ? order : 'asc'} onClick={() => handleSort('weeksStarted')}>Wks</TableSortLabel>
               </TableCell>
               <TableCell align="right">
-                <TableSortLabel active={orderBy === 'totalEfficiency'} direction={orderBy === 'totalEfficiency' ? order : 'asc'} onClick={() => handleSort('totalEfficiency')}>Eff</TableSortLabel>
+                <Tooltip title="Efficiency only on the receiving team" arrow>
+                  <TableSortLabel active={orderBy === 'totalEfficiency'} direction={orderBy === 'totalEfficiency' ? order : 'asc'} onClick={() => handleSort('totalEfficiency')}>Team Eff</TableSortLabel>
+                </Tooltip>
+              </TableCell>
+              <TableCell align="right">
+                <Tooltip title="Efficiency across all teams post-trade" arrow>
+                  <TableSortLabel active={orderBy === 'totalSeasonEfficiency'} direction={orderBy === 'totalSeasonEfficiency' ? order : 'asc'} onClick={() => handleSort('totalSeasonEfficiency')}>Total Eff</TableSortLabel>
+                </Tooltip>
               </TableCell>
               <TableCell align="right">
                 <TableSortLabel active={orderBy === 'avgEfficiency'} direction={orderBy === 'avgEfficiency' ? order : 'asc'} onClick={() => handleSort('avgEfficiency')}>Avg/Wk</TableSortLabel>
@@ -84,6 +91,7 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 </TableCell>
                 <TableCell align="right">{p.weeksStarted}</TableCell>
                 <TableCell align="right"><EfficiencyValue value={p.totalEfficiency} /></TableCell>
+                <TableCell align="right"><EfficiencyValue value={p.totalSeasonEfficiency} /></TableCell>
                 <TableCell align="right"><EfficiencyValue value={p.avgEfficiency} /></TableCell>
               </TableRow>
             ))}
@@ -101,6 +109,7 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
               </TableRow>
             ))}
             {(side.faabItems ?? []).map((fb, i) => (
@@ -112,10 +121,11 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
               </TableRow>
             ))}
             {!hasAssets && (
-              <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No trade assets</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} align="center" sx={{ color: 'text.secondary' }}>No trade assets</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

@@ -378,3 +378,11 @@
 - Position filtering is done at UI level (service fetches all data, UI filters). Cache key doesn't include position filter to avoid redundant fetches.
 - Lesson: Keep service functions position-agnostic and filter at the UI layer — avoids cache invalidation complexity and redundant API calls.
 - Lesson: When testing with Nova Act, navigate directly to known URLs rather than relying on the bot to find drafts (2026 has no real drafts yet).
+
+## TASK-047: Show full-season efficiency for traded players regardless of team changes
+- Date: 2026-03-31
+- Added `totalSeasonEfficiency` and `totalSeasonWeeksStarted` fields to `PlayerTradeEfficiency` type
+- Modified `evaluateSidePlayers` to scan ALL rosters per week (not just receiving team) for total season efficiency
+- The side's `totalEfficiency` now uses total season efficiency for the trade verdict (reflects true asset value)
+- UI shows both "Team Eff" (receiving team only) and "Total Eff" (all teams post-trade) columns
+- Lesson: When iterating matchups for a player across all rosters, break after finding them — a player can only be on one roster per week
