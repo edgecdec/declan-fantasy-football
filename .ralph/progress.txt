@@ -386,3 +386,10 @@
 - The side's `totalEfficiency` now uses total season efficiency for the trade verdict (reflects true asset value)
 - UI shows both "Team Eff" (receiving team only) and "Total Eff" (all teams post-trade) columns
 - Lesson: When iterating matchups for a player across all rosters, break after finding them — a player can only be on one roster per week
+
+## TASK-048: Include playoff weeks in trade efficiency calculations (2026-03-31)
+- Changed `evaluateTradeEfficiency` to fetch matchups through the last playoff week, not just regular season.
+- Added `getLastPlayoffWeek()` helper that uses the winners bracket to determine the number of playoff rounds, then calculates `playoffWeekStart + maxRound - 1`.
+- Falls back to 3 playoff rounds if bracket data is unavailable.
+- Minimal change: only modified `src/services/stats/tradeEfficiency.ts` — the `evaluateSidePlayers` function already iterates through `totalWeeks`, so extending the range automatically includes playoff data.
+- Lesson: The winners bracket `r` field (round number) is the most reliable way to determine playoff duration — `playoff_teams` requires manual round calculation, but the bracket already has the answer.

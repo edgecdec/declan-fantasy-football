@@ -161,6 +161,20 @@ async function fetchDraftPicksByRound(
   return map;
 }
 
+async function getLastPlayoffWeek(leagueId: string, playoffWeekStart: number): Promise<number> {
+  try {
+    const bracket = await SleeperService.getWinnersBracket(leagueId);
+    if (bracket.length > 0) {
+      const maxRound = Math.max(...bracket.map((m) => m.r));
+      return playoffWeekStart + maxRound - 1;
+    }
+  } catch {
+    // Fall through to default
+  }
+  // Default: 3 playoff rounds
+  return playoffWeekStart + 2;
+}
+
 export async function evaluateTradeEfficiency(
   leagueId: string,
   season: string
@@ -171,9 +185,9 @@ export async function evaluateTradeEfficiency(
 
   const tradeResult = await fetchLeagueTrades(leagueId, season);
   const league = await SleeperService.getLeague(leagueId);
-  const totalWeeks = league?.settings?.playoff_week_start
-    ? league.settings.playoff_week_start - 1
-    : DEFAULT_REGULAR_SEASON_WEEKS;
+  const playoffWeekStart = league?.settings?.playoff_week_start || (DEFAULT_REGULAR_SEASON_WEEKS + 1);
+  const lastWeek = await getLastPlayoffWeek(leagueId, playoffWeekStart);
+  const totalWeeks = lastWeek;
 
   const [fetched, draftPicksByRound] = await Promise.all([
     Promise.all(

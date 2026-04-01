@@ -420,7 +420,7 @@
       "title": "Include playoff weeks in trade efficiency calculations",
       "spec": "specs/code-style.md",
       "priority": 48,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-034"],
       "description": "The trade efficiency calculator currently only processes regular season weeks. Extend it to also include playoff weeks. Use the league's settings.playoff_week_start to determine where playoffs begin, then fetch matchup data for playoff weeks as well (up to week 18 or the league's final week). Players who contributed during the playoffs should have those weeks counted in their efficiency totals. This matters because a trade made late in the season is often specifically to win in the playoffs — ignoring playoff data undervalues those trades."
     }
@@ -433,6 +433,15 @@
       "status": "open",
       "dependencies": [],
       "description": "Update the maintenance.html page (from TASK-013) to include fantasy football trivia while the user waits for the deploy to finish. Add a trivia section below the 'Halftime' message with a random question displayed on each page load/refresh. Include a 'Reveal Answer' button that shows the answer when clicked. Since maintenance.html is a standalone HTML file with no framework, implement this with inline JavaScript: define an array of ~20 trivia objects ({question, answer}), pick one at random on load, wire up the reveal button. The page already auto-refreshes every 10 seconds, so each refresh shows a new question. Trivia should be fantasy-football-specific — draft strategy, historical records, fun stats. Examples: Q: 'Which undrafted RB had the most fantasy points in a single season?' A: 'Priest Holmes, 2002 — 370.6 PPR points'. Q: 'What pick number has historically produced the most fantasy MVPs?' Come up with 20 varied questions covering draft strategy, historical fantasy performances, positional scarcity, sleeper picks, bust rates, etc. Keep the styling consistent with the existing dark theme."
+    },
+    {
+      "id": "TASK-050",
+      "title": "URGENT: Fix multiple bugs on draft efficiency page",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "open",
+      "dependencies": [],
+      "description": "Multiple bugs on /draft-assistant/1206336001794920448/efficiency: (1) Hover tooltips on the scatter plot don't show correct data — investigate what's being passed to the Recharts Tooltip and fix the data mapping. (2) The rainbow highlight is being applied to the user's dots on the scatter chart — remove it from the chart, rainbow highlight should only be on the user's row in the manager leaderboard table below. (3) The manager leaderboard table has a cell misalignment — the user's row has an extra indent shifting all cells by one column. This is likely caused by the rainbow border wrapper adding an extra element that breaks the table cell count. Fix the rainbow highlight implementation so it doesn't add extra cells — use a CSS effect on the TableRow itself (e.g. background gradient or box-shadow) rather than wrapping in an extra element. (4) Player names are not appearing anywhere on the page — check if the playerName field is being populated in the DraftPickEfficiency data. The draft picks from Sleeper have metadata.first_name and metadata.last_name — make sure these are being read and passed through. Test against league 1206336001794920448."
     }
   ]
 }
