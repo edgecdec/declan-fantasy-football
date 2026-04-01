@@ -38,6 +38,7 @@ function EfficiencyValue({ value }: { value: number }) {
 
 function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
   const { sorted, order, orderBy, handleSort } = useTableSort(side.players, 'totalEfficiency');
+  const hasAssets = side.players.length > 0 || side.draftPicks.length > 0 || side.faabItems.length > 0;
   return (
     <Box sx={{ flex: 1, minWidth: 250 }}>
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -74,8 +75,30 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 <TableCell align="right"><EfficiencyValue value={p.avgEfficiency} /></TableCell>
               </TableRow>
             ))}
-            {side.players.length === 0 && (
-              <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No trackable players</TableCell></TableRow>
+            {side.draftPicks.map((dp, i) => (
+              <TableRow key={`pick-${i}`}>
+                <TableCell>{dp.season} Round {dp.round} Pick</TableCell>
+                <TableCell align="center">
+                  <Chip label="PICK" size="small" sx={{ bgcolor: 'action.selected', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
+                </TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+              </TableRow>
+            ))}
+            {side.faabItems.map((fb, i) => (
+              <TableRow key={`faab-${i}`}>
+                <TableCell>${fb.amount} FAAB</TableCell>
+                <TableCell align="center">
+                  <Chip label="FAAB" size="small" sx={{ bgcolor: 'action.selected', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
+                </TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+              </TableRow>
+            ))}
+            {!hasAssets && (
+              <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No trade assets</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

@@ -125,6 +125,12 @@ export type SleeperLeagueUser = {
   avatar: string | null;
 };
 
+export type SleeperWaiverBudget = {
+  sender: number;   // roster_id sending FAAB
+  receiver: number; // roster_id receiving FAAB
+  amount: number;
+};
+
 export type SleeperTransaction = {
   transaction_id: string;
   type: string; // 'trade', 'free_agent', 'waiver'
@@ -133,6 +139,7 @@ export type SleeperTransaction = {
   adds: Record<string, number> | null; // player_id -> roster_id
   drops: Record<string, number> | null;
   draft_picks: SleeperTradedPick[];
+  waiver_budget: SleeperWaiverBudget[];
   creator: string;
   created: number;
   leg: number; // week number

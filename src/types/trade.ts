@@ -15,10 +15,21 @@ export type PlayerTradeEfficiency = {
   weeklyBreakdown: PlayerWeekEfficiency[];
 };
 
+export type TradeDraftPick = {
+  season: string;
+  round: number;
+};
+
+export type TradeFaab = {
+  amount: number;
+};
+
 export type TradeEfficiencySide = {
   rosterId: number;
   username: string;
   players: PlayerTradeEfficiency[];
+  draftPicks: TradeDraftPick[];
+  faabItems: TradeFaab[];
   totalEfficiency: number;
 };
 

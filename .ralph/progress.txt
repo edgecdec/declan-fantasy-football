@@ -288,3 +288,20 @@
   - For computed sort fields (like diff = actualWins - expectedWins), enrich the data with useMemo before passing to the hook rather than adding custom comparators.
   - TypeScript `unknown` type requires explicit narrowing before comparison — use intermediate variables with typeof checks instead of reassigning.
   - Source column in performance standings and Pos column in trade tables skipped for sorting (static labels/chips where sorting adds no value).
+
+## TASK-037: Show draft picks and FAAB in trades with N/A for efficiency fields
+- **Status**: Done
+- **Date**: 2026-03-31
+- **Changes**:
+  - Added `SleeperWaiverBudget` type and `waiver_budget` field to `SleeperTransaction` in sleeperService.ts
+  - Added `TradeDraftPick` and `TradeFaab` types to src/types/trade.ts
+  - Added `draftPicks` and `faabItems` fields to `TradeEfficiencySide` type
+  - Added `faab` field to `TradeSide` in tradeAnalyzer.ts, parsing `waiver_budget` from transactions
+  - Updated `evaluateSidePlayers` in tradeEfficiency.ts to pass through draft picks and FAAB
+  - Updated TradeSideTable UI to render draft pick rows (with PICK chip) and FAAB rows (with FAAB chip) with N/A for efficiency columns
+  - Changed empty state from "No trackable players" to "No trade assets" — only shown when a side has zero players, zero picks, and zero FAAB
+- **Lessons**:
+  - Sleeper `waiver_budget` is an array of `{sender, receiver, amount}` objects on transactions — receiver gets the FAAB
+  - Graham's Football Fantasy (league 1048177208491130880) is the best test league for trades with draft picks and FAAB
+  - Nova Act tests need `page.goto()` for direct URL navigation — the agent struggles with multi-step navigation through the app
+  - The trade evaluator takes time to load (fetches matchups for every week) — need 5+ seconds wait in tests

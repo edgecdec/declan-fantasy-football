@@ -6,6 +6,7 @@ export type TradeSide = {
   username: string;
   players: string[];
   draftPicks: { season: string; round: number }[];
+  faab: number[];
 };
 
 export type TradeData = {
@@ -53,6 +54,7 @@ function parseTrade(
       username: rosterToUsername[rid] || `Team ${rid}`,
       players: [],
       draftPicks: [],
+      faab: [],
     });
   }
 
@@ -65,6 +67,10 @@ function parseTrade(
   for (const dp of tx.draft_picks ?? []) {
     const ownerSide = sideMap.get(dp.owner_id);
     ownerSide?.draftPicks.push({ season: dp.season, round: dp.round });
+  }
+
+  for (const wb of tx.waiver_budget ?? []) {
+    sideMap.get(wb.receiver)?.faab.push(wb.amount);
   }
 
   const sides = Array.from(sideMap.values());

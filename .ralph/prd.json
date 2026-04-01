@@ -315,6 +315,42 @@
       "status": "done",
       "dependencies": [],
       "description": "Audit every data table across the application and ensure all applicable columns are sortable via clickable column headers using MUI TableSortLabel. Pages to check: /players (player database), /expected-wins (standings tables), /performance (season review tables), /performance/positional (benchmark tables and full list), /portfolio (ownership tables), /league-history (head-to-head and record tables), /medic (alert tables), and the trade evaluator. For each table, add sort state (sortBy, sortDirection) and a click handler on each column header that toggles sort. Numeric columns (points, wins, percentages, efficiency) and text columns (name, position, team) should all be sortable. Skip columns where sorting doesn't make sense (action buttons, icons). Use a consistent pattern — extract a shared sorting utility if the same sort logic is repeated across multiple tables."
+    },
+    {
+      "id": "TASK-037",
+      "title": "Show draft picks and FAAB in trades with N/A for efficiency fields",
+      "spec": "specs/code-style.md",
+      "priority": 37,
+      "status": "done",
+      "dependencies": ["TASK-035"],
+      "description": "On /league-history/[leagueId]/trades, trades involving draft picks or FAAB budget show as empty or 'No trackable players'. Instead, display draft picks (e.g. '2026 Round 1 Pick') and FAAB amounts (e.g. '$15 FAAB') as line items on the appropriate side of the trade, with N/A for efficiency, weeks started, and per-week average columns. The Sleeper transaction object has draft_picks array (with season, round, roster_id, owner_id) and waiver_budget array for FAAB. Parse these and display them alongside any real players in the trade. Only hide a trade entirely if BOTH sides have zero players AND zero picks AND zero FAAB — which shouldn't happen for a real trade. Additionally, if the draft for that season has already happened, resolve what the pick actually became — use the draft picks data (GET /draft/{draft_id}/picks) to find which player was selected with that pick and display it, e.g. '2025 Round 1 Pick → 1.03: Justin Jefferson'. This connects the pick to its outcome."
+    },
+    {
+      "id": "TASK-038",
+      "title": "Limit trade efficiency window to actual tenure on team",
+      "spec": "specs/code-style.md",
+      "priority": 38,
+      "status": "open",
+      "dependencies": ["TASK-034"],
+      "description": "The trade efficiency calculator currently counts all weeks from the trade through end of season for each player. If a player was traded away or dropped before the season ended, we'd be counting weeks they weren't on the team. Fix: only count weeks where the player actually appeared in the receiving team's starters array in the matchup data. This naturally handles re-trades — if a player was flipped in a later trade, they simply won't be in the starters after that week, so those weeks won't count. The value from flipping them is captured in the evaluation of that subsequent trade. No need to build a full transaction timeline — just check the matchup starters data which we already fetch. Additionally, if a player stopped appearing in starters before the season ended (indicating they were re-traded or dropped), display an asterisk (*) next to their name in the trade evaluator UI. On hover (MUI Tooltip), show a note like 'Re-traded in Week X' or 'Dropped in Week X' — determine the last week they appeared in starters and add 1 to get the approximate departure week."
+    },
+    {
+      "id": "TASK-039",
+      "title": "Ensure only real trades are shown — filter out waivers and commissioner moves",
+      "spec": "specs/code-style.md",
+      "priority": 39,
+      "status": "open",
+      "dependencies": ["TASK-033"],
+      "description": "On /league-history/[leagueId]/trades, verify that the trade fetching service only includes actual trades. Sleeper transactions have a 'type' field — only include type='trade'. Filter out 'waiver', 'free_agent', and 'commissioner' types. Also filter out any transaction with status != 'complete' to exclude failed or vetoed trades. Log the raw transaction types being fetched to confirm no non-trade transactions are leaking through."
+    },
+    {
+      "id": "TASK-040",
+      "title": "Sort trades by impact on the trade evaluator page",
+      "spec": "specs/code-style.md",
+      "priority": 40,
+      "status": "open",
+      "dependencies": ["TASK-035"],
+      "description": "On /league-history/[leagueId]/trades, default sort trades by absolute efficiency impact (largest difference between the two sides first) rather than by week. Add a sort toggle so users can switch between 'Most Impactful' (default) and 'Chronological' (by week). Impact is calculated as the absolute value of the difference between side A's total efficiency and side B's total efficiency — bigger gap means more lopsided trade."
     }
   ]
 }
