@@ -384,7 +384,7 @@
       "title": "Create per-manager draft efficiency aggregation with position filtering",
       "spec": "specs/code-style.md",
       "priority": 44,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-043"],
       "description": "Add a function aggregateManagerDraftEfficiency() to src/services/stats/draftEfficiency.ts. Takes the array of DraftPickEfficiency from TASK-043 and groups by drafter (draftedByRosterId). For each manager, calculate: total draft efficiency (sum of all their picks' efficiency), average efficiency per pick, number of picks, and a breakdown by position. Support filtering by one or more positions — e.g. show only RB+WR efficiency to see who drafted skill positions best. Return an array of ManagerDraftEfficiency objects: { rosterId, username, totalEfficiency, avgPerPick, pickCount, positionBreakdown: Record<string, { total, count, avg }> }. Sort by totalEfficiency descending by default."
     },

@@ -349,3 +349,9 @@
 - Reused existing patterns from tradeEfficiency.ts: same `starters_points` casting, same positional average calculation, same player data import pattern.
 - Key design decision: player efficiency is tracked across ALL teams they started for (not just the drafting team), with `changedTeams` flag indicating mid-season movement. This matches the task spec requirement.
 - Lesson: The `starters_points` field from Sleeper API is not in the TypeScript type but exists on the response — existing codebase uses `as Record<string, unknown>` cast pattern consistently.
+
+## TASK-044: Create per-manager draft efficiency aggregation with position filtering
+- Status: DONE (already implemented as part of TASK-043)
+- The `aggregateManagerDraftEfficiency()` function and `ManagerDraftEfficiency` type were both created during TASK-043 implementation.
+- No code changes needed — just marked as done.
+- Lesson: When implementing a service, check if the next task's requirements can be included in the same file to avoid a no-op follow-up task.
