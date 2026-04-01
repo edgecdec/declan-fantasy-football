@@ -323,3 +323,12 @@
 - Added `tx.status !== 'complete'` check alongside existing `tx.type !== 'trade'` filter in tradeAnalyzer.ts
 - The existing code already filtered by type='trade'; only the status check was missing
 - Lesson: The existing filter was already 95% correct — just needed one additional condition. Always read the code before assuming a big change is needed.
+
+## TASK-040: Sort trades by impact on the trade evaluator page
+- Date: 2026-03-31
+- Added sort toggle (ToggleButtonGroup) with "Most Impactful" (default) and "Chronological" modes
+- Impact = absolute difference between side A and side B total efficiency — larger gap = more lopsided trade
+- Chronological sorts by week descending (most recent first)
+- Toggle only shown when trades exist (hidden on empty state)
+- Used useMemo for sorted trades to avoid re-sorting on every render
+- Lesson: Nova Act tests work better using Playwright locators directly (page.locator) rather than asking the agent to find UI elements — the agent tends to scroll past things looking for them

@@ -18,8 +18,12 @@ import {
   TableSortLabel,
   Button,
   Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SortIcon from '@mui/icons-material/Sort';
 import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
 import { SleeperService } from '@/services/sleeper/sleeperService';
@@ -165,6 +169,21 @@ export default function TradeEvaluatorPage() {
   const [season, setSeason] = React.useState('');
   const [trades, setTrades] = React.useState<TradeEfficiencyResult[]>([]);
   const [error, setError] = React.useState('');
+  const [sortMode, setSortMode] = React.useState<'impact' | 'chronological'>('impact');
+
+  const sortedTrades = React.useMemo(() => {
+    const copy = [...trades];
+    if (sortMode === 'impact') {
+      copy.sort((a, b) => {
+        const impactA = Math.abs(a.sides[0].totalEfficiency - a.sides[1].totalEfficiency);
+        const impactB = Math.abs(b.sides[0].totalEfficiency - b.sides[1].totalEfficiency);
+        return impactB - impactA;
+      });
+    } else {
+      copy.sort((a, b) => b.week - a.week);
+    }
+    return copy;
+  }, [trades, sortMode]);
 
   React.useEffect(() => {
     if (!leagueId) return;
@@ -220,7 +239,25 @@ export default function TradeEvaluatorPage() {
         </Paper>
       )}
 
-      {trades.map((trade) => (
+      {!loading && trades.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <ToggleButtonGroup
+            value={sortMode}
+            exclusive
+            onChange={(_, v) => { if (v) setSortMode(v); }}
+            size="small"
+          >
+            <ToggleButton value="impact">
+              <TrendingUpIcon sx={{ mr: 0.5, fontSize: 18 }} /> Most Impactful
+            </ToggleButton>
+            <ToggleButton value="chronological">
+              <SortIcon sx={{ mr: 0.5, fontSize: 18 }} /> Chronological
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
+
+      {sortedTrades.map((trade) => (
         <TradeCard key={trade.transactionId} trade={trade} />
       ))}
     </Container>

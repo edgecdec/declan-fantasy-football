@@ -348,7 +348,7 @@
       "title": "Sort trades by impact on the trade evaluator page",
       "spec": "specs/code-style.md",
       "priority": 40,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-035"],
       "description": "On /league-history/[leagueId]/trades, default sort trades by absolute efficiency impact (largest difference between the two sides first) rather than by week. Add a sort toggle so users can switch between 'Most Impactful' (default) and 'Chronological' (by week). Impact is calculated as the absolute value of the difference between side A's total efficiency and side B's total efficiency — bigger gap means more lopsided trade."
     },
@@ -360,6 +360,15 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: /league-history/1206336001794920448/trades crashes with 'TypeError: can't access property map, D.draftPicks is undefined'. The code is calling .map() on a draftPicks property that doesn't exist on some transaction objects. Fix: in the trade parsing logic (likely in src/services/stats/tradeAnalyzer.ts or the trades page component), add a null/undefined check before mapping over draftPicks — use (transaction.draft_picks || []).map(...) or optional chaining. The Sleeper transaction object may not always include draft_picks if the trade only involved players. Same defensive check should be applied to waiver_budget and any other array fields on the transaction object. This is a top priority fix as the page is completely broken."
+    },
+    {
+      "id": "TASK-042",
+      "title": "URGENT: Verify and fix draft picks, FAAB, and re-trade asterisks on trade evaluator",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "open",
+      "dependencies": [],
+      "description": "Bug: On /league-history/1206336001794920448/trades, three features from previous tasks are not working despite being marked done: (1) TASK-037: Draft picks traded should show as line items (e.g. '2025 Round 1 Pick → 1.03: Justin Jefferson') and FAAB amounts should display — neither is visible. (2) TASK-038: Players who were re-traded should have an asterisk (*) with a tooltip showing when they left — not visible. Read the current code in src/services/stats/tradeAnalyzer.ts and the trades page component. Check if the draft_picks and waiver_budget fields from Sleeper transactions are being parsed and passed to the UI. Check if the asterisk/tooltip logic was actually implemented. Fix whatever is missing. Test against league 1206336001794920448 which has trades with draft picks. Verify all three features are visually present on the page."
     }
   ]
 }
