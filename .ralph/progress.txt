@@ -243,3 +243,11 @@
 - Fix: After processing all leagues for a year, check `POSITIONS.some(p => agg.count[p] > 0)` — only add the year to chart data if at least one position had valid aggregated data.
 - Lesson: When filtering returns null/undefined from an inner function, the outer aggregation loop must also check whether any data was actually collected before including the time period in results. The `|| 1` fallback on count masked the issue by producing 0/1=0 instead of skipping entirely.
 - Verified: Nova Act test confirmed 2020 no longer appears for edgecdec, and other valid years (2021+) still display correctly.
+
+## TASK-033: Create trade fetching and parsing service for redraft leagues (2026-03-31)
+- Created `src/services/stats/tradeAnalyzer.ts` with `fetchLeagueTrades(leagueId, season)` function.
+- Added `SleeperTransaction` type and `getTransactions(leagueId, week)` method to sleeperService.ts.
+- Service fetches all regular season weeks' transactions, filters to trades, parses into structured `TradeData` with two sides (roster_id, username, players, draft_picks).
+- Builds roster_id -> username mapping from league users + rosters.
+- Results cached per league in session storage.
+- Lesson: Keep service files focused — types + one main exported function + private helpers. The parseTrade helper stays private since only fetchLeagueTrades needs it.

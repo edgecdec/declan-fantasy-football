@@ -125,6 +125,19 @@ export type SleeperLeagueUser = {
   avatar: string | null;
 };
 
+export type SleeperTransaction = {
+  transaction_id: string;
+  type: string; // 'trade', 'free_agent', 'waiver'
+  status: string;
+  roster_ids: number[];
+  adds: Record<string, number> | null; // player_id -> roster_id
+  drops: Record<string, number> | null;
+  draft_picks: SleeperTradedPick[];
+  creator: string;
+  created: number;
+  leg: number; // week number
+};
+
 export const SleeperService = {
   async getUser(username: string): Promise<SleeperUser | null> {
     const cacheKey = `user_${username.toLowerCase()}`;
@@ -173,6 +186,23 @@ export const SleeperService = {
       return data;
     } catch (e) {
       console.error(`Error fetching matchups for league ${leagueId} week ${week}`, e);
+      return [];
+    }
+  },
+
+  async getTransactions(leagueId: string, week: number): Promise<SleeperTransaction[]> {
+    const cacheKey = `transactions_${leagueId}_${week}`;
+    const cached = CacheService.get<SleeperTransaction[]>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/league/${leagueId}/transactions/${week}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session' });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching transactions for league ${leagueId} week ${week}`, e);
       return [];
     }
   },

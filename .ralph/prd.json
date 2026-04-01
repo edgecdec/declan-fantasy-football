@@ -279,6 +279,42 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: TASK-028 was supposed to apply zero-point league filtering globally but /performance/positional/history still shows 2020 for edgecdec, which should be excluded (user had 0 points that year — test league with no real games). Find the specific code path that fetches and aggregates data for the positional history page and add the zero-point check there. The page likely has its own data fetching loop that was missed by TASK-028. Check if it uses positionalBenchmarks.ts or has inline fetching. Wherever the user's points are summed per season, skip any league where the user's total points scored is 0. Verify edgecdec's 2020 no longer appears on this page after the fix."
+    },
+    {
+      "id": "TASK-033",
+      "title": "Create trade fetching and parsing service for redraft leagues",
+      "spec": "specs/code-style.md",
+      "priority": 33,
+      "status": "done",
+      "dependencies": [],
+      "description": "Create src/services/stats/tradeAnalyzer.ts with a function to fetch all trades for a redraft league. Use the Sleeper API GET /league/{league_id}/transactions/{week} for each regular season week. Filter to only type='trade' transactions. Parse each trade into a structured format: trade id, week number, timestamp, and two sides — each side is an array of { roster_id, players: [player_id[]], draft_picks: [] }. Ignore draft pick trades for now (redraft focus). Also fetch league users and rosters to map roster_ids to usernames. Cache results per league. Export a TradeData type and a fetchLeagueTrades(leagueId, season) function."
+    },
+    {
+      "id": "TASK-034",
+      "title": "Build per-player post-trade positional efficiency calculator",
+      "spec": "specs/code-style.md",
+      "priority": 34,
+      "status": "open",
+      "dependencies": ["TASK-033"],
+      "description": "Add a function evaluateTradeEfficiency() to src/services/stats/tradeAnalyzer.ts. For each trade, for each player on both sides: fetch weekly matchup data for every week AFTER the trade through end of regular season. For each week the player was in the new team's starting lineup (starters array in matchup data), get their points scored. Calculate the league average points at that player's position for the same week (average across all starters at that position in the league that week). The player's efficiency for that week = their points minus the league positional average. Sum this across all started weeks to get total efficiency gained/lost. Return per-trade results with: each side's players, each player's total efficiency sum, per-week efficiency breakdown, weeks started count, and the overall side totals. A positive total means that side of the trade outperformed league average at those positions."
+    },
+    {
+      "id": "TASK-035",
+      "title": "Create Trade Evaluator page under league history",
+      "spec": "specs/code-style.md",
+      "priority": 35,
+      "status": "open",
+      "dependencies": ["TASK-034"],
+      "description": "Create a new page at src/app/league-history/[leagueId]/trades/page.tsx that shows all trades in a redraft league evaluated by positional efficiency. The page should be accessible from the league history view. For each trade, display: the week it happened, both sides with usernames, and for each player show their position, total efficiency +/- (sum across all started weeks after trade), weeks started, and per-week average efficiency. Color code positive efficiency green and negative red. Show a trade verdict summary comparing the total efficiency of each side. Sort trades by week (most recent first). Include a link back to the league history page. Load data progressively — show each trade's evaluation as it completes. Add a nav link or button from the existing /league-history page to access this trades view for each league."
+    },
+    {
+      "id": "TASK-036",
+      "title": "Audit and add sortable columns to all existing data tables",
+      "spec": "specs/code-style.md",
+      "priority": 36,
+      "status": "open",
+      "dependencies": [],
+      "description": "Audit every data table across the application and ensure all applicable columns are sortable via clickable column headers using MUI TableSortLabel. Pages to check: /players (player database), /expected-wins (standings tables), /performance (season review tables), /performance/positional (benchmark tables and full list), /portfolio (ownership tables), /league-history (head-to-head and record tables), /medic (alert tables), and the trade evaluator. For each table, add sort state (sortBy, sortDirection) and a click handler on each column header that toggles sort. Numeric columns (points, wins, percentages, efficiency) and text columns (name, position, team) should all be sortable. Skip columns where sorting doesn't make sense (action buttons, icons). Use a consistent pattern — extract a shared sorting utility if the same sort logic is repeated across multiple tables."
     }
   ]
 }

@@ -41,3 +41,9 @@
 - Use the `@/` path alias for all internal imports.
 - Group imports: external packages first, then internal modules, then types.
 - Use top-level ES imports only.
+
+## Tables and Sorting
+- All data tables should have sortable columns by default. Any column with numeric or alphabetical data should be sortable by clicking the column header.
+- Use MUI TableSortLabel in table headers for sort indicators (arrow up/down).
+- Columns that don't benefit from sorting (e.g. action buttons, icons, static labels) can be excluded.
+- Default sort should be the most useful column for the context (e.g. rank, points, efficiency).
