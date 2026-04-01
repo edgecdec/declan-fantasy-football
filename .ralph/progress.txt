@@ -416,3 +416,13 @@
   - Recharts ComposedChart + Scatter is unreliable for tooltips — use ScatterChart with multiple Scatter series instead
   - CSS pseudo-elements (::before/::after) on table rows break table cell alignment — use background/boxShadow on the row itself
   - Browser storage quota (~5MB) fills fast with matchup data across many seasons — always implement eviction
+
+## TASK-052: Change historical draft efficiency to use same-league history instead of cross-league
+- Date: 2026-03-31
+- Changed `fetchHistoricalDraftEfficiency` to accept `leagueId` instead of `userId` + `excludeLeagueId`
+- Uses `SleeperService.getLeagueHistory(leagueId)` to trace the `previous_league_id` chain for same-league history
+- Filters to only completed prior seasons of the same league, excluding the current league_id
+- Removed `MIN_HISTORICAL_YEAR` constant and cross-league scanning logic
+- Updated efficiency page to pass `leagueId` directly (no longer needs `user.user_id` for historical fetch)
+- Updated table title from "Your Draft Efficiency by Season" to "League Draft Efficiency by Season"
+- Lesson: The existing `getLeagueHistory` method in SleeperService already handled the `previous_league_id` chain traversal — always check existing utilities before writing new logic

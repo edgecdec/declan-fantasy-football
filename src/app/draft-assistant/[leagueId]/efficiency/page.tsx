@@ -129,12 +129,11 @@ export default function DraftEfficiencyPage() {
   }, [leagueId, user?.user_id]);
 
   React.useEffect(() => {
-    if (!showHistorical || !user?.user_id || historicalData) return;
+    if (!showHistorical || historicalData) return;
     let cancelled = false;
     setHistoricalLoading(true);
 
     fetchHistoricalDraftEfficiency(
-      user.user_id,
       leagueId,
       (partial) => { if (!cancelled) setHistoricalData(partial); },
     ).then((final) => {
@@ -144,7 +143,7 @@ export default function DraftEfficiencyPage() {
     });
 
     return () => { cancelled = true; };
-  }, [showHistorical, user?.user_id, leagueId, historicalData]);
+  }, [showHistorical, leagueId, historicalData]);
 
   const filteredPicks = React.useMemo(
     () => posFilter.length ? picks.filter(p => posFilter.includes(p.position)) : picks,
@@ -359,7 +358,7 @@ export default function DraftEfficiencyPage() {
       {/* Historical Season Summaries */}
       {showHistorical && filteredSeasonSummaries.length > 0 && (
         <Paper sx={{ p: 2, mt: 3 }}>
-          <Typography variant="h6" gutterBottom>Your Draft Efficiency by Season</Typography>
+          <Typography variant="h6" gutterBottom>League Draft Efficiency by Season</Typography>
           {historicalLoading && <LinearProgress sx={{ mb: 1 }} />}
           <TableContainer>
             <Table size="small">

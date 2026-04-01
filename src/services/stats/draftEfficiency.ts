@@ -205,79 +205,57 @@ export function aggregateManagerDraftEfficiency(
   return results;
 }
 
-const MIN_HISTORICAL_YEAR = 2017;
-
 export async function fetchHistoricalDraftEfficiency(
-  userId: string,
-  excludeLeagueId: string | null,
+  leagueId: string,
   onSeasonComplete: (data: HistoricalDraftData) => void,
 ): Promise<HistoricalDraftData> {
-  const cacheKey = `hist_draft_eff_${userId}`;
+  const cacheKey = `hist_draft_eff_league_${leagueId}`;
   const cached = CacheService.get<HistoricalDraftData>(cacheKey, 'session');
   if (cached) {
     onSeasonComplete(cached);
     return cached;
   }
 
-  let seasons: string[];
+  let leagueHistory;
   try {
-    seasons = await SleeperService.getActiveSeasons(userId, true);
+    leagueHistory = await SleeperService.getLeagueHistory(leagueId);
   } catch {
     return { averagesByPick: [], seasonSummaries: [] };
   }
 
+  // Exclude the current league — only prior seasons
+  const priorLeagues = leagueHistory.filter(l => l.league_id !== leagueId && l.status === 'complete');
+
   const allPicks: DraftPickEfficiency[] = [];
   const summaries: SeasonDraftSummary[] = [];
 
-  for (const season of seasons.sort()) {
-    if (parseInt(season, 10) < MIN_HISTORICAL_YEAR) continue;
-
+  for (const league of priorLeagues) {
     try {
-      const leagues = await SleeperService.getLeagues(userId, season);
-      const completedLeagues = leagues.filter(l =>
-        ['in_season', 'complete', 'playoffs'].includes(l.status)
+      const drafts = await SleeperService.getLeagueDrafts(league.league_id);
+      const completeDraft = drafts.find(d => d.status === 'complete');
+      if (!completeDraft) continue;
+
+      const result = await calculateDraftEfficiency(
+        league.league_id, completeDraft.draft_id, completeDraft.season,
       );
+      if (result.picks.length === 0) continue;
 
-      for (const league of completedLeagues) {
-        if (league.league_id === excludeLeagueId) continue;
+      const totalEff = result.picks.reduce((s, p) => s + p.totalEfficiency, 0);
+      summaries.push({
+        season: completeDraft.season || league.season,
+        leagueName: league.name,
+        leagueId: league.league_id,
+        draftId: completeDraft.draft_id,
+        totalEfficiency: Math.round(totalEff * 100) / 100,
+        avgPerPick: Math.round((totalEff / result.picks.length) * 100) / 100,
+        pickCount: result.picks.length,
+      });
 
-        try {
-          const drafts = await SleeperService.getLeagueDrafts(league.league_id);
-          const completeDraft = drafts.find(d => d.status === 'complete');
-          if (!completeDraft) continue;
-
-          const result = await calculateDraftEfficiency(
-            league.league_id, completeDraft.draft_id, completeDraft.season,
-          );
-
-          const rosters = await SleeperService.getRosters(league.league_id);
-          const userRoster = rosters.find(r => r.owner_id === userId);
-          if (!userRoster) continue;
-
-          const userPicks = result.picks.filter(p => p.draftedByRosterId === userRoster.roster_id);
-          if (userPicks.length === 0) continue;
-
-          const totalEff = userPicks.reduce((s, p) => s + p.totalEfficiency, 0);
-          summaries.push({
-            season,
-            leagueName: league.name,
-            leagueId: league.league_id,
-            draftId: completeDraft.draft_id,
-            totalEfficiency: Math.round(totalEff * 100) / 100,
-            avgPerPick: Math.round((totalEff / userPicks.length) * 100) / 100,
-            pickCount: userPicks.length,
-          });
-
-          allPicks.push(...result.picks);
-        } catch {
-          // Skip leagues that fail
-        }
-      }
+      allPicks.push(...result.picks);
     } catch {
-      // Skip entire season if league fetch fails
+      // Skip seasons that fail
     }
 
-    // Progressive callback after each season
     onSeasonComplete({
       averagesByPick: computeAveragesByPick(allPicks),
       seasonSummaries: [...summaries],
