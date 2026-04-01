@@ -330,7 +330,7 @@
       "title": "Limit trade efficiency window to actual tenure on team",
       "spec": "specs/code-style.md",
       "priority": 38,
-      "status": "in_progress",
+      "status": "done",
       "dependencies": ["TASK-034"],
       "description": "The trade efficiency calculator currently counts all weeks from the trade through end of season for each player. If a player was traded away or dropped before the season ended, we'd be counting weeks they weren't on the team. Fix: only count weeks where the player actually appeared in the receiving team's starters array in the matchup data. This naturally handles re-trades — if a player was flipped in a later trade, they simply won't be in the starters after that week, so those weeks won't count. The value from flipping them is captured in the evaluation of that subsequent trade. No need to build a full transaction timeline — just check the matchup starters data which we already fetch. Additionally, if a player stopped appearing in starters before the season ended (indicating they were re-traded or dropped), display an asterisk (*) next to their name in the trade evaluator UI. On hover (MUI Tooltip), show a note like 'Re-traded in Week X' or 'Dropped in Week X' — determine the last week they appeared in starters and add 1 to get the approximate departure week."
     },

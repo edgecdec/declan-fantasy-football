@@ -81,6 +81,11 @@ function evaluateSidePlayers(
     }
 
     const totalEff = weeklyBreakdown.reduce((s, wb) => s + wb.efficiency, 0);
+    const lastStartedWeek = weeklyBreakdown.length > 0
+      ? weeklyBreakdown[weeklyBreakdown.length - 1].week
+      : tradeWeek;
+    const departureWeek = lastStartedWeek < totalWeeks ? lastStartedWeek + 1 : null;
+
     result.players.push({
       playerId,
       name: getPlayerName(playerId),
@@ -89,6 +94,7 @@ function evaluateSidePlayers(
       totalEfficiency: totalEff,
       avgEfficiency: weeklyBreakdown.length > 0 ? totalEff / weeklyBreakdown.length : 0,
       weeklyBreakdown,
+      departureWeek,
     });
     result.totalEfficiency += totalEff;
   }

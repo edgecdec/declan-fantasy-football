@@ -13,6 +13,7 @@ export type PlayerTradeEfficiency = {
   totalEfficiency: number;
   avgEfficiency: number;
   weeklyBreakdown: PlayerWeekEfficiency[];
+  departureWeek: number | null;
 };
 
 export type TradeDraftPick = {

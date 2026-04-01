@@ -310,3 +310,11 @@
 - Root cause: SleeperTransaction.draft_picks and waiver_budget can be undefined/null when the API returns trades that only involve players. The TypeScript type had them as required arrays, but the runtime data didn't always include them.
 - Fix: Added `?? []` defensive checks in tradeEfficiency.ts (evaluateSidePlayers) and trades/page.tsx (TradeSideTable) for draftPicks, faabItems, and faab. Made draft_picks and waiver_budget optional on the SleeperTransaction type.
 - Lesson: Always type API response fields as optional when the API doesn't guarantee their presence, even if the docs suggest they're always there. Defensive `?? []` before any .map() on API data.
+
+## TASK-038: Limit trade efficiency window to actual tenure on team
+- Date: 2026-03-31
+- The evaluateSidePlayers function already only counted weeks where the player appeared in starters (indexOf check), so the core efficiency calculation was already correct.
+- Added departureWeek detection: if a player's last started week < totalWeeks, they left the roster early. departureWeek = lastStartedWeek + 1.
+- Added departureWeek field to PlayerTradeEfficiency type.
+- Added asterisk (*) with MUI Tooltip in the trade evaluator UI showing "Left roster in Week X" on hover.
+- Lesson: Always read existing code carefully before assuming it needs major changes — the starters check was already filtering correctly, only the departure indicator was missing.

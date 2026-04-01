@@ -17,6 +17,7 @@ import {
   TableRow,
   TableSortLabel,
   Button,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
@@ -66,7 +67,14 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.playerId}>
-                <TableCell>{p.name}</TableCell>
+                <TableCell>
+                  {p.name}
+                  {p.departureWeek != null && (
+                    <Tooltip title={`Left roster in Week ${p.departureWeek}`} arrow>
+                      <Typography component="span" sx={{ color: 'warning.main', cursor: 'help', ml: 0.5 }}>*</Typography>
+                    </Tooltip>
+                  )}
+                </TableCell>
                 <TableCell align="center">
                   <Chip label={p.position} size="small" sx={{ bgcolor: getPositionColor(p.position), color: '#fff', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
                 </TableCell>
