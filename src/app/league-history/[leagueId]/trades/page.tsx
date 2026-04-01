@@ -15,6 +15,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Button,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -24,6 +25,7 @@ import { SleeperService } from '@/services/sleeper/sleeperService';
 import { evaluateTradeEfficiency } from '@/services/stats/tradeEfficiency';
 import { TradeEfficiencyResult, TradeEfficiencySide } from '@/types/trade';
 import { getPositionColor } from '@/constants/colors';
+import useTableSort from '@/hooks/useTableSort';
 
 function EfficiencyValue({ value }: { value: number }) {
   const color = value > 0 ? 'success.main' : value < 0 ? 'error.main' : 'text.secondary';
@@ -35,6 +37,7 @@ function EfficiencyValue({ value }: { value: number }) {
 }
 
 function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
+  const { sorted, order, orderBy, handleSort } = useTableSort(side.players, 'totalEfficiency');
   return (
     <Box sx={{ flex: 1, minWidth: 250 }}>
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -44,15 +47,23 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Player</TableCell>
+              <TableCell>
+                <TableSortLabel active={orderBy === 'name'} direction={orderBy === 'name' ? order : 'asc'} onClick={() => handleSort('name')}>Player</TableSortLabel>
+              </TableCell>
               <TableCell align="center">Pos</TableCell>
-              <TableCell align="right">Wks</TableCell>
-              <TableCell align="right">Eff</TableCell>
-              <TableCell align="right">Avg/Wk</TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={orderBy === 'weeksStarted'} direction={orderBy === 'weeksStarted' ? order : 'asc'} onClick={() => handleSort('weeksStarted')}>Wks</TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={orderBy === 'totalEfficiency'} direction={orderBy === 'totalEfficiency' ? order : 'asc'} onClick={() => handleSort('totalEfficiency')}>Eff</TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={orderBy === 'avgEfficiency'} direction={orderBy === 'avgEfficiency' ? order : 'asc'} onClick={() => handleSort('avgEfficiency')}>Avg/Wk</TableSortLabel>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {side.players.map((p) => (
+            {sorted.map((p) => (
               <TableRow key={p.playerId}>
                 <TableCell>{p.name}</TableCell>
                 <TableCell align="center">

@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Box, Paper, Typography, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Box, Paper, Typography, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { VBDService, LeagueSettings, Player } from '@/services/draft/vbdService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
+import useTableSort from '@/hooks/useTableSort';
 import rankingsData from '../../../data/rankings.json';
 
 const RANKINGS = rankingsData as Player[];
@@ -56,6 +57,8 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
     return bestAvailable.filter(p => p.position === positionFilter);
   }, [bestAvailable, positionFilter]);
 
+  const { sorted: sortedPlayers, order, orderBy, handleSort } = useTableSort(filteredPlayers, 'rank', 'asc');
+
   const handleFormatPositionFilter = (_: React.MouseEvent<HTMLElement>, newPos: string | null) => {
     if (newPos) setPositionFilter(newPos);
   };
@@ -85,13 +88,19 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Rank</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Player</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold' }}>Value</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>
+                <TableSortLabel active={orderBy === 'rank'} direction={orderBy === 'rank' ? order : 'asc'} onClick={() => handleSort('rank')}>Rank</TableSortLabel>
+              </TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>
+                <TableSortLabel active={orderBy === 'name'} direction={orderBy === 'name' ? order : 'asc'} onClick={() => handleSort('name')}>Player</TableSortLabel>
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold' }}>
+                <TableSortLabel active={orderBy === 'vbd_value'} direction={orderBy === 'vbd_value' ? order : 'asc'} onClick={() => handleSort('vbd_value')}>Value</TableSortLabel>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredPlayers.slice(0, 20).map((player) => {
+            {sortedPlayers.slice(0, 20).map((player) => {
               const rowBg = getPositionBgColor(player.position, 0.05);
               const borderLeft = `4px solid ${getPositionColor(player.position)}`;
               
@@ -126,7 +135,7 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
                 </TableRow>
               );
             })}
-            {filteredPlayers.length === 0 && (
+            {sortedPlayers.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} align="center">No players found</TableCell>
               </TableRow>

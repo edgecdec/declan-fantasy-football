@@ -271,3 +271,20 @@
 - Uses existing evaluateTradeEfficiency service from TASK-034
 - Fetches league first to get season string for the efficiency service
 - Lesson: The "Evaluate Trades" button only appears after user searches for leagues (inside conditional block), so Nova Act test should navigate directly to the trades URL rather than looking for the button on initial page load
+
+## TASK-036: Audit and add sortable columns to all existing data tables
+- **Date**: 2026-03-31
+- **Status**: Done
+- **Files created**: src/hooks/useTableSort.ts
+- **Files modified**: src/app/expected-wins/page.tsx, src/app/performance/page.tsx, src/components/draft/BestAvailable.tsx, src/app/league-history/[leagueId]/trades/page.tsx, .ralph/prd.json
+- **Audit results**:
+  - Already sortable (via DataTable/SmartTable): /players, /portfolio, /performance/positional, /performance/positional/history, /performance/positional/league/[leagueId]
+  - Already sortable (custom TableSortLabel): /league-history (StandingsTable)
+  - No tables (uses List/Card): /medic
+  - Sorting not applicable (chronological matrix): PositionalHeatmap component
+  - Added sorting: /expected-wins standings (Team, Actual, Expected, Diff, PF, PA, +/-), /performance standings (Rank, Team, Points, Playoffs), BestAvailable (Rank, Player, Value), Trade evaluator side tables (Player, Wks, Eff, Avg/Wk)
+- **Lessons**:
+  - Created a shared useTableSort hook to avoid duplicating sort logic across inline tables. The hook returns { sorted, order, orderBy, handleSort } and handles nested key access.
+  - For computed sort fields (like diff = actualWins - expectedWins), enrich the data with useMemo before passing to the hook rather than adding custom comparators.
+  - TypeScript `unknown` type requires explicit narrowing before comparison — use intermediate variables with typeof checks instead of reassigning.
+  - Source column in performance standings and Pos column in trade tables skipped for sorting (static labels/chips where sorting adds no value).

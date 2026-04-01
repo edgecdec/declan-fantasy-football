@@ -31,7 +31,8 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  TableSortLabel
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -40,6 +41,7 @@ import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperBracketMatch } from '@/services/sleeper/sleeperService';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import useTableSort from '@/hooks/useTableSort';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -201,6 +203,7 @@ function SummaryCard({ data }: { data: LeaguePerformanceData[] }) {
 function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, onToggle: () => void, userId: string }) {
   const { league, status, result, category } = item;
   const isIncluded = category === 'included';
+  const { sorted: sortedStandings, order, orderBy, handleSort } = useTableSort(result?.standings || [], 'rank', 'asc');
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
@@ -271,15 +274,23 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Team</TableCell>
-                    <TableCell align="right">Points</TableCell>
+                    <TableCell>
+                      <TableSortLabel active={orderBy === 'rank'} direction={orderBy === 'rank' ? order : 'asc'} onClick={() => handleSort('rank')}>Rank</TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel active={orderBy === 'name'} direction={orderBy === 'name' ? order : 'asc'} onClick={() => handleSort('name')}>Team</TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel active={orderBy === 'pointsFor'} direction={orderBy === 'pointsFor' ? order : 'asc'} onClick={() => handleSort('pointsFor')}>Points</TableSortLabel>
+                    </TableCell>
                     <TableCell align="right">Source</TableCell>
-                    <TableCell align="right">Playoffs</TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel active={orderBy === 'madePlayoffs'} direction={orderBy === 'madePlayoffs' ? order : 'asc'} onClick={() => handleSort('madePlayoffs')}>Playoffs</TableSortLabel>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {result.standings.map((team) => (
+                  {sortedStandings.map((team) => (
                     <TableRow key={team.rosterId} selected={team.ownerId === userId} hover>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>

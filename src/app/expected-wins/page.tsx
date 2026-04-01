@@ -14,6 +14,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Avatar,
   Card,
   CardContent,
@@ -44,6 +45,7 @@ import { analyzeLeague, TeamStats } from '@/services/stats/expectedWins';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import LuckSummaryCard from '@/components/analytics/LuckSummaryCard';
+import useTableSort from '@/hooks/useTableSort';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -61,6 +63,12 @@ type LeagueData = {
 function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData, userId: string, onToggle: () => void, showAdvanced: boolean }) {
   const { league, status, userStats: stats, standings, category } = item;
   const isIncluded = category === 'included';
+  const enriched = React.useMemo(() => (standings || []).map(t => ({
+    ...t,
+    diff: t.actualWins - t.expectedWins,
+    pointsDiff: t.pointsFor - t.pointsAgainst,
+  })), [standings]);
+  const { sorted: sortedStandings, order, orderBy, handleSort } = useTableSort(enriched, 'expectedWins');
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1, opacity: isIncluded ? 1 : 0.75 }}>
@@ -149,21 +157,35 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Team</TableCell>
-                    <TableCell align="right">Actual</TableCell>
-                    <TableCell align="right">Expected</TableCell>
-                    <TableCell align="right">Diff</TableCell>
+                    <TableCell>
+                      <TableSortLabel active={orderBy === 'name'} direction={orderBy === 'name' ? order : 'asc'} onClick={() => handleSort('name')}>Team</TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel active={orderBy === 'actualWins'} direction={orderBy === 'actualWins' ? order : 'asc'} onClick={() => handleSort('actualWins')}>Actual</TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel active={orderBy === 'expectedWins'} direction={orderBy === 'expectedWins' ? order : 'asc'} onClick={() => handleSort('expectedWins')}>Expected</TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel active={orderBy === 'diff'} direction={orderBy === 'diff' ? order : 'asc'} onClick={() => handleSort('diff')}>Diff</TableSortLabel>
+                    </TableCell>
                     {showAdvanced && (
                       <>
-                        <TableCell align="right">PF</TableCell>
-                        <TableCell align="right">PA</TableCell>
-                        <TableCell align="right">+/-</TableCell>
+                        <TableCell align="right">
+                          <TableSortLabel active={orderBy === 'pointsFor'} direction={orderBy === 'pointsFor' ? order : 'asc'} onClick={() => handleSort('pointsFor')}>PF</TableSortLabel>
+                        </TableCell>
+                        <TableCell align="right">
+                          <TableSortLabel active={orderBy === 'pointsAgainst'} direction={orderBy === 'pointsAgainst' ? order : 'asc'} onClick={() => handleSort('pointsAgainst')}>PA</TableSortLabel>
+                        </TableCell>
+                        <TableCell align="right">
+                          <TableSortLabel active={orderBy === 'pointsDiff'} direction={orderBy === 'pointsDiff' ? order : 'asc'} onClick={() => handleSort('pointsDiff')}>+/-</TableSortLabel>
+                        </TableCell>
                       </>
                     )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {standings.map((team) => (
+                  {sortedStandings.map((team) => (
                     <TableRow key={team.rosterId} selected={team.ownerId === userId}>
                       <TableCell sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar src={`https://sleepercdn.com/avatars/${team.avatar}`} sx={{ width: 24, height: 24 }} />

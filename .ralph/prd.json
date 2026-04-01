@@ -312,7 +312,7 @@
       "title": "Audit and add sortable columns to all existing data tables",
       "spec": "specs/code-style.md",
       "priority": 36,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Audit every data table across the application and ensure all applicable columns are sortable via clickable column headers using MUI TableSortLabel. Pages to check: /players (player database), /expected-wins (standings tables), /performance (season review tables), /performance/positional (benchmark tables and full list), /portfolio (ownership tables), /league-history (head-to-head and record tables), /medic (alert tables), and the trade evaluator. For each table, add sort state (sortBy, sortDirection) and a click handler on each column header that toggles sort. Numeric columns (points, wins, percentages, efficiency) and text columns (name, position, team) should all be sortable. Skip columns where sorting doesn't make sense (action buttons, icons). Use a consistent pattern — extract a shared sorting utility if the same sort logic is repeated across multiple tables."
     }
