@@ -366,7 +366,7 @@
       "title": "URGENT: Verify and fix draft picks, FAAB, and re-trade asterisks on trade evaluator",
       "spec": "specs/anti-patterns.md",
       "priority": 1,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Bug: On /league-history/1206336001794920448/trades, three features from previous tasks are not working despite being marked done: (1) TASK-037: Draft picks traded should show as line items (e.g. '2025 Round 1 Pick → 1.03: Justin Jefferson') and FAAB amounts should display — neither is visible. (2) TASK-038: Players who were re-traded should have an asterisk (*) with a tooltip showing when they left — not visible. Read the current code in src/services/stats/tradeAnalyzer.ts and the trades page component. Check if the draft_picks and waiver_budget fields from Sleeper transactions are being parsed and passed to the UI. Check if the asterisk/tooltip logic was actually implemented. Fix whatever is missing. Test against league 1206336001794920448 which has trades with draft picks. Verify all three features are visually present on the page."
     }

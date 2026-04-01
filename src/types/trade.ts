@@ -19,6 +19,8 @@ export type PlayerTradeEfficiency = {
 export type TradeDraftPick = {
   season: string;
   round: number;
+  resolvedPick?: string;
+  resolvedPlayer?: string;
 };
 
 export type TradeFaab = {

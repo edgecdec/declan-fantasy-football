@@ -1,8 +1,9 @@
-import { SleeperService, SleeperMatchup } from '@/services/sleeper/sleeperService';
+import { SleeperService, SleeperMatchup, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { CacheService } from '@/services/common/cacheService';
 import { fetchLeagueTrades, TradeData } from '@/services/stats/tradeAnalyzer';
 import {
   PlayerWeekEfficiency,
+  TradeDraftPick,
   TradeEfficiencySide,
   TradeEfficiencyResult,
   LeagueTradeEfficiencyResult,
@@ -44,18 +45,40 @@ function calcPositionalAvg(matchups: SleeperMatchup[], position: string): number
   return count > 0 ? total / count : 0;
 }
 
+function resolveDraftPick(
+  dp: { season: string; round: number; rosterId: number },
+  draftPicksByRound: Map<string, SleeperDraftPick[]>
+): TradeDraftPick {
+  const key = `${dp.season}_${dp.round}`;
+  const roundPicks = draftPicksByRound.get(key) || [];
+  const match = roundPicks.find((p) => p.roster_id === dp.rosterId);
+  if (match) {
+    const name = match.metadata
+      ? `${match.metadata.first_name} ${match.metadata.last_name}`
+      : getPlayerName(match.player_id);
+    return {
+      season: dp.season,
+      round: dp.round,
+      resolvedPick: `${match.round}.${String(match.draft_slot).padStart(2, '0')}`,
+      resolvedPlayer: name,
+    };
+  }
+  return { season: dp.season, round: dp.round };
+}
+
 function evaluateSidePlayers(
   side: TradeData['sides'][0],
   tradeWeek: number,
   totalWeeks: number,
   allMatchups: Map<number, SleeperMatchup[]>,
-  getAvg: (week: number, position: string) => number
+  getAvg: (week: number, position: string) => number,
+  draftPicksByRound: Map<string, SleeperDraftPick[]>
 ): TradeEfficiencySide {
   const result: TradeEfficiencySide = {
     rosterId: side.rosterId,
     username: side.username,
     players: [],
-    draftPicks: (side.draftPicks ?? []).map((dp) => ({ season: dp.season, round: dp.round })),
+    draftPicks: (side.draftPicks ?? []).map((dp) => resolveDraftPick(dp, draftPicksByRound)),
     faabItems: (side.faab ?? []).map((amount) => ({ amount })),
     totalEfficiency: 0,
   };
@@ -83,8 +106,10 @@ function evaluateSidePlayers(
     const totalEff = weeklyBreakdown.reduce((s, wb) => s + wb.efficiency, 0);
     const lastStartedWeek = weeklyBreakdown.length > 0
       ? weeklyBreakdown[weeklyBreakdown.length - 1].week
-      : tradeWeek;
-    const departureWeek = lastStartedWeek < totalWeeks ? lastStartedWeek + 1 : null;
+      : null;
+    const departureWeek = lastStartedWeek != null && lastStartedWeek < totalWeeks
+      ? lastStartedWeek + 1
+      : null;
 
     result.players.push({
       playerId,
@@ -102,6 +127,27 @@ function evaluateSidePlayers(
   return result;
 }
 
+async function fetchDraftPicksByRound(
+  leagueId: string,
+  season: string
+): Promise<Map<string, SleeperDraftPick[]>> {
+  const map = new Map<string, SleeperDraftPick[]>();
+  try {
+    const drafts = await SleeperService.getLeagueDrafts(leagueId);
+    const seasonDraft = drafts.find((d) => d.season === season && d.status === 'complete');
+    if (!seasonDraft) return map;
+    const picks = await SleeperService.getDraftPicks(seasonDraft.draft_id);
+    for (const p of picks) {
+      const key = `${season}_${p.round}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+  } catch {
+    // Draft may not exist yet — return empty map
+  }
+  return map;
+}
+
 export async function evaluateTradeEfficiency(
   leagueId: string,
   season: string
@@ -116,10 +162,17 @@ export async function evaluateTradeEfficiency(
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
 
-  const weekNums = Array.from({ length: totalWeeks }, (_, i) => i + 1);
-  const fetched = await Promise.all(weekNums.map((w) => SleeperService.getMatchups(leagueId, w)));
+  const [fetched, draftPicksByRound] = await Promise.all([
+    Promise.all(
+      Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) =>
+        SleeperService.getMatchups(leagueId, w)
+      )
+    ),
+    fetchDraftPicksByRound(leagueId, season),
+  ]);
+
   const allMatchups = new Map<number, SleeperMatchup[]>();
-  weekNums.forEach((w, i) => allMatchups.set(w, fetched[i]));
+  fetched.forEach((m, i) => allMatchups.set(i + 1, m));
 
   const avgCache = new Map<string, number>();
   function getAvg(week: number, position: string): number {
@@ -135,8 +188,8 @@ export async function evaluateTradeEfficiency(
     week: trade.week,
     timestamp: trade.timestamp,
     sides: [
-      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg),
-      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg),
+      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound),
+      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound),
     ],
   }));
 

@@ -5,7 +5,7 @@ export type TradeSide = {
   rosterId: number;
   username: string;
   players: string[];
-  draftPicks: { season: string; round: number }[];
+  draftPicks: { season: string; round: number; rosterId: number }[];
   faab: number[];
 };
 
@@ -66,7 +66,7 @@ function parseTrade(
 
   for (const dp of tx.draft_picks ?? []) {
     const ownerSide = sideMap.get(dp.owner_id);
-    ownerSide?.draftPicks.push({ season: dp.season, round: dp.round });
+    ownerSide?.draftPicks.push({ season: dp.season, round: dp.round, rosterId: dp.roster_id });
   }
 
   for (const wb of tx.waiver_budget ?? []) {

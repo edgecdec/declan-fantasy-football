@@ -332,3 +332,11 @@
 - Toggle only shown when trades exist (hidden on empty state)
 - Used useMemo for sorted trades to avoid re-sorting on every render
 - Lesson: Nova Act tests work better using Playwright locators directly (page.locator) rather than asking the agent to find UI elements — the agent tends to scroll past things looking for them
+
+## TASK-042: Fix draft picks, FAAB, and re-trade asterisks on trade evaluator
+- Date: 2026-03-31
+- Three issues fixed:
+  1. Draft pick resolution: Added `rosterId` to `TradeSide.draftPicks` in tradeAnalyzer.ts, then in tradeEfficiency.ts fetch the league's completed draft picks and resolve each traded pick to its actual selection (e.g., "2025 Round 1 Pick → 1.03: Justin Jefferson"). Added `resolvedPick` and `resolvedPlayer` optional fields to `TradeDraftPick` type.
+  2. FAAB: Was already working — the parsing in tradeAnalyzer.ts and rendering in the trades page were correct.
+  3. Re-trade asterisks: Fixed `departureWeek` bug — previously when a player was never started (`weeklyBreakdown.length === 0`), `lastStartedWeek` defaulted to `tradeWeek` which made `departureWeek` non-null, showing a false asterisk. Fixed by only computing `departureWeek` when the player was actually started at least once.
+- Lesson: When checking if a feature "works", the data flow matters — the parsing can be correct but the resolution/enrichment step may be missing. Always trace the full pipeline from API → service → type → UI.

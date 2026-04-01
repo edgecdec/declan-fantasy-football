@@ -89,7 +89,12 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
             ))}
             {(side.draftPicks ?? []).map((dp, i) => (
               <TableRow key={`pick-${i}`}>
-                <TableCell>{dp.season} Round {dp.round} Pick</TableCell>
+                <TableCell>
+                  {dp.season} Round {dp.round} Pick
+                  {dp.resolvedPick && (
+                    <Typography component="span" variant="body2" color="text.secondary"> → {dp.resolvedPick}: {dp.resolvedPlayer}</Typography>
+                  )}
+                </TableCell>
                 <TableCell align="center">
                   <Chip label="PICK" size="small" sx={{ bgcolor: 'action.selected', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
                 </TableCell>
