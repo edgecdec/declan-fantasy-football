@@ -1,0 +1,343 @@
+'use client';
+
+import * as React from 'react';
+import { useParams } from 'next/navigation';
+import {
+  Container, Box, Paper, Typography, LinearProgress, Alert, Button,
+  ToggleButtonGroup, ToggleButton, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TableSortLabel,
+} from '@mui/material';
+import { keyframes } from '@mui/material/styles';
+import {
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, Line, ComposedChart, ReferenceLine,
+} from 'recharts';
+import Link from 'next/link';
+import PageHeader from '@/components/common/PageHeader';
+import { useUser } from '@/context/UserContext';
+import { SleeperService } from '@/services/sleeper/sleeperService';
+import { calculateDraftEfficiency, aggregateManagerDraftEfficiency } from '@/services/stats/draftEfficiency';
+import { DraftPickEfficiency, ManagerDraftEfficiency, LogCurveCoefficients } from '@/types/draftEfficiency';
+import { getPositionColor } from '@/constants/colors';
+
+const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
+const RAINBOW_CYCLE_SECONDS = 3.5;
+const spinGradient = keyframes`0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}`;
+const CONIC_GRADIENT = 'conic-gradient(red,orange,yellow,green,dodgerblue,blueviolet,red)';
+
+type SortField = 'rank' | 'username' | 'totalEfficiency' | 'avgPerPick' | 'pickCount';
+type SortDir = 'asc' | 'desc';
+
+function buildCurveData(curve: LogCurveCoefficients, maxPick: number) {
+  const pts: { pickNumber: number; expected: number }[] = [];
+  for (let x = 1; x <= maxPick; x++) {
+    pts.push({ pickNumber: x, expected: Math.round((curve.a * Math.log(x) + curve.b) * 100) / 100 });
+  }
+  return pts;
+}
+
+function formatPickLabel(pick: DraftPickEfficiency): string {
+  const teams = pick.draftSlot; // approximate
+  const round = pick.round;
+  const slot = pick.pickNumber - (round - 1) * (teams || 1);
+  return `${round}.${String(slot).padStart(2, '0')}`;
+}
+
+function bestWorstPosition(bd: Record<string, { total: number; count: number; avg: number }>): string {
+  const entries = Object.entries(bd);
+  if (entries.length === 0) return '-';
+  entries.sort((a, b) => b[1].avg - a[1].avg);
+  const best = entries[0];
+  const worst = entries[entries.length - 1];
+  if (entries.length === 1) return `${best[0]}: ${best[1].avg > 0 ? '+' : ''}${best[1].avg}`;
+  return `Best: ${best[0]} (${best[1].avg > 0 ? '+' : ''}${best[1].avg}) / Worst: ${worst[0]} (${worst[1].avg > 0 ? '+' : ''}${worst[1].avg})`;
+}
+
+// Custom scatter dot colored by position
+function PositionDot(props: Record<string, unknown>) {
+  const { cx, cy, payload, currentUserRosterId } = props as {
+    cx: number; cy: number;
+    payload: DraftPickEfficiency & { isCurrentUser?: boolean };
+    currentUserRosterId: number | null;
+  };
+  const isUser = payload.draftedByRosterId === currentUserRosterId;
+  const r = isUser ? 7 : 4;
+  return (
+    <circle
+      cx={cx} cy={cy} r={r}
+      fill={getPositionColor(payload.position)}
+      stroke={isUser ? '#fff' : 'none'}
+      strokeWidth={isUser ? 2 : 0}
+      opacity={0.85}
+    />
+  );
+}
+
+// Custom tooltip for scatter
+function PickTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DraftPickEfficiency }> }) {
+  if (!active || !payload?.[0]) return null;
+  const p = payload[0].payload;
+  return (
+    <Paper sx={{ p: 1.5, maxWidth: 240 }}>
+      <Typography variant="subtitle2" fontWeight="bold">{p.playerName}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {p.position} • {p.team} • Pick {formatPickLabel(p)}
+      </Typography>
+      <Box sx={{ mt: 0.5 }}>
+        <Typography variant="body2">Efficiency: {p.totalEfficiency > 0 ? '+' : ''}{p.totalEfficiency}</Typography>
+        <Typography variant="body2">Weeks Started: {p.weeksStarted}</Typography>
+        <Typography variant="body2">Avg/Week: {p.avgEfficiencyPerWeek > 0 ? '+' : ''}{p.avgEfficiencyPerWeek}</Typography>
+        <Typography variant="body2">Drafted by: {p.draftedByUsername}</Typography>
+        {p.changedTeams && <Typography variant="body2" color="warning.main">Changed teams mid-season</Typography>}
+      </Box>
+    </Paper>
+  );
+}
+
+export default function DraftEfficiencyPage() {
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const { user } = useUser();
+
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [picks, setPicks] = React.useState<DraftPickEfficiency[]>([]);
+  const [curve, setCurve] = React.useState<LogCurveCoefficients>({ a: 0, b: 0 });
+  const [currentUserRosterId, setCurrentUserRosterId] = React.useState<number | null>(null);
+  const [posFilter, setPosFilter] = React.useState<string[]>([]);
+  const [sortBy, setSortBy] = React.useState<SortField>('totalEfficiency');
+  const [sortDir, setSortDir] = React.useState<SortDir>('desc');
+  const [draftName, setDraftName] = React.useState('');
+
+  React.useEffect(() => {
+    if (!leagueId) return;
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [drafts, rosters] = await Promise.all([
+          SleeperService.getLeagueDrafts(leagueId),
+          SleeperService.getRosters(leagueId),
+        ]);
+
+        // Find best completed draft
+        const completeDraft = drafts.find(d => d.status === 'complete') || drafts[0];
+        if (!completeDraft) { setError('No drafts found.'); setLoading(false); return; }
+
+        const fullDraft = await SleeperService.getDraft(completeDraft.draft_id);
+        if (cancelled) return;
+
+        setDraftName(fullDraft?.metadata?.name || completeDraft.metadata?.name || 'Draft');
+
+        // Find current user's roster_id
+        if (user?.user_id) {
+          const roster = rosters.find(r => r.owner_id === user.user_id);
+          if (roster) setCurrentUserRosterId(roster.roster_id);
+        }
+
+        const result = await calculateDraftEfficiency(leagueId, completeDraft.draft_id, completeDraft.season);
+        if (cancelled) return;
+
+        setPicks(result.picks);
+        setCurve(result.curve);
+      } catch (e) {
+        if (!cancelled) setError('Failed to load draft efficiency data.');
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [leagueId, user?.user_id]);
+
+  const filteredPicks = React.useMemo(
+    () => posFilter.length ? picks.filter(p => posFilter.includes(p.position)) : picks,
+    [picks, posFilter]
+  );
+
+  const managers = React.useMemo(
+    () => aggregateManagerDraftEfficiency(picks, posFilter.length ? posFilter : undefined),
+    [picks, posFilter]
+  );
+
+  const sortedManagers = React.useMemo(() => {
+    const ranked = managers.map((m, i) => ({ ...m, rank: i + 1 }));
+    return [...ranked].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortBy === 'username') return dir * a.username.localeCompare(b.username);
+      if (sortBy === 'rank') return dir * (a.rank - b.rank);
+      return dir * ((a[sortBy] as number) - (b[sortBy] as number));
+    });
+  }, [managers, sortBy, sortDir]);
+
+  const curveData = React.useMemo(() => {
+    const maxPick = picks.length > 0 ? Math.max(...picks.map(p => p.pickNumber)) : 0;
+    return buildCurveData(curve, maxPick);
+  }, [curve, picks]);
+
+  const handleSort = (field: SortField) => {
+    setSortDir(prev => sortBy === field ? (prev === 'asc' ? 'desc' : 'asc') : 'desc');
+    setSortBy(field);
+  };
+
+  const handlePosFilter = (_: React.MouseEvent<HTMLElement>, newVal: string[]) => {
+    setPosFilter(newVal);
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
+        <PageHeader title="Draft Efficiency" subtitle="Calculating..." />
+        <LinearProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
+        <PageHeader title="Draft Efficiency" subtitle="" />
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button component={Link} href={`/draft-assistant/${leagueId}`} variant="contained">Back to Draft</Button>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <PageHeader title="Draft Efficiency" subtitle={draftName} action={
+        <Button component={Link} href={`/draft-assistant/${leagueId}`} variant="outlined">Back to Draft</Button>
+      } />
+
+      {/* Position Filter */}
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Typography variant="body2" color="text.secondary">Filter by position:</Typography>
+        <ToggleButtonGroup value={posFilter} onChange={handlePosFilter} size="small">
+          {POSITIONS.map(pos => (
+            <ToggleButton key={pos} value={pos} sx={{ px: 1.5, color: getPositionColor(pos), '&.Mui-selected': { bgcolor: getPositionColor(pos), color: '#fff' } }}>
+              {pos}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Scatter Plot */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>Pick Efficiency vs. Draft Position</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          Dots above the curve = steals • Dots below = busts • Larger dots = your picks
+        </Typography>
+        <ResponsiveContainer width="100%" height={400}>
+          <ComposedChart data={curveData} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis dataKey="pickNumber" type="number" label={{ value: 'Pick #', position: 'insideBottom', offset: -5 }} />
+            <YAxis label={{ value: 'Total Efficiency', angle: -90, position: 'insideLeft' }} />
+            <ReferenceLine y={0} stroke="#666" strokeDasharray="4 4" />
+            <Line dataKey="expected" stroke="#ff9800" strokeWidth={2} dot={false} name="Expected (log fit)" />
+            <Scatter
+              data={filteredPicks}
+              dataKey="totalEfficiency"
+              name="Players"
+              shape={<PositionDot currentUserRosterId={currentUserRosterId} />}
+            />
+            <RechartsTooltip content={<PickTooltip />} />
+          </ComposedChart>
+        </ResponsiveContainer>
+        {/* Legend */}
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, justifyContent: 'center' }}>
+          {POSITIONS.map(pos => (
+            <Box key={pos} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: getPositionColor(pos) }} />
+              <Typography variant="caption">{pos}</Typography>
+            </Box>
+          ))}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 16, height: 2, bgcolor: '#ff9800' }} />
+            <Typography variant="caption">Expected (log fit)</Typography>
+          </Box>
+        </Box>
+      </Paper>
+
+      {/* Manager Leaderboard */}
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>Manager Draft Leaderboard</Typography>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {([
+                  ['rank', 'Rank'],
+                  ['username', 'Manager'],
+                  ['totalEfficiency', 'Total Efficiency'],
+                  ['avgPerPick', 'Avg / Pick'],
+                  ['pickCount', 'Picks'],
+                ] as [SortField, string][]).map(([field, label]) => (
+                  <TableCell key={field} sortDirection={sortBy === field ? sortDir : false}>
+                    <TableSortLabel active={sortBy === field} direction={sortBy === field ? sortDir : 'desc'} onClick={() => handleSort(field)}>
+                      {label}
+                    </TableSortLabel>
+                  </TableCell>
+                ))}
+                <TableCell>Best / Worst Position</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sortedManagers.map((m) => {
+                const isUser = m.rosterId === currentUserRosterId;
+                return (
+                  <TableRow key={m.rosterId} sx={{ position: 'relative' }}>
+                    {/* Rainbow wrapper for current user */}
+                    {isUser && (
+                      <Box
+                        component="td"
+                        colSpan={6}
+                        sx={{
+                          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+                          '&::before': {
+                            content: '""', position: 'absolute', inset: -2,
+                            background: CONIC_GRADIENT,
+                            animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
+                            borderRadius: 1,
+                          },
+                          '&::after': {
+                            content: '""', position: 'absolute', inset: 0,
+                            bgcolor: 'background.paper', borderRadius: 1,
+                          },
+                        }}
+                      />
+                    )}
+                    <TableCell sx={{ position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal' }}>
+                      {managers.findIndex(mgr => mgr.rosterId === m.rosterId) + 1}
+                    </TableCell>
+                    <TableCell sx={{ position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal' }}>
+                      {m.username}{isUser ? ' (You)' : ''}
+                    </TableCell>
+                    <TableCell sx={{
+                      position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal',
+                      color: m.totalEfficiency > 0 ? 'success.main' : m.totalEfficiency < 0 ? 'error.main' : 'text.primary',
+                    }}>
+                      {m.totalEfficiency > 0 ? '+' : ''}{m.totalEfficiency}
+                    </TableCell>
+                    <TableCell sx={{
+                      position: 'relative', zIndex: 1,
+                      color: m.avgPerPick > 0 ? 'success.main' : m.avgPerPick < 0 ? 'error.main' : 'text.primary',
+                    }}>
+                      {m.avgPerPick > 0 ? '+' : ''}{m.avgPerPick}
+                    </TableCell>
+                    <TableCell sx={{ position: 'relative', zIndex: 1 }}>{m.pickCount}</TableCell>
+                    <TableCell sx={{ position: 'relative', zIndex: 1 }}>
+                      <Typography variant="caption">{bestWorstPosition(m.positionBreakdown)}</Typography>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Container>
+  );
+}

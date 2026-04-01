@@ -393,9 +393,18 @@
       "title": "Create Draft Efficiency page with scatter plot and value curve",
       "spec": "specs/code-style.md",
       "priority": 45,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-043", "TASK-044"],
       "description": "Create a new page at src/app/draft-assistant/[leagueId]/efficiency/page.tsx. The page has two main sections: (1) SCATTER PLOT — Using Recharts ScatterChart, plot every draft pick as a dot: X axis = pick number (1 to total picks), Y axis = total efficiency. Color dots by position (use existing getPositionColor). Highlight the current user's picks with a larger dot size or outline. Overlay the logarithmic best-fit curve from TASK-043 as a Line on the same chart using ReferenceLine or a computed Line series — picks above the curve are steals, below are busts. On hover, show a tooltip with player name, position, team, pick number (e.g. '1.03'), total efficiency, weeks started, and whether they changed teams. (2) MANAGER LEADERBOARD TABLE — Below the chart, show a sortable table of all managers ranked by total draft efficiency. Columns: Rank, Manager, Total Efficiency, Avg Per Pick, Picks, and a mini breakdown showing their best/worst position. Add a position filter (MUI ToggleButtonGroup with ALL, QB, RB, WR, TE, FLEX) that filters BOTH the scatter plot and the leaderboard — so you can see 'who drafted RBs best?' by clicking RB. Add a link to this page from the draft assistant view for each league. Use the current user's rainbow highlight on their row in the leaderboard."
+    },
+    {
+      "id": "TASK-046",
+      "title": "Build historical draft efficiency analysis across all seasons",
+      "spec": "specs/code-style.md",
+      "priority": 46,
+      "status": "open",
+      "dependencies": ["TASK-043"],
+      "description": "Create a page at src/app/draft-assistant/history/page.tsx (or /draft-assistant/[leagueId]/efficiency/history if scoped to a league chain). For the current user, scan all seasons (2017 to present) and all their leagues per season. Run the draft efficiency calculation from TASK-043 for each draft. Aggregate the results by pick number across all drafts — for each pick slot (1st overall, 2nd overall, etc.), average the efficiency across all years/leagues. Display two things: (1) A line chart showing average efficiency by pick number across all years, with individual season lines as faded background and the all-time average as a bold line. This reveals historical trends like 'pick 3 has historically been the best value spot' or 'late round picks have gotten more efficient over time'. (2) A per-season comparison table showing the user's total draft efficiency per year, sortable, so they can see if their drafting has improved over time. Support position filtering (same ToggleButtonGroup pattern as TASK-045) to see trends by position — e.g. 'has drafting RBs early gotten worse over the years?'. Load progressively as each season completes."
     }
   ]
 }

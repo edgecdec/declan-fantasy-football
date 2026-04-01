@@ -355,3 +355,16 @@
 - The `aggregateManagerDraftEfficiency()` function and `ManagerDraftEfficiency` type were both created during TASK-043 implementation.
 - No code changes needed — just marked as done.
 - Lesson: When implementing a service, check if the next task's requirements can be included in the same file to avoid a no-op follow-up task.
+
+## TASK-045: Create Draft Efficiency page with scatter plot and value curve
+- Date: 2026-03-31
+- Status: DONE
+- Created src/app/draft-assistant/[leagueId]/efficiency/page.tsx with:
+  - Recharts ComposedChart combining scatter dots (colored by position) with log-fit curve line
+  - Current user's picks shown as larger dots with white outline
+  - Position filter via MUI ToggleButtonGroup that filters both chart and leaderboard
+  - Sortable manager leaderboard table with rainbow highlight on current user's row
+  - Best/worst position breakdown per manager
+  - Color-coded efficiency values (green positive, red negative)
+- Added "Efficiency" button with BarChart icon to draft assistant [leagueId] page header
+- Lessons: Recharts ComposedChart works well for overlaying scatter + line data. The Scatter component needs a custom shape prop to color dots individually. For the rainbow row highlight, the absolute positioning approach from DraftGrid works but is tricky in table rows — simpler approaches may be better for tables.
