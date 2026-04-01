@@ -393,3 +393,7 @@
 - Falls back to 3 playoff rounds if bracket data is unavailable.
 - Minimal change: only modified `src/services/stats/tradeEfficiency.ts` — the `evaluateSidePlayers` function already iterates through `totalWeeks`, so extending the range automatically includes playoff data.
 - Lesson: The winners bracket `r` field (round number) is the most reliable way to determine playoff duration — `playoff_teams` requires manual round calculation, but the bracket already has the answer.
+
+## TASK-050: Fix multiple bugs on draft efficiency page (2026-03-31)
+- Fixed 4 bugs: (1) Tooltip now filters out curve data and only shows player info for scatter dots, (2) Removed rainbow/size highlight from scatter dots — all dots uniform, (3) Fixed table cell misalignment by moving rainbow effect from extra `<td>` element to TableRow pseudo-elements, (4) Player names now use pick metadata (first_name/last_name from Sleeper API response) as primary source with static JSON fallback.
+- Lessons: In Recharts ComposedChart with mixed Line+Scatter, the Tooltip receives payloads from ALL series — must check payload type before rendering. Never add extra `<td>` elements to a `<tr>` for styling — use CSS pseudo-elements on the row itself. Sleeper draft pick metadata is the most reliable source for player names since it comes directly from the API response for that specific draft.

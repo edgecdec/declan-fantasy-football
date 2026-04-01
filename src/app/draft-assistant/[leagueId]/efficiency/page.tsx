@@ -55,28 +55,26 @@ function bestWorstPosition(bd: Record<string, { total: number; count: number; av
 
 // Custom scatter dot colored by position
 function PositionDot(props: Record<string, unknown>) {
-  const { cx, cy, payload, currentUserRosterId } = props as {
+  const { cx, cy, payload } = props as {
     cx: number; cy: number;
-    payload: DraftPickEfficiency & { isCurrentUser?: boolean };
-    currentUserRosterId: number | null;
+    payload: DraftPickEfficiency;
   };
-  const isUser = payload.draftedByRosterId === currentUserRosterId;
-  const r = isUser ? 7 : 4;
   return (
     <circle
-      cx={cx} cy={cy} r={r}
+      cx={cx} cy={cy} r={4}
       fill={getPositionColor(payload.position)}
-      stroke={isUser ? '#fff' : 'none'}
-      strokeWidth={isUser ? 2 : 0}
       opacity={0.85}
     />
   );
 }
 
-// Custom tooltip for scatter
-function PickTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DraftPickEfficiency }> }) {
+// Custom tooltip for scatter — only renders for DraftPickEfficiency data
+function PickTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: Record<string, unknown> }> }) {
   if (!active || !payload?.[0]) return null;
-  const p = payload[0].payload;
+  const raw = payload[0].payload;
+  // Skip if this is curve data (no playerName field)
+  if (!raw.playerName) return null;
+  const p = raw as unknown as DraftPickEfficiency;
   return (
     <Paper sx={{ p: 1.5, maxWidth: 240 }}>
       <Typography variant="subtitle2" fontWeight="bold">{p.playerName}</Typography>
@@ -273,7 +271,7 @@ export default function DraftEfficiencyPage() {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Pick Efficiency vs. Draft Position</Typography>
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          Dots above the curve = steals • Dots below = busts • Larger dots = your picks
+          Dots above the curve = steals • Dots below = busts
         </Typography>
         <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={curveData} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
@@ -298,7 +296,7 @@ export default function DraftEfficiencyPage() {
               data={filteredPicks}
               dataKey="totalEfficiency"
               name="Players"
-              shape={<PositionDot currentUserRosterId={currentUserRosterId} />}
+              shape={<PositionDot />}
             />
             <RechartsTooltip content={<PickTooltip />} />
           </ComposedChart>
@@ -351,27 +349,22 @@ export default function DraftEfficiencyPage() {
               {sortedManagers.map((m) => {
                 const isUser = m.rosterId === currentUserRosterId;
                 return (
-                  <TableRow key={m.rosterId} sx={{ position: 'relative' }}>
-                    {/* Rainbow wrapper for current user */}
-                    {isUser && (
-                      <Box
-                        component="td"
-                        colSpan={6}
-                        sx={{
-                          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-                          '&::before': {
-                            content: '""', position: 'absolute', inset: -2,
-                            background: CONIC_GRADIENT,
-                            animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
-                            borderRadius: 1,
-                          },
-                          '&::after': {
-                            content: '""', position: 'absolute', inset: 0,
-                            bgcolor: 'background.paper', borderRadius: 1,
-                          },
-                        }}
-                      />
-                    )}
+                  <TableRow
+                    key={m.rosterId}
+                    sx={isUser ? {
+                      position: 'relative',
+                      '&::before': {
+                        content: '""', position: 'absolute', inset: -2,
+                        background: CONIC_GRADIENT,
+                        animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
+                        borderRadius: 1, zIndex: 0,
+                      },
+                      '&::after': {
+                        content: '""', position: 'absolute', inset: 0,
+                        bgcolor: 'background.paper', borderRadius: 1, zIndex: 0,
+                      },
+                    } : undefined}
+                  >
                     <TableCell sx={{ position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal' }}>
                       {managers.findIndex(mgr => mgr.rosterId === m.rosterId) + 1}
                     </TableCell>

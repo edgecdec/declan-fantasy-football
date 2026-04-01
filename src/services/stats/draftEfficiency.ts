@@ -22,13 +22,14 @@ function getPlayerPosition(playerId: string): string | null {
   return pos && VALID_POSITIONS.includes(pos) ? pos : null;
 }
 
-function getPlayerName(playerId: string): string {
+function getPlayerName(playerId: string, pickMeta?: { first_name: string; last_name: string }): string {
+  if (pickMeta?.first_name) return `${pickMeta.first_name} ${pickMeta.last_name}`;
   const p = players[playerId];
   return p ? `${p.first_name} ${p.last_name}` : 'Unknown';
 }
 
-function getPlayerTeam(playerId: string): string {
-  return players[playerId]?.team || 'FA';
+function getPlayerTeam(playerId: string, pickMeta?: { team: string }): string {
+  return pickMeta?.team || players[playerId]?.team || 'FA';
 }
 
 function calcPositionalAvg(matchups: SleeperMatchup[], position: string): number {
@@ -141,9 +142,9 @@ export async function calculateDraftEfficiency(
       round: pick.round,
       draftSlot: pick.draft_slot,
       playerId: pick.player_id,
-      playerName: getPlayerName(pick.player_id),
+      playerName: getPlayerName(pick.player_id, pick.metadata),
       position,
-      team: getPlayerTeam(pick.player_id),
+      team: getPlayerTeam(pick.player_id, pick.metadata),
       totalEfficiency: Math.round(totalEff * 100) / 100,
       weeksStarted,
       avgEfficiencyPerWeek: weeksStarted > 0 ? Math.round((totalEff / weeksStarted) * 100) / 100 : 0,
