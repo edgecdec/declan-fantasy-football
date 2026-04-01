@@ -318,3 +318,8 @@
 - Added departureWeek field to PlayerTradeEfficiency type.
 - Added asterisk (*) with MUI Tooltip in the trade evaluator UI showing "Left roster in Week X" on hover.
 - Lesson: Always read existing code carefully before assuming it needs major changes — the starters check was already filtering correctly, only the departure indicator was missing.
+
+## TASK-039 — 2026-03-31
+- Added `tx.status !== 'complete'` check alongside existing `tx.type !== 'trade'` filter in tradeAnalyzer.ts
+- The existing code already filtered by type='trade'; only the status check was missing
+- Lesson: The existing filter was already 95% correct — just needed one additional condition. Always read the code before assuming a big change is needed.

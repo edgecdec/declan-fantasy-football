@@ -111,7 +111,7 @@ export async function fetchLeagueTrades(
   const trades: TradeData[] = [];
   for (const weekTxs of allTransactions) {
     for (const tx of weekTxs) {
-      if (tx.type !== 'trade') continue;
+      if (tx.type !== 'trade' || tx.status !== 'complete') continue;
       const parsed = parseTrade(tx, rosterToUsername);
       if (parsed) trades.push(parsed);
     }

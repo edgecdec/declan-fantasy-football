@@ -339,7 +339,7 @@
       "title": "Ensure only real trades are shown — filter out waivers and commissioner moves",
       "spec": "specs/code-style.md",
       "priority": 39,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-033"],
       "description": "On /league-history/[leagueId]/trades, verify that the trade fetching service only includes actual trades. Sleeper transactions have a 'type' field — only include type='trade'. Filter out 'waiver', 'free_agent', and 'commissioner' types. Also filter out any transaction with status != 'complete' to exclude failed or vetoed trades. Log the raw transaction types being fetched to confirm no non-trade transactions are leaking through."
     },
