@@ -303,7 +303,7 @@
       "title": "Create Trade Evaluator page under league history",
       "spec": "specs/code-style.md",
       "priority": 35,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-034"],
       "description": "Create a new page at src/app/league-history/[leagueId]/trades/page.tsx that shows all trades in a redraft league evaluated by positional efficiency. The page should be accessible from the league history view. For each trade, display: the week it happened, both sides with usernames, and for each player show their position, total efficiency +/- (sum across all started weeks after trade), weeks started, and per-week average efficiency. Color code positive efficiency green and negative red. Show a trade verdict summary comparing the total efficiency of each side. Sort trades by week (most recent first). Include a link back to the league history page. Load data progressively — show each trade's evaluation as it completes. Add a nav link or button from the existing /league-history page to access this trades view for each league."
     },

@@ -261,3 +261,13 @@
   - The sleeper_players.json has a top-level `updated_at` and `season` field alongside `players`, so casting as `Record<string, Record<string, string>>` fails because `updated_at` is a string not a record. Use `unknown` intermediate cast with a proper typed shape.
   - Matchup data from Sleeper includes `starters_points` array (parallel to `starters`) but it's not in the SleeperMatchup type — accessed via `(m as Record<string, unknown>).starters_points`. Same pattern used in positionalBenchmarks.ts.
   - Split service + types across files to stay under 150-line limit per code-style.md.
+
+## TASK-035: Create Trade Evaluator page under league history (2026-03-31)
+- Created /league-history/[leagueId]/trades/page.tsx with trade evaluation display
+- Each trade shows both sides with player names, positions, weeks started, total/avg efficiency
+- Color-coded efficiency values (green positive, red negative) with trade verdict summary
+- Added "Evaluate Trades" button with CompareArrows icon on league-history page next to league selector
+- Back to League History navigation button on trades page
+- Uses existing evaluateTradeEfficiency service from TASK-034
+- Fetches league first to get season string for the efficiency service
+- Lesson: The "Evaluate Trades" button only appears after user searches for leagues (inside conditional block), so Nova Act test should navigate directly to the trades URL rather than looking for the button on initial page load

@@ -1,0 +1,186 @@
+'use client';
+
+import * as React from 'react';
+import { useParams } from 'next/navigation';
+import {
+  Container,
+  Box,
+  Paper,
+  Typography,
+  LinearProgress,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import Link from 'next/link';
+import PageHeader from '@/components/common/PageHeader';
+import { SleeperService } from '@/services/sleeper/sleeperService';
+import { evaluateTradeEfficiency } from '@/services/stats/tradeEfficiency';
+import { TradeEfficiencyResult, TradeEfficiencySide } from '@/types/trade';
+import { getPositionColor } from '@/constants/colors';
+
+function EfficiencyValue({ value }: { value: number }) {
+  const color = value > 0 ? 'success.main' : value < 0 ? 'error.main' : 'text.secondary';
+  return (
+    <Typography component="span" sx={{ color, fontWeight: 'bold' }}>
+      {value > 0 ? '+' : ''}{value.toFixed(1)}
+    </Typography>
+  );
+}
+
+function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
+  return (
+    <Box sx={{ flex: 1, minWidth: 250 }}>
+      <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+        {side.username} received:
+      </Typography>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Player</TableCell>
+              <TableCell align="center">Pos</TableCell>
+              <TableCell align="right">Wks</TableCell>
+              <TableCell align="right">Eff</TableCell>
+              <TableCell align="right">Avg/Wk</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {side.players.map((p) => (
+              <TableRow key={p.playerId}>
+                <TableCell>{p.name}</TableCell>
+                <TableCell align="center">
+                  <Chip label={p.position} size="small" sx={{ bgcolor: getPositionColor(p.position), color: '#fff', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
+                </TableCell>
+                <TableCell align="right">{p.weeksStarted}</TableCell>
+                <TableCell align="right"><EfficiencyValue value={p.totalEfficiency} /></TableCell>
+                <TableCell align="right"><EfficiencyValue value={p.avgEfficiency} /></TableCell>
+              </TableRow>
+            ))}
+            {side.players.length === 0 && (
+              <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>No trackable players</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Box sx={{ mt: 1, textAlign: 'right' }}>
+        <Typography variant="body2">
+          Side Total: <EfficiencyValue value={side.totalEfficiency} />
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function TradeVerdict({ trade }: { trade: TradeEfficiencyResult }) {
+  const [a, b] = trade.sides;
+  const diff = a.totalEfficiency - b.totalEfficiency;
+  const winner = Math.abs(diff) < 1 ? null : diff > 0 ? a.username : b.username;
+
+  return (
+    <Box sx={{ textAlign: 'center', mt: 1 }}>
+      {winner ? (
+        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+          🏆 {winner} won this trade by <EfficiencyValue value={Math.abs(diff)} /> pts
+        </Typography>
+      ) : (
+        <Typography variant="body2" color="text.secondary">Even trade</Typography>
+      )}
+    </Box>
+  );
+}
+
+function TradeCard({ trade }: { trade: TradeEfficiencyResult }) {
+  return (
+    <Paper sx={{ p: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="subtitle1" fontWeight="bold">Week {trade.week}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {new Date(trade.timestamp).toLocaleDateString()}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+        <TradeSideTable side={trade.sides[0]} />
+        <TradeSideTable side={trade.sides[1]} />
+      </Box>
+      <TradeVerdict trade={trade} />
+    </Paper>
+  );
+}
+
+export default function TradeEvaluatorPage() {
+  const params = useParams();
+  const leagueId = params.leagueId as string;
+
+  const [loading, setLoading] = React.useState(true);
+  const [leagueName, setLeagueName] = React.useState('');
+  const [season, setSeason] = React.useState('');
+  const [trades, setTrades] = React.useState<TradeEfficiencyResult[]>([]);
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    if (!leagueId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const league = await SleeperService.getLeague(leagueId);
+        const leagueSeason = league?.season || '';
+        const result = await evaluateTradeEfficiency(leagueId, leagueSeason);
+        if (cancelled) return;
+        setLeagueName(result.leagueName);
+        setSeason(result.season);
+        setTrades(result.trades);
+      } catch (e) {
+        if (!cancelled) setError(String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [leagueId]);
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <PageHeader
+        title="Trade Evaluator"
+        subtitle={leagueName ? `${leagueName} — ${season}` : 'Loading...'}
+        action={
+          <Button component={Link} href="/league-history" startIcon={<ArrowBackIcon />} variant="outlined">
+            Back to League History
+          </Button>
+        }
+      />
+
+      {loading && (
+        <Paper sx={{ p: 3, mb: 2 }}>
+          <Typography align="center" gutterBottom>Evaluating trades...</Typography>
+          <LinearProgress />
+        </Paper>
+      )}
+
+      {error && (
+        <Paper sx={{ p: 3, mb: 2 }}>
+          <Typography color="error">{error}</Typography>
+        </Paper>
+      )}
+
+      {!loading && trades.length === 0 && !error && (
+        <Paper sx={{ p: 3 }}>
+          <Typography align="center" color="text.secondary">No trades found in this league.</Typography>
+        </Paper>
+      )}
+
+      {trades.map((trade) => (
+        <TradeCard key={trade.transactionId} trade={trade} />
+      ))}
+    </Container>
+  );
+}

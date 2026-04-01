@@ -28,6 +28,8 @@ import {
   ToggleButton,
   ToggleButtonGroup
 } from '@mui/material';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import Link from 'next/link';
 import { SleeperService, SleeperLeague } from '@/services/sleeper/sleeperService';
 import { analyzeLeagueHistory, LeagueHistoryResult, MemberHistoryStats } from '@/services/stats/leagueHistory';
 import PageHeader from '@/components/common/PageHeader';
@@ -344,6 +346,16 @@ export default function LeagueHistoryPage() {
               sx={{ height: 56 }}
             >
               {loading ? 'Analyzing...' : 'Analyze History'}
+            </Button>
+            <Button
+              component={Link}
+              href={`/league-history/${selectedLeagueId}/trades`}
+              variant="outlined"
+              startIcon={<CompareArrowsIcon />}
+              disabled={!selectedLeagueId}
+              sx={{ height: 56 }}
+            >
+              Evaluate Trades
             </Button>
           </Box>
         )}
