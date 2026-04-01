@@ -403,3 +403,16 @@
 - Status: done
 - Changes: Updated maintenance.html with 20 fantasy football trivia questions, random selection on each page load/refresh, and a "Reveal Answer" button. Inline JS and CSS, no external dependencies.
 - Lessons: Standalone HTML files with inline JS are straightforward — no build validation issues. The 10-second auto-refresh naturally cycles through trivia questions. Kept styling consistent with existing dark theme (#1a1a1a card on #121212 background).
+
+## TASK-051: Fix draft efficiency page — tooltips, rainbow, extra column, cache quota, historical loading
+- Date: 2026-03-31
+- Changes:
+  1. Tooltips: Switched from ComposedChart to ScatterChart. ComposedChart's Scatter component doesn't properly trigger tooltips because the chart's primary data source (curve data) takes precedence. ScatterChart with multiple Scatter series (one per position + curve lines rendered as Scatter with line prop and null shape) works correctly.
+  2. Rainbow on chart: Removed entirely — was never in PositionDot but the old ComposedChart may have been applying styles. Clean ScatterChart has no rainbow on dots.
+  3. Extra column: The ::before/::after pseudo-elements with position:absolute on TableRow don't work in table layout — they create visual artifacts and can shift cells. Replaced with a simple animated linear-gradient background on the row's sx prop using @keyframes rainbowSlide.
+  4. Cache quota: Added evictOldest() function to cacheService.ts that removes oldest entries (by expiry timestamp) when storage is full. Wrapped setItem in nested try/catch: first attempt → evict → retry → silently skip.
+  5. Historical loading stuck: Wrapped getActiveSeasons and per-season getLeagues calls in try/catch so one failed API call or cache error doesn't halt the entire historical scan loop.
+- Lessons:
+  - Recharts ComposedChart + Scatter is unreliable for tooltips — use ScatterChart with multiple Scatter series instead
+  - CSS pseudo-elements (::before/::after) on table rows break table cell alignment — use background/boxShadow on the row itself
+  - Browser storage quota (~5MB) fills fast with matchup data across many seasons — always implement eviction

@@ -7,39 +7,35 @@ import {
   ToggleButtonGroup, ToggleButton, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TableSortLabel,
 } from '@mui/material';
-import { keyframes } from '@mui/material/styles';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, Line, ComposedChart, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, ZAxis,
 } from 'recharts';
 import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { calculateDraftEfficiency, aggregateManagerDraftEfficiency, fetchHistoricalDraftEfficiency } from '@/services/stats/draftEfficiency';
-import { DraftPickEfficiency, ManagerDraftEfficiency, LogCurveCoefficients, HistoricalDraftData, HistoricalPickAverage, SeasonDraftSummary } from '@/types/draftEfficiency';
+import { DraftPickEfficiency, LogCurveCoefficients, HistoricalDraftData } from '@/types/draftEfficiency';
 import { getPositionColor } from '@/constants/colors';
 
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
-const RAINBOW_CYCLE_SECONDS = 3.5;
-const spinGradient = keyframes`0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}`;
-const CONIC_GRADIENT = 'conic-gradient(red,orange,yellow,green,dodgerblue,blueviolet,red)';
+const RAINBOW_BG = 'linear-gradient(90deg, red, orange, yellow, green, dodgerblue, blueviolet, red)';
 
 type SortField = 'rank' | 'username' | 'totalEfficiency' | 'avgPerPick' | 'pickCount';
 type SortDir = 'asc' | 'desc';
 
 function buildCurveData(curve: LogCurveCoefficients, maxPick: number) {
-  const pts: { pickNumber: number; expected: number }[] = [];
+  const pts: { pickNumber: number; totalEfficiency: number }[] = [];
   for (let x = 1; x <= maxPick; x++) {
-    pts.push({ pickNumber: x, expected: Math.round((curve.a * Math.log(x) + curve.b) * 100) / 100 });
+    pts.push({ pickNumber: x, totalEfficiency: Math.round((curve.a * Math.log(x) + curve.b) * 100) / 100 });
   }
   return pts;
 }
 
 function formatPickLabel(pick: DraftPickEfficiency): string {
-  const teams = pick.draftSlot; // approximate
   const round = pick.round;
-  const slot = pick.pickNumber - (round - 1) * (teams || 1);
+  const slot = pick.pickNumber - (round - 1) * (pick.draftSlot || 1);
   return `${round}.${String(slot).padStart(2, '0')}`;
 }
 
@@ -53,26 +49,9 @@ function bestWorstPosition(bd: Record<string, { total: number; count: number; av
   return `Best: ${best[0]} (${best[1].avg > 0 ? '+' : ''}${best[1].avg}) / Worst: ${worst[0]} (${worst[1].avg > 0 ? '+' : ''}${worst[1].avg})`;
 }
 
-// Custom scatter dot colored by position
-function PositionDot(props: Record<string, unknown>) {
-  const { cx, cy, payload } = props as {
-    cx: number; cy: number;
-    payload: DraftPickEfficiency;
-  };
-  return (
-    <circle
-      cx={cx} cy={cy} r={4}
-      fill={getPositionColor(payload.position)}
-      opacity={0.85}
-    />
-  );
-}
-
-// Custom tooltip for scatter — only renders for DraftPickEfficiency data
 function PickTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: Record<string, unknown> }> }) {
   if (!active || !payload?.[0]) return null;
   const raw = payload[0].payload;
-  // Skip if this is curve data (no playerName field)
   if (!raw.playerName) return null;
   const p = raw as unknown as DraftPickEfficiency;
   return (
@@ -121,17 +100,13 @@ export default function DraftEfficiencyPage() {
           SleeperService.getLeagueDrafts(leagueId),
           SleeperService.getRosters(leagueId),
         ]);
-
-        // Find best completed draft
         const completeDraft = drafts.find(d => d.status === 'complete') || drafts[0];
         if (!completeDraft) { setError('No drafts found.'); setLoading(false); return; }
 
         const fullDraft = await SleeperService.getDraft(completeDraft.draft_id);
         if (cancelled) return;
-
         setDraftName(fullDraft?.metadata?.name || completeDraft.metadata?.name || 'Draft');
 
-        // Find current user's roster_id
         if (user?.user_id) {
           const roster = rosters.find(r => r.owner_id === user.user_id);
           if (roster) setCurrentUserRosterId(roster.roster_id);
@@ -139,7 +114,6 @@ export default function DraftEfficiencyPage() {
 
         const result = await calculateDraftEfficiency(leagueId, completeDraft.draft_id, completeDraft.season);
         if (cancelled) return;
-
         setPicks(result.picks);
         setCurve(result.curve);
       } catch (e) {
@@ -154,7 +128,6 @@ export default function DraftEfficiencyPage() {
     return () => { cancelled = true; };
   }, [leagueId, user?.user_id]);
 
-  // Load historical data when toggled on
   React.useEffect(() => {
     if (!showHistorical || !user?.user_id || historicalData) return;
     let cancelled = false;
@@ -202,7 +175,7 @@ export default function DraftEfficiencyPage() {
     if (!showHistorical || !historicalData) return [];
     return historicalData.averagesByPick.map(h => ({
       pickNumber: h.pickNumber,
-      historicalAvg: h.avgEfficiency,
+      totalEfficiency: h.avgEfficiency,
     }));
   }, [showHistorical, historicalData]);
 
@@ -274,32 +247,25 @@ export default function DraftEfficiencyPage() {
           Dots above the curve = steals • Dots below = busts
         </Typography>
         <ResponsiveContainer width="100%" height={400}>
-          <ComposedChart data={curveData} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
+          <ScatterChart margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="pickNumber" type="number" label={{ value: 'Pick #', position: 'insideBottom', offset: -5 }} />
-            <YAxis label={{ value: 'Total Efficiency', angle: -90, position: 'insideLeft' }} />
+            <XAxis dataKey="pickNumber" type="number" name="Pick #" label={{ value: 'Pick #', position: 'insideBottom', offset: -5 }} />
+            <YAxis dataKey="totalEfficiency" type="number" name="Efficiency" label={{ value: 'Total Efficiency', angle: -90, position: 'insideLeft' }} />
+            <ZAxis range={[30, 30]} />
             <ReferenceLine y={0} stroke="#666" strokeDasharray="4 4" />
-            <Line dataKey="expected" stroke="#ff9800" strokeWidth={2} dot={false} name="Expected (log fit)" />
+            <Scatter name="Expected (log fit)" data={curveData} fill="#ff9800" line={{ stroke: '#ff9800', strokeWidth: 2 }} shape={() => null} />
             {showHistorical && historicalCurveData.length > 0 && (
-              <Line
-                data={historicalCurveData}
-                dataKey="historicalAvg"
-                stroke="#9e9e9e"
-                strokeWidth={2}
-                strokeDasharray="6 3"
-                dot={false}
-                opacity={0.5}
-                name="Historical Avg"
-              />
+              <Scatter name="Historical Avg" data={historicalCurveData} fill="#9e9e9e" line={{ stroke: '#9e9e9e', strokeWidth: 2, strokeDasharray: '6 3' }} shape={() => null} legendType="line" />
             )}
-            <Scatter
-              data={filteredPicks}
-              dataKey="totalEfficiency"
-              name="Players"
-              shape={<PositionDot />}
-            />
+            {POSITIONS.map(pos => {
+              const posData = filteredPicks.filter(p => p.position === pos);
+              if (posData.length === 0) return null;
+              return (
+                <Scatter key={pos} name={pos} data={posData} fill={getPositionColor(pos)} opacity={0.85} />
+              );
+            })}
             <RechartsTooltip content={<PickTooltip />} />
-          </ComposedChart>
+          </ScatterChart>
         </ResponsiveContainer>
         {/* Legend */}
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1, justifyContent: 'center' }}>
@@ -352,40 +318,35 @@ export default function DraftEfficiencyPage() {
                   <TableRow
                     key={m.rosterId}
                     sx={isUser ? {
-                      position: 'relative',
-                      '&::before': {
-                        content: '""', position: 'absolute', inset: -2,
-                        background: CONIC_GRADIENT,
-                        animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
-                        borderRadius: 1, zIndex: 0,
-                      },
-                      '&::after': {
-                        content: '""', position: 'absolute', inset: 0,
-                        bgcolor: 'background.paper', borderRadius: 1, zIndex: 0,
+                      backgroundImage: RAINBOW_BG,
+                      backgroundSize: '200% 100%',
+                      animation: 'rainbowSlide 3.5s linear infinite',
+                      '@keyframes rainbowSlide': {
+                        '0%': { backgroundPosition: '0% 0%' },
+                        '100%': { backgroundPosition: '200% 0%' },
                       },
                     } : undefined}
                   >
-                    <TableCell sx={{ position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal' }}>
+                    <TableCell sx={{ fontWeight: isUser ? 'bold' : 'normal', color: isUser ? '#fff' : undefined }}>
                       {managers.findIndex(mgr => mgr.rosterId === m.rosterId) + 1}
                     </TableCell>
-                    <TableCell sx={{ position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal' }}>
+                    <TableCell sx={{ fontWeight: isUser ? 'bold' : 'normal', color: isUser ? '#fff' : undefined }}>
                       {m.username}{isUser ? ' (You)' : ''}
                     </TableCell>
                     <TableCell sx={{
-                      position: 'relative', zIndex: 1, fontWeight: isUser ? 'bold' : 'normal',
-                      color: m.totalEfficiency > 0 ? 'success.main' : m.totalEfficiency < 0 ? 'error.main' : 'text.primary',
+                      fontWeight: isUser ? 'bold' : 'normal',
+                      color: isUser ? '#fff' : m.totalEfficiency > 0 ? 'success.main' : m.totalEfficiency < 0 ? 'error.main' : 'text.primary',
                     }}>
                       {m.totalEfficiency > 0 ? '+' : ''}{m.totalEfficiency}
                     </TableCell>
                     <TableCell sx={{
-                      position: 'relative', zIndex: 1,
-                      color: m.avgPerPick > 0 ? 'success.main' : m.avgPerPick < 0 ? 'error.main' : 'text.primary',
+                      color: isUser ? '#fff' : m.avgPerPick > 0 ? 'success.main' : m.avgPerPick < 0 ? 'error.main' : 'text.primary',
                     }}>
                       {m.avgPerPick > 0 ? '+' : ''}{m.avgPerPick}
                     </TableCell>
-                    <TableCell sx={{ position: 'relative', zIndex: 1 }}>{m.pickCount}</TableCell>
-                    <TableCell sx={{ position: 'relative', zIndex: 1 }}>
-                      <Typography variant="caption">{bestWorstPosition(m.positionBreakdown)}</Typography>
+                    <TableCell sx={{ color: isUser ? '#fff' : undefined }}>{m.pickCount}</TableCell>
+                    <TableCell sx={{ color: isUser ? '#fff' : undefined }}>
+                      <Typography variant="caption" sx={{ color: 'inherit' }}>{bestWorstPosition(m.positionBreakdown)}</Typography>
                     </TableCell>
                   </TableRow>
                 );
