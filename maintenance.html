@@ -8,11 +8,17 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#121212;color:#e0e0e0;text-align:center;padding:1rem}
-.card{max-width:420px}
+.card{max-width:480px}
 h1{font-size:1.5rem;margin-bottom:.75rem}
 p{color:#aaa;line-height:1.5;margin-bottom:.5rem}
 .icon{font-size:3rem;margin-bottom:1rem}
 .sub{font-size:.85rem;color:#777}
+.trivia{margin-top:1.5rem;padding:1.25rem;border:1px solid #333;border-radius:8px;background:#1a1a1a}
+.trivia-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:.5rem}
+.trivia-q{font-size:.95rem;color:#e0e0e0;margin-bottom:.75rem}
+.trivia-a{font-size:.9rem;color:#66bb6a;margin-bottom:.75rem;display:none}
+.reveal-btn{background:none;border:1px solid #555;color:#aaa;padding:.4rem 1rem;border-radius:4px;cursor:pointer;font-size:.85rem;transition:border-color .2s,color .2s}
+.reveal-btn:hover{border-color:#90caf9;color:#90caf9}
 </style>
 </head>
 <body>
@@ -21,6 +27,40 @@ p{color:#aaa;line-height:1.5;margin-bottom:.5rem}
 <h1>Halftime! We're making some updates.</h1>
 <p>Declanalytics is updating. This usually takes less than a minute.</p>
 <p class="sub">This page will automatically refresh.</p>
+<div class="trivia">
+<div class="trivia-label">Fantasy Trivia</div>
+<div class="trivia-q" id="trivia-q"></div>
+<div class="trivia-a" id="trivia-a"></div>
+<button class="reveal-btn" id="reveal-btn" onclick="reveal()">Reveal Answer</button>
 </div>
+</div>
+<script>
+var trivia=[
+{q:"Which undrafted RB had the most fantasy points in a single PPR season?",a:"Priest Holmes, 2002 — 370.6 PPR points with the Chiefs."},
+{q:"What overall draft pick number has historically produced the most fantasy league winners?",a:"Pick 1 overall — the top pick wins the league about 15% of the time, more than any other slot."},
+{q:"Who holds the record for most receiving yards in a single NFL game?",a:"Flipper Anderson — 336 receiving yards for the Rams in 1989."},
+{q:"Which QB scored the most fantasy points in a single game (PPR)?",a:"Jalen Hurts scored 48.42 PPR points vs. the Packers in 2024 (Week 1)."},
+{q:"What is 'Zero RB' draft strategy?",a:"Drafting WRs and TEs early, waiting on RBs until later rounds — banking on RB volatility and waiver wire finds."},
+{q:"Which position has the highest bust rate in the first round of fantasy drafts?",a:"Running back — roughly 40% of first-round RBs fail to finish as RB1s."},
+{q:"Who was the biggest fantasy sleeper of 2023?",a:"Puka Nacua — undrafted in most leagues, finished as WR6 in PPR as a rookie."},
+{q:"What is positional scarcity and why does it matter?",a:"The drop-off in points between top players and replacements at a position. Bigger drop-off = more valuable to draft early."},
+{q:"Which TE had the most PPR points in a single season?",a:"Travis Kelce, 2020 — 312.1 PPR points (105 rec, 1,416 yards, 11 TDs)."},
+{q:"What does VBD stand for in fantasy football?",a:"Value Based Drafting — ranking players by how much they outscore a baseline replacement at their position."},
+{q:"Which WR had the most fantasy points in their rookie season (PPR)?",a:"Puka Nacua, 2023 — 288.5 PPR points (105 rec, 1,486 yards, 6 TDs)."},
+{q:"What is the 'handcuff' strategy?",a:"Drafting the backup RB behind your starter so you're covered if the starter gets injured."},
+{q:"Which player has been the #1 overall fantasy pick the most times?",a:"LaDainian Tomlinson — went #1 overall in fantasy drafts for 5 consecutive years (2003–2007)."},
+{q:"What week of the NFL season do most fantasy leagues have their championship?",a:"Week 17 (or Week 16 in older formats) — before the final regular season game when stars may rest."},
+{q:"Which defense/special teams unit scored the most fantasy points in a single game?",a:"The 2009 Chargers D/ST scored 44 fantasy points in one game with 3 defensive TDs and a punt return TD."},
+{q:"What is 'Robust RB' strategy?",a:"The opposite of Zero RB — loading up on 3+ RBs in the first 4 rounds to lock in the most volatile position early."},
+{q:"Who holds the record for most rushing TDs in a single NFL season?",a:"LaDainian Tomlinson — 28 rushing TDs in 2006, a fantasy cheat code."},
+{q:"What percentage of your fantasy roster's points typically come from the waiver wire?",a:"Studies show 30–40% of championship roster points come from players added after the draft."},
+{q:"Which round is statistically the best value in fantasy drafts?",a:"Rounds 3–5 — these picks hit at a high rate while costing far less draft capital than rounds 1–2."},
+{q:"What is the 'late-round QB' strategy?",a:"Waiting until rounds 8+ to draft a QB, since the points difference between QB1 and QB10 is smaller than at other positions."}
+];
+var t=trivia[Math.floor(Math.random()*trivia.length)];
+document.getElementById("trivia-q").textContent=t.q;
+document.getElementById("trivia-a").textContent=t.a;
+function reveal(){document.getElementById("trivia-a").style.display="block";document.getElementById("reveal-btn").style.display="none"}
+</script>
 </body>
 </html>

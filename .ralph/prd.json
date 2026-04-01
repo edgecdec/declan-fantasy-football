@@ -423,14 +423,13 @@
       "status": "done",
       "dependencies": ["TASK-034"],
       "description": "The trade efficiency calculator currently only processes regular season weeks. Extend it to also include playoff weeks. Use the league's settings.playoff_week_start to determine where playoffs begin, then fetch matchup data for playoff weeks as well (up to week 18 or the league's final week). Players who contributed during the playoffs should have those weeks counted in their efficiency totals. This matters because a trade made late in the season is often specifically to win in the playoffs — ignoring playoff data undervalues those trades."
-    }
     },
     {
       "id": "TASK-049",
       "title": "Add fantasy football trivia with reveal button during loading states",
       "spec": "specs/code-style.md",
       "priority": 49,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Update the maintenance.html page (from TASK-013) to include fantasy football trivia while the user waits for the deploy to finish. Add a trivia section below the 'Halftime' message with a random question displayed on each page load/refresh. Include a 'Reveal Answer' button that shows the answer when clicked. Since maintenance.html is a standalone HTML file with no framework, implement this with inline JavaScript: define an array of ~20 trivia objects ({question, answer}), pick one at random on load, wire up the reveal button. The page already auto-refreshes every 10 seconds, so each refresh shows a new question. Trivia should be fantasy-football-specific — draft strategy, historical records, fun stats. Examples: Q: 'Which undrafted RB had the most fantasy points in a single season?' A: 'Priest Holmes, 2002 — 370.6 PPR points'. Q: 'What pick number has historically produced the most fantasy MVPs?' Come up with 20 varied questions covering draft strategy, historical fantasy performances, positional scarcity, sleeper picks, bust rates, etc. Keep the styling consistent with the existing dark theme."
     },

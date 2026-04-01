@@ -397,3 +397,9 @@
 ## TASK-050: Fix multiple bugs on draft efficiency page (2026-03-31)
 - Fixed 4 bugs: (1) Tooltip now filters out curve data and only shows player info for scatter dots, (2) Removed rainbow/size highlight from scatter dots — all dots uniform, (3) Fixed table cell misalignment by moving rainbow effect from extra `<td>` element to TableRow pseudo-elements, (4) Player names now use pick metadata (first_name/last_name from Sleeper API response) as primary source with static JSON fallback.
 - Lessons: In Recharts ComposedChart with mixed Line+Scatter, the Tooltip receives payloads from ALL series — must check payload type before rendering. Never add extra `<td>` elements to a `<tr>` for styling — use CSS pseudo-elements on the row itself. Sleeper draft pick metadata is the most reliable source for player names since it comes directly from the API response for that specific draft.
+
+## TASK-049: Add fantasy football trivia with reveal button to maintenance page
+- Date: 2026-03-31
+- Status: done
+- Changes: Updated maintenance.html with 20 fantasy football trivia questions, random selection on each page load/refresh, and a "Reveal Answer" button. Inline JS and CSS, no external dependencies.
+- Lessons: Standalone HTML files with inline JS are straightforward — no build validation issues. The 10-second auto-refresh naturally cycles through trivia questions. Kept styling consistent with existing dark theme (#1a1a1a card on #121212 background).
