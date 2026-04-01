@@ -251,3 +251,13 @@
 - Builds roster_id -> username mapping from league users + rosters.
 - Results cached per league in session storage.
 - Lesson: Keep service files focused — types + one main exported function + private helpers. The parseTrade helper stays private since only fetchLeagueTrades needs it.
+
+## TASK-034: Build per-player post-trade positional efficiency calculator
+- **Date**: 2026-03-31
+- **Status**: Done
+- **Files created**: src/services/stats/tradeEfficiency.ts, src/types/trade.ts
+- **Files modified**: .ralph/prd.json
+- **Lessons**:
+  - The sleeper_players.json has a top-level `updated_at` and `season` field alongside `players`, so casting as `Record<string, Record<string, string>>` fails because `updated_at` is a string not a record. Use `unknown` intermediate cast with a proper typed shape.
+  - Matchup data from Sleeper includes `starters_points` array (parallel to `starters`) but it's not in the SleeperMatchup type — accessed via `(m as Record<string, unknown>).starters_points`. Same pattern used in positionalBenchmarks.ts.
+  - Split service + types across files to stay under 150-line limit per code-style.md.

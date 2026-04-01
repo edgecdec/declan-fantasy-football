@@ -294,7 +294,7 @@
       "title": "Build per-player post-trade positional efficiency calculator",
       "spec": "specs/code-style.md",
       "priority": 34,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-033"],
       "description": "Add a function evaluateTradeEfficiency() to src/services/stats/tradeAnalyzer.ts. For each trade, for each player on both sides: fetch weekly matchup data for every week AFTER the trade through end of regular season. For each week the player was in the new team's starting lineup (starters array in matchup data), get their points scored. Calculate the league average points at that player's position for the same week (average across all starters at that position in the league that week). The player's efficiency for that week = their points minus the league positional average. Sum this across all started weeks to get total efficiency gained/lost. Return per-trade results with: each side's players, each player's total efficiency sum, per-week efficiency breakdown, weeks started count, and the overall side totals. A positive total means that side of the trade outperformed league average at those positions."
     },
