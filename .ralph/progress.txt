@@ -305,3 +305,8 @@
   - Graham's Football Fantasy (league 1048177208491130880) is the best test league for trades with draft picks and FAAB
   - Nova Act tests need `page.goto()` for direct URL navigation — the agent struggles with multi-step navigation through the app
   - The trade evaluator takes time to load (fetches matchups for every week) — need 5+ seconds wait in tests
+
+## TASK-041: Fix crash on trade evaluator page — draftPicks is undefined (2026-03-31)
+- Root cause: SleeperTransaction.draft_picks and waiver_budget can be undefined/null when the API returns trades that only involve players. The TypeScript type had them as required arrays, but the runtime data didn't always include them.
+- Fix: Added `?? []` defensive checks in tradeEfficiency.ts (evaluateSidePlayers) and trades/page.tsx (TradeSideTable) for draftPicks, faabItems, and faab. Made draft_picks and waiver_budget optional on the SleeperTransaction type.
+- Lesson: Always type API response fields as optional when the API doesn't guarantee their presence, even if the docs suggest they're always there. Defensive `?? []` before any .map() on API data.

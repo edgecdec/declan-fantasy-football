@@ -330,7 +330,7 @@
       "title": "Limit trade efficiency window to actual tenure on team",
       "spec": "specs/code-style.md",
       "priority": 38,
-      "status": "open",
+      "status": "in_progress",
       "dependencies": ["TASK-034"],
       "description": "The trade efficiency calculator currently counts all weeks from the trade through end of season for each player. If a player was traded away or dropped before the season ended, we'd be counting weeks they weren't on the team. Fix: only count weeks where the player actually appeared in the receiving team's starters array in the matchup data. This naturally handles re-trades — if a player was flipped in a later trade, they simply won't be in the starters after that week, so those weeks won't count. The value from flipping them is captured in the evaluation of that subsequent trade. No need to build a full transaction timeline — just check the matchup starters data which we already fetch. Additionally, if a player stopped appearing in starters before the season ended (indicating they were re-traded or dropped), display an asterisk (*) next to their name in the trade evaluator UI. On hover (MUI Tooltip), show a note like 'Re-traded in Week X' or 'Dropped in Week X' — determine the last week they appeared in starters and add 1 to get the approximate departure week."
     },
@@ -351,6 +351,15 @@
       "status": "open",
       "dependencies": ["TASK-035"],
       "description": "On /league-history/[leagueId]/trades, default sort trades by absolute efficiency impact (largest difference between the two sides first) rather than by week. Add a sort toggle so users can switch between 'Most Impactful' (default) and 'Chronological' (by week). Impact is calculated as the absolute value of the difference between side A's total efficiency and side B's total efficiency — bigger gap means more lopsided trade."
+    },
+    {
+      "id": "TASK-041",
+      "title": "URGENT: Fix crash on trade evaluator page — draftPicks is undefined",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "done",
+      "dependencies": [],
+      "description": "Bug: /league-history/1206336001794920448/trades crashes with 'TypeError: can't access property map, D.draftPicks is undefined'. The code is calling .map() on a draftPicks property that doesn't exist on some transaction objects. Fix: in the trade parsing logic (likely in src/services/stats/tradeAnalyzer.ts or the trades page component), add a null/undefined check before mapping over draftPicks — use (transaction.draft_picks || []).map(...) or optional chaining. The Sleeper transaction object may not always include draft_picks if the trade only involved players. Same defensive check should be applied to waiver_budget and any other array fields on the transaction object. This is a top priority fix as the page is completely broken."
     }
   ]
 }

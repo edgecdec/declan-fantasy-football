@@ -138,8 +138,8 @@ export type SleeperTransaction = {
   roster_ids: number[];
   adds: Record<string, number> | null; // player_id -> roster_id
   drops: Record<string, number> | null;
-  draft_picks: SleeperTradedPick[];
-  waiver_budget: SleeperWaiverBudget[];
+  draft_picks?: SleeperTradedPick[];
+  waiver_budget?: SleeperWaiverBudget[];
   creator: string;
   created: number;
   leg: number; // week number

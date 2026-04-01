@@ -55,8 +55,8 @@ function evaluateSidePlayers(
     rosterId: side.rosterId,
     username: side.username,
     players: [],
-    draftPicks: side.draftPicks.map((dp) => ({ season: dp.season, round: dp.round })),
-    faabItems: side.faab.map((amount) => ({ amount })),
+    draftPicks: (side.draftPicks ?? []).map((dp) => ({ season: dp.season, round: dp.round })),
+    faabItems: (side.faab ?? []).map((amount) => ({ amount })),
     totalEfficiency: 0,
   };
 
