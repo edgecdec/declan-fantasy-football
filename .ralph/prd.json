@@ -483,7 +483,7 @@
       "title": "Create weekly start/sit analysis aggregator",
       "spec": "specs/code-style.md",
       "priority": 55,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-054"],
       "description": "Add a function analyzeStartSitDecisions(leagueId, userId, season) to src/services/stats/lineupOptimizer.ts. For each regular season week: (1) Fetch the user's matchup data (starters + players arrays give actual lineup and full roster). (2) Fetch weekly projections from Sleeper. (3) Get the league's scoring_settings and roster_positions. (4) Run calculateOptimalLineup to find the best possible lineup from the user's roster. (5) Compare actual vs optimal and record mistakes. Aggregate across all weeks: total points left on bench for the season, decision accuracy % (weeks where actual == optimal / total weeks), accuracy by position (which position do they make the worst decisions at), worst individual mistakes (biggest point differential in a single slot). Also support aggregating across multiple leagues for a single season (sum/average the stats), and across multiple seasons for a single league chain (trace previous_league_id). Return WeeklyDecision[] and SeasonDecisionSummary types."
     },
@@ -513,6 +513,15 @@
       "status": "open",
       "dependencies": ["TASK-053", "TASK-055"],
       "description": "Build the 'Historical' tab content at /skill?tab=historical. This combines historical positional efficiency (migrated from the old /performance/positional/history) and historical start/sit decision data. Show: (1) YEAR-OVER-YEAR TREND CHART — line chart with seasons on X axis, showing decision accuracy % and points left on bench per season. Are you getting better at setting your lineup over time? (2) POSITIONAL EFFICIENCY TRENDS — the existing historical efficiency vs league average data (from TASK-029), now living in this tab. (3) ALL-TIME MVPs/LVPs — migrated from the old history page (TASK-027). (4) PER-SEASON SUMMARY TABLE — each row is a season, columns are: decision accuracy, points left on bench, positional efficiency vs avg, number of leagues. For league-specific historical view (/skill/league/[leagueId]?tab=historical), trace the previous_league_id chain and show the same data scoped to that league's history. Load progressively."
+    },
+    {
+      "id": "TASK-059",
+      "title": "Evaluate pre-season draft pick trades by the player the pick became",
+      "spec": "specs/code-style.md",
+      "priority": 59,
+      "status": "open",
+      "dependencies": ["TASK-037"],
+      "description": "On /league-history/[leagueId]/trades, when a trade involves draft picks that have already been used (the draft happened), the picks currently show as 'N/A' for efficiency even though we know which player was selected. Fix: if a traded pick resolved to an actual player (e.g. '2025 Round 7 Pick → 7.09: Patrick Mahomes'), calculate that player's positional efficiency for the rest of the season as if the player themselves were traded. Use the same efficiency calculation as regular player trades — find the player in starters across all weeks after the trade, compute points vs league positional average, sum it up. Display the efficiency numbers in the same columns instead of N/A. This way a pre-season pick trade like '2025 Round 4 Pick → 4.03: Mike Evans' shows Mike Evans' actual season efficiency, making the trade evaluable. The pick label should still show it was a pick (e.g. '2025 Rd 4 → Mike Evans') but the efficiency columns should show real numbers. Only apply this when the pick has resolved to a player — future unresolved picks remain N/A. Test against league 1206336001794920448 which has pre-season pick trades."
     }
   ]
 }

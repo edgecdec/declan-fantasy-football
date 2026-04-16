@@ -445,3 +445,11 @@
 - Files: src/services/stats/lineupOptimizer.ts (new), src/types/lineup.ts (new), src/services/sleeper/sleeperService.ts (added getWeeklyProjections + projection types)
 - Approach: Greedy solver filling most-restrictive slots first (K, DEF, QB, then TE, RB, WR, then FLEX/SUPER_FLEX). calculateProjectedPoints() multiplies stat projections by league scoring_settings weights. SLOT_ELIGIBILITY map defines which positions can fill each slot type.
 - Lessons: Sleeper projections API returns an array of {player_id, stats} objects, not a direct map — needed to transform. REC_FLEX (WR/TE only) is another slot type to handle. The greedy approach works well for small roster sizes (<15 slots) without needing combinatorial optimization.
+
+## TASK-055: Create weekly start/sit analysis aggregator (2026-04-16)
+- Added `analyzeStartSitDecisions()`, `analyzeMultiLeagueSeason()`, and `analyzeLeagueChainHistory()` to `src/services/stats/lineupOptimizer.ts`
+- Added `WeeklyDecision`, `PositionAccuracy`, and `SeasonDecisionSummary` types to `src/types/lineup.ts`
+- The function fetches matchups + projections per week, runs the optimal lineup solver, and aggregates mistakes across weeks
+- Position accuracy tracks mistakes per slot type (QB, RB, FLEX, etc.) correctly handling multiple slots of the same type
+- Sleeper league objects have `roster_positions` and `scoring_settings` fields not typed in `SleeperLeague` — accessed via type assertion cast
+- Lessons: Keep slot-level accuracy tracking simple — count total slot-weeks and subtract mistake count rather than trying to track per-instance correctness

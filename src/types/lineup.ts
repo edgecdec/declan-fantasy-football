@@ -19,3 +19,27 @@ export type OptimalLineupResult = {
   pointsLeftOnBench: number;
   mistakes: LineupMistake[];
 };
+
+export type WeeklyDecision = {
+  week: number;
+  optimal: OptimalLineupResult;
+  isOptimal: boolean;
+};
+
+export type PositionAccuracy = {
+  position: string;
+  correct: number;
+  total: number;
+  accuracy: number;
+};
+
+export type SeasonDecisionSummary = {
+  leagueId: string;
+  leagueName: string;
+  season: string;
+  totalPointsLeftOnBench: number;
+  decisionAccuracy: number;
+  weeklyDecisions: WeeklyDecision[];
+  positionAccuracy: PositionAccuracy[];
+  worstMistakes: LineupMistake[];
+};

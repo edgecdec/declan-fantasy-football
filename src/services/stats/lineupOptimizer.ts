@@ -1,5 +1,8 @@
-import { SleeperProjection } from '@/services/sleeper/sleeperService';
-import { OptimalLineupResult, LineupSlot, LineupMistake } from '@/types/lineup';
+import { SleeperService, SleeperProjection, SleeperLeague } from '@/services/sleeper/sleeperService';
+import {
+  OptimalLineupResult, LineupSlot, LineupMistake,
+  WeeklyDecision, PositionAccuracy, SeasonDecisionSummary,
+} from '@/types/lineup';
 import playerData from '../../../data/sleeper_players.json';
 
 type PlayerRecord = { first_name: string; last_name: string; position: string };
@@ -179,4 +182,148 @@ export function calculateOptimalLineup(
   mistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
 
   return { optimalLineup, actualLineup, pointsLeftOnBench, mistakes };
+}
+
+const DEFAULT_REGULAR_SEASON_WEEKS = 14;
+const WORST_MISTAKES_LIMIT = 5;
+
+/**
+ * Analyze start/sit decisions for a user across all regular season weeks in a league.
+ */
+export async function analyzeStartSitDecisions(
+  leagueId: string,
+  userId: string,
+  season: string,
+  onWeekComplete?: (week: number, total: number) => void
+): Promise<SeasonDecisionSummary | null> {
+  const league = await SleeperService.getLeague(leagueId);
+  if (!league) return null;
+
+  const rosters = await SleeperService.getRosters(leagueId);
+  const userRoster = rosters.find(r => r.owner_id === userId);
+  if (!userRoster) return null;
+
+  const leagueAny = league as SleeperLeague & {
+    roster_positions?: string[];
+    scoring_settings?: Record<string, number>;
+  };
+  const rosterPositions = leagueAny.roster_positions;
+  const scoringSettings = leagueAny.scoring_settings;
+  if (!rosterPositions || !scoringSettings) return null;
+
+  const totalWeeks = league.settings.playoff_week_start
+    ? league.settings.playoff_week_start - 1
+    : DEFAULT_REGULAR_SEASON_WEEKS;
+
+  const weeklyDecisions: WeeklyDecision[] = [];
+  const allMistakes: LineupMistake[] = [];
+  let optimalWeeks = 0;
+  const positionMistakes = new Map<string, number>();
+
+  for (let week = 1; week <= totalWeeks; week++) {
+    const [matchups, projections] = await Promise.all([
+      SleeperService.getMatchups(leagueId, week),
+      SleeperService.getWeeklyProjections(season, week),
+    ]);
+
+    const userMatchup = matchups.find(m => m.roster_id === userRoster.roster_id);
+    if (!userMatchup || !userMatchup.starters?.length || !userMatchup.players?.length) {
+      onWeekComplete?.(week, totalWeeks);
+      continue;
+    }
+
+    const result = calculateOptimalLineup(
+      userMatchup.players,
+      rosterPositions,
+      projections,
+      scoringSettings,
+      userMatchup.starters,
+    );
+
+    const isOptimal = result.mistakes.length === 0;
+    if (isOptimal) optimalWeeks++;
+
+    weeklyDecisions.push({ week, optimal: result, isOptimal });
+    allMistakes.push(...result.mistakes);
+
+    // Track per-position mistakes
+    for (const m of result.mistakes) {
+      const entry = positionMistakes.get(m.slot) || 0;
+      positionMistakes.set(m.slot, entry + 1);
+    }
+
+    onWeekComplete?.(week, totalWeeks);
+  }
+
+  if (weeklyDecisions.length === 0) return null;
+
+  const totalPointsLeft = weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+  const accuracy = (optimalWeeks / weeklyDecisions.length) * 100;
+
+  // Build position accuracy from starter slot counts and mistake counts
+  const starterSlots = rosterPositions.filter(s => s !== 'BN');
+  const slotTotals = new Map<string, number>();
+  for (const slot of starterSlots) {
+    slotTotals.set(slot, (slotTotals.get(slot) || 0) + weeklyDecisions.length);
+  }
+
+  const positionAccuracy: PositionAccuracy[] = Array.from(slotTotals.entries())
+    .map(([position, total]) => {
+      const mistakes = positionMistakes.get(position) || 0;
+      const correct = total - mistakes;
+      return { position, correct, total, accuracy: total > 0 ? (correct / total) * 100 : 100 };
+    })
+    .sort((a, b) => a.accuracy - b.accuracy);
+
+  allMistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
+  const worstMistakes = allMistakes.slice(0, WORST_MISTAKES_LIMIT);
+
+  return {
+    leagueId,
+    leagueName: league.name,
+    season,
+    totalPointsLeftOnBench: totalPointsLeft,
+    decisionAccuracy: accuracy,
+    weeklyDecisions,
+    positionAccuracy,
+    worstMistakes,
+  };
+}
+
+/**
+ * Aggregate start/sit analysis across multiple leagues for a single season.
+ */
+export async function analyzeMultiLeagueSeason(
+  leagues: SleeperLeague[],
+  userId: string,
+  season: string,
+  onLeagueComplete?: (completed: number, total: number) => void
+): Promise<SeasonDecisionSummary[]> {
+  const results: SeasonDecisionSummary[] = [];
+  for (let i = 0; i < leagues.length; i++) {
+    const summary = await analyzeStartSitDecisions(leagues[i].league_id, userId, season);
+    if (summary) results.push(summary);
+    onLeagueComplete?.(i + 1, leagues.length);
+  }
+  return results;
+}
+
+/**
+ * Aggregate start/sit analysis across all seasons of a single league chain.
+ */
+export async function analyzeLeagueChainHistory(
+  currentLeagueId: string,
+  userId: string,
+  onSeasonComplete?: (season: string, completed: number, total: number) => void
+): Promise<SeasonDecisionSummary[]> {
+  const history = await SleeperService.getLeagueHistory(currentLeagueId);
+  const results: SeasonDecisionSummary[] = [];
+  for (let i = 0; i < history.length; i++) {
+    const league = history[i];
+    if (league.status !== 'complete' && league.status !== 'in_season') continue;
+    const summary = await analyzeStartSitDecisions(league.league_id, userId, league.season);
+    if (summary) results.push(summary);
+    onSeasonComplete?.(league.season, i + 1, history.length);
+  }
+  return results;
 }
