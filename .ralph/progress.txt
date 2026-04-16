@@ -426,3 +426,16 @@
 - Updated efficiency page to pass `leagueId` directly (no longer needs `user.user_id` for historical fetch)
 - Updated table title from "Your Draft Efficiency by Season" to "League Draft Efficiency by Season"
 - Lesson: The existing `getLeagueHistory` method in SleeperService already handled the `previous_league_id` chain traversal — always check existing utilities before writing new logic
+
+## TASK-053: Create /skill route with tab structure and migrate positional benchmarks
+- Date: 2026-04-16
+- Created /skill page with MUI Tabs (Positional Efficiency, Start/Sit Decisions, Historical)
+- Extracted positional benchmarks page into reusable PositionalBenchmarksContent component
+- Also extracted LeagueBreakdown and ImpactsModal into separate components for code organization
+- Updated sidebar nav: "Positional Benchmarks" → "Manager Skill" with href /skill
+- Updated home page card link to /skill
+- Added middleware redirects: /performance/positional → /skill?tab=efficiency, /performance/positional/history → /skill?tab=historical
+- Replaced old /performance/positional/page.tsx with client-side redirect to /skill?tab=efficiency
+- Lesson: useSearchParams() requires a Suspense boundary in Next.js 16 — split into inner content component + outer Suspense wrapper
+- Lesson: When extracting a page into a component, strip Container/PageHeader from the component and let the parent page provide those — keeps the component reusable across different page layouts
+- The /performance/positional/league/[leagueId] route was left in place since the task only asked to move the main positional page

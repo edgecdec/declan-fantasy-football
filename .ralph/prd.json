@@ -459,6 +459,60 @@
       "status": "done",
       "dependencies": ["TASK-046"],
       "description": "TASK-046 implemented historical draft efficiency by scanning all the user's leagues across all seasons. This is wrong — different leagues have different scoring rules so comparing across them is misleading. Instead, trace the current league's previous_league_id chain to find all prior seasons of the SAME league. Only aggregate draft efficiency data from that league's own history. This keeps scoring rules consistent. Update the historical toggle on /draft-assistant/[leagueId]/efficiency to use the league chain instead of the user's full league list. The per-season comparison table should show each year of THIS league, not all leagues."
+    },
+    {
+      "id": "TASK-053",
+      "title": "Create /skill route with tab structure and migrate positional benchmarks",
+      "spec": "specs/code-style.md",
+      "priority": 53,
+      "status": "done",
+      "dependencies": [],
+      "description": "Create a new section at /skill (Manager Skill Hub) with a tabbed layout. Tabs: 'Positional Efficiency', 'Start/Sit Decisions', 'Historical'. The top of the page has the shared user/year selector (same pattern as existing pages). Move the existing positional benchmarks code from /performance/positional into the 'Positional Efficiency' tab at /skill. The 'Start/Sit Decisions' and 'Historical' tabs can show placeholder content for now — they'll be built in subsequent tasks. Update the sidebar nav in AppLayout.tsx: rename 'Positional Benchmarks' to 'Manager Skill' (or 'Skill Analysis') and change the href to /skill. Keep 'Season Review' at /performance unchanged. Add redirects from /performance/positional/* to /skill/* so old bookmarks still work (use Next.js middleware or redirect config). Use MUI Tabs component for the tab navigation, with the tab state reflected in the URL (e.g. /skill?tab=efficiency, /skill?tab=decisions, /skill?tab=historical) so tabs are bookmarkable."
+    },
+    {
+      "id": "TASK-054",
+      "title": "Create optimal lineup solver service using Sleeper projections",
+      "spec": "specs/code-style.md",
+      "priority": 54,
+      "status": "open",
+      "dependencies": [],
+      "description": "Create src/services/stats/lineupOptimizer.ts. Core function: calculateOptimalLineup(rosterPlayerIds, rosterPositions, projections, scoringSettings) that returns the lineup maximizing projected points. Inputs: (1) Array of player IDs on the user's roster (starters + bench from matchup data). (2) League roster positions array (e.g. ['QB','RB','RB','WR','WR','TE','FLEX','K','DEF']). (3) Weekly projections from Sleeper API (GET /projections/nfl/regular/{season}/{week}). (4) League scoring_settings to calculate custom projected points per player (multiply each stat projection by the scoring weight and sum). The solver must handle FLEX (RB/WR/TE eligible) and SUPER_FLEX (QB/RB/WR/TE eligible) slots correctly. Algorithm: since roster sizes are small (~10 slots), use a greedy approach — fill position-locked slots first (QB, K, DEF), then fill RB/WR/TE slots with best available at each position, then fill FLEX/SUPER_FLEX with the best remaining eligible player. Return: { optimalLineup: [{slot, playerId, playerName, position, projectedPoints}], actualLineup: same format, pointsLeftOnBench: number, mistakes: [{slot, started, shouldHaveStarted, pointsDiff}] }."
+    },
+    {
+      "id": "TASK-055",
+      "title": "Create weekly start/sit analysis aggregator",
+      "spec": "specs/code-style.md",
+      "priority": 55,
+      "status": "open",
+      "dependencies": ["TASK-054"],
+      "description": "Add a function analyzeStartSitDecisions(leagueId, userId, season) to src/services/stats/lineupOptimizer.ts. For each regular season week: (1) Fetch the user's matchup data (starters + players arrays give actual lineup and full roster). (2) Fetch weekly projections from Sleeper. (3) Get the league's scoring_settings and roster_positions. (4) Run calculateOptimalLineup to find the best possible lineup from the user's roster. (5) Compare actual vs optimal and record mistakes. Aggregate across all weeks: total points left on bench for the season, decision accuracy % (weeks where actual == optimal / total weeks), accuracy by position (which position do they make the worst decisions at), worst individual mistakes (biggest point differential in a single slot). Also support aggregating across multiple leagues for a single season (sum/average the stats), and across multiple seasons for a single league chain (trace previous_league_id). Return WeeklyDecision[] and SeasonDecisionSummary types."
+    },
+    {
+      "id": "TASK-056",
+      "title": "Build Start/Sit Decisions tab in the Skill Hub",
+      "spec": "specs/code-style.md",
+      "priority": 56,
+      "status": "open",
+      "dependencies": ["TASK-053", "TASK-055"],
+      "description": "Build the 'Start/Sit Decisions' tab content at /skill?tab=decisions. The tab shows: (1) SUMMARY CARDS at the top — total points left on bench this season, overall decision accuracy %, worst position for decisions. (2) WEEKLY BREAKDOWN TABLE — for each week, show: week number, your projected score vs optimal projected score, points left on bench, and number of mistakes. Expandable rows (MUI Accordion) that show the actual vs optimal lineup side by side for that week, with mistakes highlighted in red. (3) POSITION ACCURACY CHART — bar chart or radar chart showing decision accuracy % by position (QB, RB, WR, TE, FLEX). (4) WORST MISTAKES LIST — top 5 biggest single-slot mistakes across the season (e.g. 'Week 5: Started Player A (proj 8.2) over Player B (proj 15.1) at RB — cost 6.9 projected points'). Load data progressively as each week completes. Sortable columns on the weekly table."
+    },
+    {
+      "id": "TASK-057",
+      "title": "Build league drilldown page with leaguemate comparison at /skill/league/[leagueId]",
+      "spec": "specs/code-style.md",
+      "priority": 57,
+      "status": "open",
+      "dependencies": ["TASK-053", "TASK-055"],
+      "description": "Create /skill/league/[leagueId] page that shows the same tab structure as /skill but scoped to a single league, AND includes all league members for comparison. On the 'Positional Efficiency' tab: show every manager's efficiency at each position in a sortable table/chart so you can compare your positional strength vs leaguemates. On the 'Start/Sit Decisions' tab: show a leaderboard of all managers ranked by decision accuracy and points left on bench — who's the best/worst at setting their lineup? Run the optimal lineup analysis for EVERY manager in the league (not just the user). Highlight the current user's row with the rainbow effect. This creates a compelling 'am I a good manager compared to my competition?' view. Link to this page from anywhere a league name appears in the skill hub (clicking a league name navigates here)."
+    },
+    {
+      "id": "TASK-058",
+      "title": "Build Historical tab in the Skill Hub with all-time trends",
+      "spec": "specs/code-style.md",
+      "priority": 58,
+      "status": "open",
+      "dependencies": ["TASK-053", "TASK-055"],
+      "description": "Build the 'Historical' tab content at /skill?tab=historical. This combines historical positional efficiency (migrated from the old /performance/positional/history) and historical start/sit decision data. Show: (1) YEAR-OVER-YEAR TREND CHART — line chart with seasons on X axis, showing decision accuracy % and points left on bench per season. Are you getting better at setting your lineup over time? (2) POSITIONAL EFFICIENCY TRENDS — the existing historical efficiency vs league average data (from TASK-029), now living in this tab. (3) ALL-TIME MVPs/LVPs — migrated from the old history page (TASK-027). (4) PER-SEASON SUMMARY TABLE — each row is a season, columns are: decision accuracy, points left on bench, positional efficiency vs avg, number of leagues. For league-specific historical view (/skill/league/[leagueId]?tab=historical), trace the previous_league_id chain and show the same data scoped to that league's history. Load progressively."
     }
   ]
 }

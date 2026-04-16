@@ -109,7 +109,7 @@ export default function HomePage() {
       <Grid container spacing={4} sx={{ mt: 2 }}>
         {[
           { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
-          { title: 'Positional Benchmarks', desc: 'Compare your positional output and efficiency against league averages.', href: '/performance/positional', cta: 'View Benchmarks' },
+          { title: 'Manager Skill', desc: 'Analyze your positional efficiency, lineup decisions, and historical trends.', href: '/skill', cta: 'View Skills' },
           { title: 'Season Review', desc: 'Analyze your final placements and playoff performance.', href: '/performance', cta: 'View Results' },
           { title: 'Legacy Analyzer', desc: 'Explore all-time history, rivalries, and head-to-head records.', href: '/league-history', cta: 'Explore History' },
           { title: 'Roster Medic', desc: 'Scan rosters for empty spots, IR violations, and inactive starters.', href: '/medic', cta: 'Scan Rosters' },

@@ -45,7 +45,7 @@ const drawerWidth = 240;
 const BASE_MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
-  { text: 'Positional Benchmarks', href: '/performance/positional', icon: <BarChartIcon /> },
+  { text: 'Manager Skill', href: '/skill', icon: <BarChartIcon /> },
   { text: 'Season Review', href: '/performance', icon: <EmojiEventsIcon /> },
   { text: 'Legacy Analyzer', href: '/league-history', icon: <HistoryIcon /> },
   { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },

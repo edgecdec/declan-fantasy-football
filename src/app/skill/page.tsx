@@ -1,0 +1,82 @@
+'use client';
+
+import * as React from 'react';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  Container,
+  Box,
+  Tabs,
+  Tab,
+  Typography
+} from '@mui/material';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import HistoryIcon from '@mui/icons-material/History';
+import PageHeader from '@/components/common/PageHeader';
+import PositionalBenchmarksContent from '@/components/performance/PositionalBenchmarksContent';
+
+const TABS = [
+  { value: 'efficiency', label: 'Positional Efficiency', icon: <BarChartIcon /> },
+  { value: 'decisions', label: 'Start/Sit Decisions', icon: <CompareArrowsIcon /> },
+  { value: 'historical', label: 'Historical', icon: <HistoryIcon /> },
+] as const;
+
+type TabValue = typeof TABS[number]['value'];
+
+function SkillHubContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = (searchParams.get('tab') as TabValue) || 'efficiency';
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: TabValue) => {
+    router.push(`/skill?tab=${newValue}`);
+  };
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <PageHeader
+        title="Manager Skill Hub"
+        subtitle="Analyze your fantasy management skills — positional efficiency, lineup decisions, and historical trends."
+      />
+
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={currentTab} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
+          {TABS.map(tab => (
+            <Tab key={tab.value} value={tab.value} label={tab.label} icon={tab.icon} iconPosition="start" />
+          ))}
+        </Tabs>
+      </Box>
+
+      {currentTab === 'efficiency' && <PositionalBenchmarksContent />}
+
+      {currentTab === 'decisions' && (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <CompareArrowsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h5" gutterBottom>Start/Sit Decisions</Typography>
+          <Typography color="text.secondary">
+            Coming soon — analyze your weekly lineup decisions vs the optimal lineup.
+          </Typography>
+        </Box>
+      )}
+
+      {currentTab === 'historical' && (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <HistoryIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h5" gutterBottom>Historical Analysis</Typography>
+          <Typography color="text.secondary">
+            Coming soon — all-time positional trends and career MVPs/LVPs.
+          </Typography>
+        </Box>
+      )}
+    </Container>
+  );
+}
+
+export default function SkillHubPage() {
+  return (
+    <Suspense>
+      <SkillHubContent />
+    </Suspense>
+  );
+}
