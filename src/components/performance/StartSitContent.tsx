@@ -384,10 +384,13 @@ export default function StartSitContent() {
   // All metrics use ACTUAL outcomes
   const allMistakes = summaries.flatMap(s => s.worstMistakes);
 
-  const totalActualLost = allMistakes.reduce((s, m) => {
-    if (m.actualDiff != null && m.actualDiff < 0) return s + m.actualDiff;
-    return s;
-  }, 0);
+  // Skill Efficiency % averaged across leagues (don't sum raw points across different scoring)
+  const avgSkillEfficiency = summaries.length > 0
+    ? summaries.reduce((s, sm) => s + sm.skillEfficiency, 0) / summaries.length : 100;
+
+  // Net Skill +/- per week averaged across leagues
+  const avgNetSkillPerWeek = summaries.length > 0
+    ? summaries.reduce((s, sm) => s + sm.netSkillPerWeek, 0) / summaries.length : 0;
 
   const timesBeat = allMistakes.filter(m => m.actualDiff != null && m.actualDiff > 0).length;
   const netSkill = allMistakes.reduce((s, m) => s + (m.actualDiff ?? 0), 0);
@@ -440,8 +443,10 @@ export default function StartSitContent() {
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h4" color="error.main">{totalActualLost.toFixed(1)}</Typography>
-                <Typography variant="body2" color="text.secondary">Actual Pts Lost</Typography>
+                <Typography variant="h4" color={avgSkillEfficiency >= 100 ? 'success.main' : 'error.main'}>
+                  {avgSkillEfficiency.toFixed(1)}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">Skill Efficiency</Typography>
               </Paper>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -452,10 +457,10 @@ export default function StartSitContent() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h4" color={netSkill >= 0 ? 'success.main' : 'error.main'}>
-                  {netSkill >= 0 ? '+' : ''}{netSkill.toFixed(1)}
+                <Typography variant="h4" color={avgNetSkillPerWeek >= 0 ? 'success.main' : 'error.main'}>
+                  {avgNetSkillPerWeek >= 0 ? '+' : ''}{avgNetSkillPerWeek.toFixed(2)}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">Net Skill Score</Typography>
+                <Typography variant="body2" color="text.secondary">Net Skill +/− per Wk</Typography>
               </Paper>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>

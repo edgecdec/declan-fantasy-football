@@ -533,3 +533,11 @@
 - The greedy approach works well for fantasy lineup optimization because roster sizes are small and position-locked slots outnumber flex slots
 - Key insight: fill single-position slots first to avoid wasting elite players on flex slots (e.g. don't put your best QB in SUPER_FLEX when you still need to fill the QB slot)
 - StartSitPanels.tsx and types/startSit.ts are now dead code (no imports) — can be cleaned up in a future task
+
+## TASK-063 — 2026-04-16
+- Replaced "Actual Pts Lost" and "Optimal Lineup Rate" with new metrics: Skill Efficiency % (primary sort), Net Skill +/-, +/- per Wk, Optimal Weeks.
+- Added `computeSkillMetrics` helper in lineupOptimizer.ts used by both `analyzeStartSitDecisions` and `analyzeLeagueAllManagers`.
+- Skill Efficiency % = (actual started pts) / (optimal actual pts) × 100. Values ≥100% mean user beat Sleeper's projections.
+- Aggregate /skill?tab=decisions now averages percentages across leagues instead of summing raw points.
+- The `analyzeLeagueAllManagers` already ran the solver for all managers; the 0.0 issue was because the old metrics (accuracy/pointsLeft) didn't reflect meaningful data. New metrics compute correctly from weekly lineup actuals.
+- Lesson: When metrics show 0.0, check whether the data is truly missing vs the metric formula being wrong. Here the data was computed correctly but the displayed metric didn't capture useful information.

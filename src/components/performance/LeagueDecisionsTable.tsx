@@ -10,17 +10,18 @@ import { SeasonDecisionSummary } from '@/types/lineup';
 
 const RAINBOW_BG = 'linear-gradient(90deg, red, orange, yellow, green, dodgerblue, blueviolet, red)';
 
-type SortField = 'rank' | 'name' | 'accuracy' | 'pointsLeft' | 'optimalWeeks';
+type SortField = 'rank' | 'name' | 'skillEff' | 'netSkill' | 'netSkillWk' | 'optimalWeeks';
 type SortDir = 'asc' | 'desc';
 
-type ManagerDecisionRow = {
+type ManagerRow = {
   userId: string;
   displayName: string;
   avatar: string;
-  accuracy: number;
-  pointsLeft: number;
-  totalWeeks: number;
+  skillEfficiency: number;
+  netSkillPlusMinus: number;
+  netSkillPerWeek: number;
   optimalWeeks: number;
+  totalWeeks: number;
 };
 
 export default function LeagueDecisionsTable({
@@ -30,11 +31,10 @@ export default function LeagueDecisionsTable({
   currentUserId?: string;
   leagueId: string;
 }) {
-  const [sortField, setSortField] = React.useState<SortField>('accuracy');
+  const [sortField, setSortField] = React.useState<SortField>('skillEff');
   const [sortDir, setSortDir] = React.useState<SortDir>('desc');
   const [userMap, setUserMap] = React.useState<Record<string, { displayName: string; avatar: string }>>({});
 
-  // Fetch user display names and avatars
   React.useEffect(() => {
     SleeperService.getLeagueUsers(leagueId).then(users => {
       SleeperService.getRosters(leagueId).then(rosters => {
@@ -50,20 +50,19 @@ export default function LeagueDecisionsTable({
     });
   }, [leagueId]);
 
-  const rows: ManagerDecisionRow[] = React.useMemo(() =>
+  const rows: ManagerRow[] = React.useMemo(() =>
     summaries.map(s => {
       const uid = s.userId || '';
       const meta = userMap[uid];
-      const totalWeeks = s.weeklyDecisions.length;
-      const optimalWeeks = s.weeklyDecisions.filter(w => w.isOptimal).length;
       return {
         userId: uid,
         displayName: meta?.displayName || uid,
         avatar: meta?.avatar || '',
-        accuracy: s.decisionAccuracy,
-        pointsLeft: s.totalActualPointsLeftOnBench,
-        totalWeeks,
-        optimalWeeks,
+        skillEfficiency: s.skillEfficiency,
+        netSkillPlusMinus: s.netSkillPlusMinus,
+        netSkillPerWeek: s.netSkillPerWeek,
+        optimalWeeks: s.optimalWeeks,
+        totalWeeks: s.weeklyDecisions.length,
       };
     }),
   [summaries, userMap]);
@@ -73,13 +72,13 @@ export default function LeagueDecisionsTable({
     const s = [...rows].sort((a, b) => {
       switch (sortField) {
         case 'name': return a.displayName.localeCompare(b.displayName) * dir;
-        case 'accuracy': return (a.accuracy - b.accuracy) * dir;
-        case 'pointsLeft': return (a.pointsLeft - b.pointsLeft) * dir;
+        case 'skillEff': return (a.skillEfficiency - b.skillEfficiency) * dir;
+        case 'netSkill': return (a.netSkillPlusMinus - b.netSkillPlusMinus) * dir;
+        case 'netSkillWk': return (a.netSkillPerWeek - b.netSkillPerWeek) * dir;
         case 'optimalWeeks': return (a.optimalWeeks - b.optimalWeeks) * dir;
         default: return 0;
       }
     });
-    // Add rank after sort
     return s.map((r, i) => ({ ...r, rank: i + 1 }));
   }, [rows, sortField, sortDir]);
 
@@ -102,18 +101,23 @@ export default function LeagueDecisionsTable({
                 </TableSortLabel>
               </TableCell>
               <TableCell align="right">
-                <TableSortLabel active={sortField === 'accuracy'} direction={sortField === 'accuracy' ? sortDir : 'asc'} onClick={() => handleSort('accuracy')}>
-                  Optimal Lineup Rate
+                <TableSortLabel active={sortField === 'skillEff'} direction={sortField === 'skillEff' ? sortDir : 'asc'} onClick={() => handleSort('skillEff')}>
+                  Skill Efficiency %
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={sortField === 'netSkill'} direction={sortField === 'netSkill' ? sortDir : 'asc'} onClick={() => handleSort('netSkill')}>
+                  Net Skill +/−
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={sortField === 'netSkillWk'} direction={sortField === 'netSkillWk' ? sortDir : 'asc'} onClick={() => handleSort('netSkillWk')}>
+                  +/− per Wk
                 </TableSortLabel>
               </TableCell>
               <TableCell align="right">
                 <TableSortLabel active={sortField === 'optimalWeeks'} direction={sortField === 'optimalWeeks' ? sortDir : 'asc'} onClick={() => handleSort('optimalWeeks')}>
                   Optimal Weeks
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right">
-                <TableSortLabel active={sortField === 'pointsLeft'} direction={sortField === 'pointsLeft' ? sortDir : 'asc'} onClick={() => handleSort('pointsLeft')}>
-                  Actual Pts Left on Bench
                 </TableSortLabel>
               </TableCell>
             </TableRow>
@@ -142,14 +146,17 @@ export default function LeagueDecisionsTable({
                       {row.displayName}
                     </Box>
                   </TableCell>
-                  <TableCell align="right" sx={{ color: row.accuracy >= 50 ? 'success.main' : 'error.main', fontWeight: 600 }}>
-                    {row.accuracy.toFixed(1)}%
+                  <TableCell align="right" sx={{ color: row.skillEfficiency >= 100 ? 'success.main' : 'error.main', fontWeight: 600 }}>
+                    {row.skillEfficiency.toFixed(1)}%
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: row.netSkillPlusMinus >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
+                    {row.netSkillPlusMinus >= 0 ? '+' : ''}{row.netSkillPlusMinus.toFixed(1)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: row.netSkillPerWeek >= 0 ? 'success.main' : 'error.main' }}>
+                    {row.netSkillPerWeek >= 0 ? '+' : ''}{row.netSkillPerWeek.toFixed(2)}
                   </TableCell>
                   <TableCell align="right">
                     {row.optimalWeeks} / {row.totalWeeks}
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: row.pointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
-                    {row.pointsLeft > 0 ? `−${row.pointsLeft.toFixed(1)}` : '0.0'}
                   </TableCell>
                 </TableRow>
               );

@@ -193,6 +193,30 @@ export function calculateOptimalLineup(
 
 const DEFAULT_REGULAR_SEASON_WEEKS = 14;
 
+/** Compute skill efficiency metrics from weekly decision data */
+function computeSkillMetrics(weekly: WeeklyDecision[]) {
+  let totalActualStarted = 0;
+  let totalActualOptimal = 0;
+  let optimalWeeks = 0;
+  let netSkillPlusMinus = 0;
+
+  for (const w of weekly) {
+    const actPts = w.optimal.actualLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+    const optPts = w.optimal.optimalLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+    totalActualStarted += actPts;
+    totalActualOptimal += optPts;
+    const weekSkill = actPts - optPts;
+    netSkillPlusMinus += weekSkill;
+    if (weekSkill >= 0) optimalWeeks++;
+  }
+
+  const skillEfficiency = totalActualOptimal > 0
+    ? (totalActualStarted / totalActualOptimal) * 100 : 100;
+  const netSkillPerWeek = weekly.length > 0 ? netSkillPlusMinus / weekly.length : 0;
+
+  return { skillEfficiency, netSkillPlusMinus, netSkillPerWeek, optimalWeeks, totalActualStarted, totalActualOptimal };
+}
+
 /** Analyze one user across all regular-season weeks in one league */
 export async function analyzeStartSitDecisions(
   leagueId: string,
@@ -269,6 +293,8 @@ export async function analyzeStartSitDecisions(
 
   allMistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
+  const skill = computeSkillMetrics(weekly);
+
   return {
     leagueId, leagueName: league.name, season,
     totalPointsLeftOnBench: totalPtsLeft,
@@ -277,6 +303,7 @@ export async function analyzeStartSitDecisions(
     weeklyDecisions: weekly,
     positionAccuracy,
     worstMistakes: allMistakes,
+    ...skill,
   };
 }
 
@@ -363,6 +390,8 @@ export async function analyzeLeagueAllManagers(
 
     mgr.mistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
+    const skill = computeSkillMetrics(mgr.weekly);
+
     results.push({
       leagueId, leagueName: league.name, season,
       totalPointsLeftOnBench: totalPtsLeft,
@@ -372,6 +401,7 @@ export async function analyzeLeagueAllManagers(
       positionAccuracy,
       worstMistakes: mgr.mistakes,
       userId: mgr.ownerId,
+      ...skill,
     });
   }
 

@@ -49,4 +49,16 @@ export type SeasonDecisionSummary = {
   positionAccuracy: PositionAccuracy[];
   worstMistakes: LineupMistake[];
   userId?: string;
+  /** (actual started pts) / (optimal actual pts) × 100 */
+  skillEfficiency: number;
+  /** Sum of all actualDiff across all mistakes & weeks */
+  netSkillPlusMinus: number;
+  /** netSkillPlusMinus / weeks played */
+  netSkillPerWeek: number;
+  /** Weeks where weekly net skill +/- >= 0 */
+  optimalWeeks: number;
+  /** Total actual points scored by starters */
+  totalActualStarted: number;
+  /** Total actual points the optimal lineup would have scored */
+  totalActualOptimal: number;
 };
