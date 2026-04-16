@@ -483,3 +483,15 @@
 - Added Historical tab to both the main skill hub page and the league drilldown page.
 - Reused existing components: PlayerImpactList, PositionalHeatmap, SmartTable, StartsTooltip.
 - Lessons: The old /performance/positional/history page had all the positional/MVP logic already — the main work was adding decision accuracy integration and wiring it into the new component structure. Keeping the two HistoricalContent components separate (global vs league-scoped) is cleaner than trying to make one component handle both cases.
+
+## TASK-060: Fix broken projections and redesign Start/Sit Decisions tab
+- Date: 2026-04-16
+- Root cause of broken projections: Sleeper's `/projections/nfl/regular/{season}/{week}` API returns `Record<player_id, stats>` (a dict keyed by player_id with stats directly as the value), NOT `Array<{ player_id, stats }>` as the code assumed. The getWeeklyProjections method was trying to iterate it as an array and extract `.player_id` and `.stats` fields, which failed silently, producing an empty projections map and 0.0 for all values.
+- Fix: Changed getWeeklyProjections to directly use the API response dict as-is, since it already matches the SleeperWeeklyProjections type (Record<string, SleeperProjection>).
+- Also added `starters_points` and `players_points` to SleeperMatchup type to access actual scored points.
+- Updated lineup.ts types: added `actualPoints` to LineupSlot and LineupMistake, and `actualDiff` to LineupMistake for comparing actual vs projected outcomes.
+- Added `leagueId` and `leagueName` to WeeklyDecision for drill-down context.
+- Redesigned StartSitPanels: Week → League → Lineup nested drill-down using MUI Accordion/Collapse pattern. Each week expands to show per-league breakdown, each league expands to show side-by-side actual vs optimal lineup with +/- column.
+- Redesigned summary cards: Actual Pts Lost, Times Beat Projections, Net Skill Score, Worst Position.
+- Updated AggWeek type to include `leagues: LeagueWeekDetail[]` instead of flat `decisions` array.
+- Lesson: Always verify API response format against the actual live endpoint before assuming the shape. The Sleeper API is undocumented and response formats can differ from expectations.

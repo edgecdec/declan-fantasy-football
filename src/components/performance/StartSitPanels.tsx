@@ -12,58 +12,126 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { LineupMistake, PositionAccuracy } from '@/types/lineup';
+import { LineupMistake, PositionAccuracy, LineupSlot } from '@/types/lineup';
 import { getPositionColor } from '@/constants/colors';
-import { AggWeek, SortField, SortDir } from '@/types/startSit';
+import { AggWeek, LeagueWeekDetail, SortField, SortDir } from '@/types/startSit';
 
 const HIGH_ACCURACY = 90;
 const MID_ACCURACY = 70;
 
 const COLUMNS: { field: SortField; label: string }[] = [
   { field: 'week', label: 'Week' },
-  { field: 'projected', label: 'Your Proj' },
-  { field: 'optimal', label: 'Optimal Proj' },
-  { field: 'pointsLeft', label: 'Pts Left on Bench' },
-  { field: 'mistakes', label: 'Mistakes' },
+  { field: 'pointsLeft', label: 'Proj Pts Left on Bench' },
+  { field: 'mistakes', label: 'Leagues' },
 ];
 
-function MistakeRow({ m }: { m: LineupMistake }) {
-  return (
-    <TableRow>
-      <TableCell><Chip label={m.slot} size="small" sx={{ bgcolor: getPositionColor(m.slot), color: '#fff', fontWeight: 700 }} /></TableCell>
-      <TableCell sx={{ color: 'error.main' }}>{m.started.playerName} ({m.started.projectedPoints.toFixed(1)})</TableCell>
-      <TableCell sx={{ color: 'success.main' }}>{m.shouldHaveStarted.playerName} ({m.shouldHaveStarted.projectedPoints.toFixed(1)})</TableCell>
-      <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>−{m.pointsDiff.toFixed(1)}</TableCell>
-    </TableRow>
-  );
+function formatPts(v: number | undefined): string {
+  return v != null ? v.toFixed(1) : '—';
 }
 
-/** Expanded detail for a single week showing all lineup mistakes */
-export function WeekDetailRow({ row }: { row: AggWeek }) {
-  const mistakes = row.decisions.flatMap(d => d.optimal.mistakes).sort((a, b) => b.pointsDiff - a.pointsDiff);
-  if (mistakes.length === 0) {
-    return <Typography variant="body2" color="success.main" sx={{ py: 1 }}>✓ Optimal lineup set for all leagues this week.</Typography>;
-  }
+function diffColor(v: number | undefined): string {
+  if (v == null) return 'text.secondary';
+  return v > 0 ? 'success.main' : v < 0 ? 'error.main' : 'text.secondary';
+}
+
+/** Side-by-side actual vs optimal for one league+week */
+function LineupComparison({ actual, optimal, mistakes }: {
+  actual: LineupSlot[]; optimal: LineupSlot[]; mistakes: LineupMistake[];
+}) {
+  const mistakeSlots = new Set(mistakes.map(m => m.slot + m.started.playerId));
   return (
     <Table size="small">
       <TableHead>
         <TableRow>
           <TableCell>Slot</TableCell>
           <TableCell>You Started</TableCell>
-          <TableCell>Should Have Started</TableCell>
-          <TableCell align="right">Proj Diff</TableCell>
+          <TableCell align="right">Proj</TableCell>
+          <TableCell align="right">Actual</TableCell>
+          <TableCell>Optimal Pick</TableCell>
+          <TableCell align="right">Proj</TableCell>
+          <TableCell align="right">Actual</TableCell>
+          <TableCell align="right">+/−</TableCell>
         </TableRow>
       </TableHead>
-      <TableBody>{mistakes.map((m, i) => <MistakeRow key={i} m={m} />)}</TableBody>
+      <TableBody>
+        {actual.map((a, i) => {
+          const o = optimal[i];
+          const isMistake = mistakeSlots.has(a.slot + a.playerId);
+          const actualDiff = a.actualPoints != null && o?.actualPoints != null
+            ? a.actualPoints - o.actualPoints : undefined;
+          return (
+            <TableRow key={i} sx={isMistake ? { bgcolor: 'action.hover' } : undefined}>
+              <TableCell>
+                <Chip label={a.slot} size="small" sx={{ bgcolor: getPositionColor(a.position), color: '#fff', fontWeight: 700, minWidth: 50 }} />
+              </TableCell>
+              <TableCell sx={isMistake ? { color: 'error.main' } : undefined}>{a.playerName}</TableCell>
+              <TableCell align="right">{formatPts(a.projectedPoints)}</TableCell>
+              <TableCell align="right">{formatPts(a.actualPoints)}</TableCell>
+              <TableCell sx={isMistake ? { color: 'success.main' } : undefined}>{o?.playerName || '—'}</TableCell>
+              <TableCell align="right">{formatPts(o?.projectedPoints)}</TableCell>
+              <TableCell align="right">{formatPts(o?.actualPoints)}</TableCell>
+              <TableCell align="right" sx={{ color: diffColor(actualDiff), fontWeight: 600 }}>
+                {actualDiff != null ? (actualDiff >= 0 ? '+' : '') + actualDiff.toFixed(1) : '—'}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
     </Table>
   );
 }
 
-/** Sortable weekly breakdown table with collapsible detail rows */
-export function WeeklyBreakdown({ rows, sortField, sortDir, expandedWeek, onSort, onToggle }: {
-  rows: AggWeek[]; sortField: SortField; sortDir: SortDir; expandedWeek: number | null;
-  onSort: (f: SortField) => void; onToggle: (w: number) => void;
+/** Expandable league row within a week */
+function LeagueRow({ detail, expanded, onToggle }: {
+  detail: LeagueWeekDetail; expanded: boolean; onToggle: () => void;
 }) {
+  const { decision } = detail;
+  return (
+    <>
+      <TableRow hover sx={{ cursor: 'pointer', '& > *': { borderBottom: expanded ? 'unset' : undefined } }} onClick={onToggle}>
+        <TableCell sx={{ pl: 4 }}>
+          <IconButton size="small">{expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}</IconButton>
+        </TableCell>
+        <TableCell>{detail.leagueName}</TableCell>
+        <TableCell align="right">{detail.projected.toFixed(1)}</TableCell>
+        <TableCell align="right">{detail.optimal.toFixed(1)}</TableCell>
+        <TableCell align="right" sx={{ color: detail.pointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
+          {detail.pointsLeft > 0 ? `−${detail.pointsLeft.toFixed(1)}` : '0.0'}
+        </TableCell>
+        <TableCell align="right">
+          {detail.mistakeCount === 0
+            ? <Chip label="✓ Optimal" size="small" color="success" variant="outlined" />
+            : <Chip label={String(detail.mistakeCount)} size="small" color="error" variant="outlined" />}
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell sx={{ py: 0, border: 0 }} colSpan={6}>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Box sx={{ py: 2 }}>
+              {detail.mistakeCount === 0
+                ? <Typography variant="body2" color="success.main">✓ Optimal lineup set.</Typography>
+                : <LineupComparison
+                    actual={decision.optimal.actualLineup}
+                    optimal={decision.optimal.optimalLineup}
+                    mistakes={decision.optimal.mistakes}
+                  />
+              }
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
+
+/** Sortable weekly breakdown with Week → League → Lineup drill-down */
+export function WeeklyBreakdown({ rows, sortField, sortDir, onSort }: {
+  rows: AggWeek[]; sortField: SortField; sortDir: SortDir;
+  onSort: (f: SortField) => void;
+}) {
+  const [expandedWeek, setExpandedWeek] = React.useState<number | null>(null);
+  const [expandedLeague, setExpandedLeague] = React.useState<string | null>(null);
+
   return (
     <Paper sx={{ mb: 3 }}>
       <Typography variant="h6" sx={{ p: 2, pb: 1 }}>Weekly Breakdown</Typography>
@@ -74,32 +142,60 @@ export function WeeklyBreakdown({ rows, sortField, sortDir, expandedWeek, onSort
               <TableCell width={40} />
               {COLUMNS.map(c => (
                 <TableCell key={c.field} align={c.field === 'week' ? 'left' : 'right'} sortDirection={sortField === c.field ? sortDir : false}>
-                  <TableSortLabel active={sortField === c.field} direction={sortField === c.field ? sortDir : 'asc'} onClick={() => onSort(c.field)}>{c.label}</TableSortLabel>
+                  <TableSortLabel active={sortField === c.field} direction={sortField === c.field ? sortDir : 'asc'} onClick={() => onSort(c.field)}>
+                    {c.label}
+                  </TableSortLabel>
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map(row => {
-              const open = expandedWeek === row.week;
+              const weekOpen = expandedWeek === row.week;
               return (
                 <React.Fragment key={row.week}>
-                  <TableRow hover sx={{ cursor: 'pointer', '& > *': { borderBottom: open ? 'unset' : undefined } }} onClick={() => onToggle(row.week)}>
-                    <TableCell><IconButton size="small">{open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}</IconButton></TableCell>
+                  <TableRow
+                    hover
+                    sx={{ cursor: 'pointer', '& > *': { borderBottom: weekOpen ? 'unset' : undefined } }}
+                    onClick={() => { setExpandedWeek(weekOpen ? null : row.week); setExpandedLeague(null); }}
+                  >
+                    <TableCell><IconButton size="small">{weekOpen ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}</IconButton></TableCell>
                     <TableCell>Week {row.week}</TableCell>
-                    <TableCell align="right">{row.projected.toFixed(1)}</TableCell>
-                    <TableCell align="right">{row.optimal.toFixed(1)}</TableCell>
                     <TableCell align="right" sx={{ color: row.pointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
                       {row.pointsLeft > 0 ? `−${row.pointsLeft.toFixed(1)}` : '0.0'}
                     </TableCell>
-                    <TableCell align="right">
-                      {row.mistakeCount === 0 ? <Chip label="✓ Optimal" size="small" color="success" variant="outlined" /> : <Chip label={String(row.mistakeCount)} size="small" color="error" variant="outlined" />}
-                    </TableCell>
+                    <TableCell align="right">{row.leagues.length}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell sx={{ py: 0, border: 0 }} colSpan={6}>
-                      <Collapse in={open} timeout="auto" unmountOnExit>
-                        <Box sx={{ py: 2 }}><WeekDetailRow row={row} /></Box>
+                    <TableCell sx={{ py: 0, border: 0 }} colSpan={4}>
+                      <Collapse in={weekOpen} timeout="auto" unmountOnExit>
+                        <Box sx={{ py: 1 }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell width={40} />
+                                <TableCell>League</TableCell>
+                                <TableCell align="right">Your Proj</TableCell>
+                                <TableCell align="right">Optimal Proj</TableCell>
+                                <TableCell align="right">Pts Left</TableCell>
+                                <TableCell align="right">Mistakes</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {row.leagues.map(lg => {
+                                const lgKey = `${row.week}-${lg.leagueId}`;
+                                return (
+                                  <LeagueRow
+                                    key={lgKey}
+                                    detail={lg}
+                                    expanded={expandedLeague === lgKey}
+                                    onToggle={() => setExpandedLeague(expandedLeague === lgKey ? null : lgKey)}
+                                  />
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </Box>
                       </Collapse>
                     </TableCell>
                   </TableRow>
@@ -153,9 +249,22 @@ export function WorstMistakesList({ mistakes }: { mistakes: LineupMistake[] }) {
             <TableCell>Started</TableCell>
             <TableCell>Should Have Started</TableCell>
             <TableCell align="right">Proj Diff</TableCell>
+            <TableCell align="right">Actual +/−</TableCell>
           </TableRow>
         </TableHead>
-        <TableBody>{mistakes.map((m, i) => <MistakeRow key={i} m={m} />)}</TableBody>
+        <TableBody>
+          {mistakes.map((m, i) => (
+            <TableRow key={i}>
+              <TableCell><Chip label={m.slot} size="small" sx={{ bgcolor: getPositionColor(m.slot), color: '#fff', fontWeight: 700 }} /></TableCell>
+              <TableCell sx={{ color: 'error.main' }}>{m.started.playerName} ({formatPts(m.started.projectedPoints)})</TableCell>
+              <TableCell sx={{ color: 'success.main' }}>{m.shouldHaveStarted.playerName} ({formatPts(m.shouldHaveStarted.projectedPoints)})</TableCell>
+              <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>−{m.pointsDiff.toFixed(1)}</TableCell>
+              <TableCell align="right" sx={{ color: diffColor(m.actualDiff), fontWeight: 600 }}>
+                {m.actualDiff != null ? (m.actualDiff >= 0 ? '+' : '') + m.actualDiff.toFixed(1) : '—'}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
       </Table>
     </Paper>
   );

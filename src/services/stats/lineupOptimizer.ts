@@ -110,13 +110,15 @@ function solveLineup(
  * @param projections Map of player_id -> stat projections for this week
  * @param scoringSettings League scoring_settings (stat key -> point value)
  * @param actualStarters The starters array from the matchup (ordered by roster slot)
+ * @param playersPoints Optional map of player_id -> actual points scored
  */
 export function calculateOptimalLineup(
   rosterPlayerIds: string[],
   rosterPositions: string[],
   projections: Record<string, SleeperProjection>,
   scoringSettings: Record<string, number>,
-  actualStarters: string[]
+  actualStarters: string[],
+  playersPoints?: Record<string, number>
 ): OptimalLineupResult {
   // Build player pool with projected points
   const playerPool = rosterPlayerIds
@@ -131,6 +133,11 @@ export function calculateOptimalLineup(
   // Solve optimal lineup
   const optimalLineup = solveLineup(playerPool, rosterPositions);
 
+  // Attach actual points to optimal lineup
+  for (const slot of optimalLineup) {
+    slot.actualPoints = playersPoints?.[slot.playerId];
+  }
+
   // Build actual lineup from starters
   const starterSlots = rosterPositions.filter(s => s !== 'BN');
   const actualLineup: LineupSlot[] = actualStarters
@@ -141,6 +148,7 @@ export function calculateOptimalLineup(
       playerName: getPlayerName(playerId),
       position: getPlayerPosition(playerId),
       projectedPoints: calculateProjectedPoints(projections[playerId], scoringSettings),
+      actualPoints: playersPoints?.[playerId],
     }));
 
   // Calculate points left on bench
@@ -160,6 +168,8 @@ export function calculateOptimalLineup(
       a => a.slot === optSlot.slot && !optimalStarterSet.has(a.playerId)
     );
     if (actualInSlot) {
+      const actualStartedPts = playersPoints?.[actualInSlot.playerId];
+      const actualOptimalPts = playersPoints?.[optSlot.playerId];
       mistakes.push({
         slot: optSlot.slot,
         started: {
@@ -167,14 +177,18 @@ export function calculateOptimalLineup(
           playerName: actualInSlot.playerName,
           position: actualInSlot.position,
           projectedPoints: actualInSlot.projectedPoints,
+          actualPoints: actualStartedPts,
         },
         shouldHaveStarted: {
           playerId: optSlot.playerId,
           playerName: optSlot.playerName,
           position: optSlot.position,
           projectedPoints: optSlot.projectedPoints,
+          actualPoints: actualOptimalPts,
         },
         pointsDiff: optSlot.projectedPoints - actualInSlot.projectedPoints,
+        actualDiff: actualStartedPts != null && actualOptimalPts != null
+          ? actualStartedPts - actualOptimalPts : undefined,
       });
     }
   }
@@ -238,12 +252,13 @@ export async function analyzeStartSitDecisions(
       projections,
       scoringSettings,
       userMatchup.starters,
+      userMatchup.players_points,
     );
 
     const isOptimal = result.mistakes.length === 0;
     if (isOptimal) optimalWeeks++;
 
-    weeklyDecisions.push({ week, optimal: result, isOptimal });
+    weeklyDecisions.push({ week, leagueId, leagueName: league.name, optimal: result, isOptimal });
     allMistakes.push(...result.mistakes);
 
     // Track per-position mistakes
@@ -347,7 +362,7 @@ export async function analyzeLeagueAllManagers(
       if (!mgr || !matchup.starters?.length || !matchup.players?.length) continue;
 
       const result = calculateOptimalLineup(
-        matchup.players, rosterPositions, projections, scoringSettings, matchup.starters,
+        matchup.players, rosterPositions, projections, scoringSettings, matchup.starters, matchup.players_points,
       );
       const isOptimal = result.mistakes.length === 0;
       if (isOptimal) mgr.optimalWeeks++;

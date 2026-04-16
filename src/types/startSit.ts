@@ -1,12 +1,24 @@
 import { WeeklyDecision, SeasonDecisionSummary, PositionAccuracy } from '@/types/lineup';
 
+/** A single league's data for one week */
+export type LeagueWeekDetail = {
+  leagueId: string;
+  leagueName: string;
+  projected: number;
+  optimal: number;
+  pointsLeft: number;
+  mistakeCount: number;
+  decision: WeeklyDecision;
+};
+
+/** Aggregated week row with per-league breakdown */
 export type AggWeek = {
   week: number;
   projected: number;
   optimal: number;
   pointsLeft: number;
   mistakeCount: number;
-  decisions: WeeklyDecision[];
+  leagues: LeagueWeekDetail[];
 };
 
 export type SortField = 'week' | 'projected' | 'optimal' | 'pointsLeft' | 'mistakes';
@@ -16,12 +28,22 @@ export function aggregateWeekly(summaries: SeasonDecisionSummary[]): AggWeek[] {
   const byWeek = new Map<number, AggWeek>();
   for (const s of summaries) {
     for (const w of s.weeklyDecisions) {
-      const e = byWeek.get(w.week) || { week: w.week, projected: 0, optimal: 0, pointsLeft: 0, mistakeCount: 0, decisions: [] };
-      e.projected += w.optimal.actualLineup.reduce((a, b) => a + b.projectedPoints, 0);
-      e.optimal += w.optimal.optimalLineup.reduce((a, b) => a + b.projectedPoints, 0);
+      const e = byWeek.get(w.week) || { week: w.week, projected: 0, optimal: 0, pointsLeft: 0, mistakeCount: 0, leagues: [] };
+      const proj = w.optimal.actualLineup.reduce((a, b) => a + b.projectedPoints, 0);
+      const opt = w.optimal.optimalLineup.reduce((a, b) => a + b.projectedPoints, 0);
+      e.projected += proj;
+      e.optimal += opt;
       e.pointsLeft += w.optimal.pointsLeftOnBench;
       e.mistakeCount += w.optimal.mistakes.length;
-      e.decisions.push(w);
+      e.leagues.push({
+        leagueId: w.leagueId || s.leagueId,
+        leagueName: w.leagueName || s.leagueName,
+        projected: proj,
+        optimal: opt,
+        pointsLeft: w.optimal.pointsLeftOnBench,
+        mistakeCount: w.optimal.mistakes.length,
+        decision: w,
+      });
       byWeek.set(w.week, e);
     }
   }

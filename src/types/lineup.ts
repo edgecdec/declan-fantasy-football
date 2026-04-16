@@ -4,13 +4,15 @@ export type LineupSlot = {
   playerName: string;
   position: string;
   projectedPoints: number;
+  actualPoints?: number;
 };
 
 export type LineupMistake = {
   slot: string;
-  started: { playerId: string; playerName: string; position: string; projectedPoints: number };
-  shouldHaveStarted: { playerId: string; playerName: string; position: string; projectedPoints: number };
+  started: { playerId: string; playerName: string; position: string; projectedPoints: number; actualPoints?: number };
+  shouldHaveStarted: { playerId: string; playerName: string; position: string; projectedPoints: number; actualPoints?: number };
   pointsDiff: number;
+  actualDiff?: number;
 };
 
 export type OptimalLineupResult = {
@@ -22,6 +24,8 @@ export type OptimalLineupResult = {
 
 export type WeeklyDecision = {
   week: number;
+  leagueId?: string;
+  leagueName?: string;
   optimal: OptimalLineupResult;
   isOptimal: boolean;
 };

@@ -12,7 +12,6 @@ import YearSelector from '@/components/common/YearSelector';
 import { WeeklyBreakdown, PositionAccuracyChart, WorstMistakesList } from '@/components/performance/StartSitPanels';
 
 const WORST_MISTAKES_COUNT = 5;
-const ACCURACY_THRESHOLD = 50;
 
 export default function StartSitContent() {
   const { user, fetchUser } = useUser();
@@ -23,7 +22,6 @@ export default function StartSitContent() {
   const [summaries, setSummaries] = React.useState<SeasonDecisionSummary[]>([]);
   const [sortField, setSortField] = React.useState<SortField>('week');
   const [sortDir, setSortDir] = React.useState<SortDir>('asc');
-  const [expandedWeek, setExpandedWeek] = React.useState<number | null>(null);
   const prevTrigger = React.useRef('');
 
   React.useEffect(() => { if (user) setUsername(user.username); }, [user]);
@@ -61,14 +59,25 @@ export default function StartSitContent() {
     }
   };
 
-  const totalPointsLeft = summaries.reduce((s, d) => s + d.totalPointsLeftOnBench, 0);
-  const allWeekly = summaries.flatMap(s => s.weeklyDecisions);
-  const optimalWeeks = allWeekly.filter(w => w.isOptimal).length;
-  const accuracy = allWeekly.length > 0 ? (optimalWeeks / allWeekly.length) * 100 : 0;
+  // Compute summary stats
+  const allMistakes = summaries.flatMap(s => s.worstMistakes).sort((a, b) => b.pointsDiff - a.pointsDiff);
+
+  // Net actual points lost: sum actualDiff for all mistakes (negative = user lost pts)
+  const totalActualLost = allMistakes.reduce((s, m) => {
+    if (m.actualDiff != null && m.actualDiff < 0) return s + m.actualDiff;
+    return s;
+  }, 0);
+
+  // Times user beat projections (their pick scored more than the optimal pick)
+  const timesBeatProjection = allMistakes.filter(m => m.actualDiff != null && m.actualDiff > 0).length;
+
+  // Net skill: sum of all actualDiff values (positive = user is better than projections overall)
+  const netSkill = allMistakes.reduce((s, m) => s + (m.actualDiff ?? 0), 0);
+
   const posAccuracy = mergePositionAccuracy(summaries);
   const worstPosition = posAccuracy.length > 0 ? posAccuracy[0].position : '—';
   const weeklyRows = aggregateWeekly(summaries);
-  const allMistakes = summaries.flatMap(s => s.worstMistakes).sort((a, b) => b.pointsDiff - a.pointsDiff).slice(0, WORST_MISTAKES_COUNT);
+  const topMistakes = allMistakes.slice(0, WORST_MISTAKES_COUNT);
 
   const handleSort = (field: SortField) => {
     setSortDir(sortField === field && sortDir === 'asc' ? 'desc' : 'asc');
@@ -103,31 +112,39 @@ export default function StartSitContent() {
       {summaries.length > 0 && (
         <>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h4" color="error.main">{totalPointsLeft.toFixed(1)}</Typography>
-                <Typography variant="body2" color="text.secondary">Projected Pts Left on Bench</Typography>
+                <Typography variant="h4" color="error.main">{totalActualLost.toFixed(1)}</Typography>
+                <Typography variant="body2" color="text.secondary">Actual Pts Lost</Typography>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h4" color={accuracy >= ACCURACY_THRESHOLD ? 'success.main' : 'error.main'}>{accuracy.toFixed(1)}%</Typography>
-                <Typography variant="body2" color="text.secondary">Optimal Lineup Rate</Typography>
+                <Typography variant="h4" color="success.main">{timesBeatProjection}</Typography>
+                <Typography variant="body2" color="text.secondary">Times Beat Projections</Typography>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="h4" color={netSkill >= 0 ? 'success.main' : 'error.main'}>
+                  {netSkill >= 0 ? '+' : ''}{netSkill.toFixed(1)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">Net Skill Score</Typography>
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="h4" color="warning.main">{worstPosition}</Typography>
-                <Typography variant="body2" color="text.secondary">Worst Decision Position</Typography>
+                <Typography variant="body2" color="text.secondary">Worst Position</Typography>
               </Paper>
             </Grid>
           </Grid>
 
-          <WeeklyBreakdown rows={sortedRows} sortField={sortField} sortDir={sortDir} expandedWeek={expandedWeek} onSort={handleSort} onToggle={w => setExpandedWeek(expandedWeek === w ? null : w)} />
+          <WeeklyBreakdown rows={sortedRows} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }}><PositionAccuracyChart data={posAccuracy} /></Grid>
-            <Grid size={{ xs: 12, md: 6 }}><WorstMistakesList mistakes={allMistakes} /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><WorstMistakesList mistakes={topMistakes} /></Grid>
           </Grid>
         </>
       )}

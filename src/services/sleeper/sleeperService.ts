@@ -54,6 +54,8 @@ export type SleeperMatchup = {
   matchup_id: number;
   points: number;
   custom_points: number | null;
+  starters_points?: number[];
+  players_points?: Record<string, number>;
 };
 
 export type SleeperBracketMatch = {
@@ -599,13 +601,10 @@ export const SleeperService = {
     try {
       const res = await fetch(`${BASE_URL}/projections/nfl/regular/${season}/${week}`);
       if (!res.ok) return {};
-      const data: Array<{ player_id: string; stats: SleeperProjection }> = await res.json();
-      const mapped: SleeperWeeklyProjections = {};
-      for (const entry of data) {
-        if (entry.player_id && entry.stats) mapped[entry.player_id] = entry.stats;
-      }
-      CacheService.set(cacheKey, mapped, { storage: 'session', ttl: 1000 * 60 * 60 });
-      return mapped;
+      const data: Record<string, SleeperProjection> = await res.json();
+      // API returns { player_id: { stat: value, ... } } directly
+      CacheService.set(cacheKey, data, { storage: 'session', ttl: 1000 * 60 * 60 });
+      return data;
     } catch (e) {
       console.error(`Error fetching projections for ${season} week ${week}`, e);
       return {};
