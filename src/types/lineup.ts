@@ -19,6 +19,7 @@ export type OptimalLineupResult = {
   optimalLineup: LineupSlot[];
   actualLineup: LineupSlot[];
   pointsLeftOnBench: number;
+  actualPointsLeftOnBench: number;
   mistakes: LineupMistake[];
 };
 
@@ -42,6 +43,7 @@ export type SeasonDecisionSummary = {
   leagueName: string;
   season: string;
   totalPointsLeftOnBench: number;
+  totalActualPointsLeftOnBench: number;
   decisionAccuracy: number;
   weeklyDecisions: WeeklyDecision[];
   positionAccuracy: PositionAccuracy[];

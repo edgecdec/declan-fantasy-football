@@ -502,3 +502,13 @@
 - Approach: When resolveDraftPick finds the player a pick became, we now store the playerId and position. A new calculateResolvedPickEfficiency function runs the same efficiency calculation as regular player trades (points vs league positional avg for each week started post-trade). The efficiency is attached to the TradeDraftPick and included in the side's total. The UI shows position chip, weeks started, team/total/avg efficiency for resolved picks instead of N/A. Unresolved picks still show N/A.
 - Verified: Nova Act test confirmed resolved picks display real efficiency values on league 1206336001794920448 (e.g. "2025 Rd 1 → Saquon Barkley" shows RB chip and efficiency numbers).
 - Lesson: The existing code structure made this straightforward — resolveDraftPick already identified the player, just needed to carry the ID through and run the same calculation pattern used for regular player trades.
+
+## TASK-061: Make all Start/Sit metrics use actual point outcomes (2026-04-16)
+- Changed all summary cards (Actual Pts Lost, Times Beat Projections, Net Skill Score) to use actualDiff from real game outcomes instead of projected point differences.
+- Top 5 Worst Mistakes now sorted by most negative actualDiff (worst actual outcomes), not projected.
+- Weekly breakdown rows show "Actual Pts Left" instead of projected. League-level rows show actual pts left and skill +/-.
+- Removed the per-league truncation of mistakes to top 5 (was losing data for aggregate calculations) — all mistakes now pass through to the UI.
+- Added `actualPointsLeftOnBench` field to OptimalLineupResult and `totalActualPointsLeftOnBench` to SeasonDecisionSummary.
+- Updated aggregateWeekly in startSit.ts to compute actual-based week/league totals.
+- Updated LeagueDecisionsTable and both historical content components to use actual-based points left.
+- Lesson: The `worstMistakes` field was previously truncated to 5 per league which silently discarded data needed for cross-league aggregation. Always be careful about truncation in service layers — let the UI decide how much to show.

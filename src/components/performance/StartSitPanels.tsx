@@ -21,7 +21,7 @@ const MID_ACCURACY = 70;
 
 const COLUMNS: { field: SortField; label: string }[] = [
   { field: 'week', label: 'Week' },
-  { field: 'pointsLeft', label: 'Proj Pts Left on Bench' },
+  { field: 'actualPointsLeft', label: 'Actual Pts Left' },
   { field: 'mistakes', label: 'Leagues' },
 ];
 
@@ -50,7 +50,7 @@ function LineupComparison({ actual, optimal, mistakes }: {
           <TableCell>Optimal Pick</TableCell>
           <TableCell align="right">Proj</TableCell>
           <TableCell align="right">Actual</TableCell>
-          <TableCell align="right">+/−</TableCell>
+          <TableCell align="right">Skill +/−</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -93,10 +93,11 @@ function LeagueRow({ detail, expanded, onToggle }: {
           <IconButton size="small">{expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}</IconButton>
         </TableCell>
         <TableCell>{detail.leagueName}</TableCell>
-        <TableCell align="right">{detail.projected.toFixed(1)}</TableCell>
-        <TableCell align="right">{detail.optimal.toFixed(1)}</TableCell>
-        <TableCell align="right" sx={{ color: detail.pointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
-          {detail.pointsLeft > 0 ? `−${detail.pointsLeft.toFixed(1)}` : '0.0'}
+        <TableCell align="right" sx={{ color: diffColor(-detail.actualPointsLeft), fontWeight: 600 }}>
+          {detail.actualPointsLeft > 0 ? `−${detail.actualPointsLeft.toFixed(1)}` : detail.actualPointsLeft < 0 ? `+${Math.abs(detail.actualPointsLeft).toFixed(1)}` : '0.0'}
+        </TableCell>
+        <TableCell align="right" sx={{ color: diffColor(detail.actualSkillPlusMinus), fontWeight: 600 }}>
+          {detail.actualSkillPlusMinus >= 0 ? '+' : ''}{detail.actualSkillPlusMinus.toFixed(1)}
         </TableCell>
         <TableCell align="right">
           {detail.mistakeCount === 0
@@ -105,7 +106,7 @@ function LeagueRow({ detail, expanded, onToggle }: {
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell sx={{ py: 0, border: 0 }} colSpan={6}>
+        <TableCell sx={{ py: 0, border: 0 }} colSpan={5}>
           <Collapse in={expanded} timeout="auto" unmountOnExit>
             <Box sx={{ py: 2 }}>
               {detail.mistakeCount === 0
@@ -161,8 +162,8 @@ export function WeeklyBreakdown({ rows, sortField, sortDir, onSort }: {
                   >
                     <TableCell><IconButton size="small">{weekOpen ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}</IconButton></TableCell>
                     <TableCell>Week {row.week}</TableCell>
-                    <TableCell align="right" sx={{ color: row.pointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
-                      {row.pointsLeft > 0 ? `−${row.pointsLeft.toFixed(1)}` : '0.0'}
+                    <TableCell align="right" sx={{ color: row.actualPointsLeft > 0 ? 'error.main' : 'success.main', fontWeight: 600 }}>
+                      {row.actualPointsLeft > 0 ? `−${row.actualPointsLeft.toFixed(1)}` : row.actualPointsLeft < 0 ? `+${Math.abs(row.actualPointsLeft).toFixed(1)}` : '0.0'}
                     </TableCell>
                     <TableCell align="right">{row.leagues.length}</TableCell>
                   </TableRow>
@@ -175,9 +176,8 @@ export function WeeklyBreakdown({ rows, sortField, sortDir, onSort }: {
                               <TableRow>
                                 <TableCell width={40} />
                                 <TableCell>League</TableCell>
-                                <TableCell align="right">Your Proj</TableCell>
-                                <TableCell align="right">Optimal Proj</TableCell>
-                                <TableCell align="right">Pts Left</TableCell>
+                                <TableCell align="right">Actual Pts Left</TableCell>
+                                <TableCell align="right">Skill +/−</TableCell>
                                 <TableCell align="right">Mistakes</TableCell>
                               </TableRow>
                             </TableHead>
@@ -236,19 +236,18 @@ export function PositionAccuracyChart({ data }: { data: PositionAccuracy[] }) {
   );
 }
 
-/** Top 5 worst single-slot mistakes across the season */
+/** Top 5 worst single-slot mistakes by actual outcome across the season */
 export function WorstMistakesList({ mistakes }: { mistakes: LineupMistake[] }) {
   if (mistakes.length === 0) return null;
   return (
     <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>Top 5 Worst Mistakes</Typography>
+      <Typography variant="h6" gutterBottom>Top 5 Worst Mistakes (by Actual Outcome)</Typography>
       <Table size="small">
         <TableHead>
           <TableRow>
             <TableCell>Slot</TableCell>
             <TableCell>Started</TableCell>
             <TableCell>Should Have Started</TableCell>
-            <TableCell align="right">Proj Diff</TableCell>
             <TableCell align="right">Actual +/−</TableCell>
           </TableRow>
         </TableHead>
@@ -256,10 +255,13 @@ export function WorstMistakesList({ mistakes }: { mistakes: LineupMistake[] }) {
           {mistakes.map((m, i) => (
             <TableRow key={i}>
               <TableCell><Chip label={m.slot} size="small" sx={{ bgcolor: getPositionColor(m.slot), color: '#fff', fontWeight: 700 }} /></TableCell>
-              <TableCell sx={{ color: 'error.main' }}>{m.started.playerName} ({formatPts(m.started.projectedPoints)})</TableCell>
-              <TableCell sx={{ color: 'success.main' }}>{m.shouldHaveStarted.playerName} ({formatPts(m.shouldHaveStarted.projectedPoints)})</TableCell>
-              <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>−{m.pointsDiff.toFixed(1)}</TableCell>
-              <TableCell align="right" sx={{ color: diffColor(m.actualDiff), fontWeight: 600 }}>
+              <TableCell sx={{ color: 'error.main' }}>
+                {m.started.playerName} ({formatPts(m.started.actualPoints)})
+              </TableCell>
+              <TableCell sx={{ color: 'success.main' }}>
+                {m.shouldHaveStarted.playerName} ({formatPts(m.shouldHaveStarted.actualPoints)})
+              </TableCell>
+              <TableCell align="right" sx={{ color: diffColor(m.actualDiff), fontWeight: 700 }}>
                 {m.actualDiff != null ? (m.actualDiff >= 0 ? '+' : '') + m.actualDiff.toFixed(1) : '—'}
               </TableCell>
             </TableRow>

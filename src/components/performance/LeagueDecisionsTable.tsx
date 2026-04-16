@@ -61,7 +61,7 @@ export default function LeagueDecisionsTable({
         displayName: meta?.displayName || uid,
         avatar: meta?.avatar || '',
         accuracy: s.decisionAccuracy,
-        pointsLeft: s.totalPointsLeftOnBench,
+        pointsLeft: s.totalActualPointsLeftOnBench,
         totalWeeks,
         optimalWeeks,
       };
@@ -113,7 +113,7 @@ export default function LeagueDecisionsTable({
               </TableCell>
               <TableCell align="right">
                 <TableSortLabel active={sortField === 'pointsLeft'} direction={sortField === 'pointsLeft' ? sortDir : 'asc'} onClick={() => handleSort('pointsLeft')}>
-                  Proj Pts Left on Bench
+                  Actual Pts Left on Bench
                 </TableSortLabel>
               </TableCell>
             </TableRow>

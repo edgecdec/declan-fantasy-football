@@ -7,6 +7,8 @@ export type LeagueWeekDetail = {
   projected: number;
   optimal: number;
   pointsLeft: number;
+  actualPointsLeft: number;
+  actualSkillPlusMinus: number;
   mistakeCount: number;
   decision: WeeklyDecision;
 };
@@ -17,23 +19,36 @@ export type AggWeek = {
   projected: number;
   optimal: number;
   pointsLeft: number;
+  actualPointsLeft: number;
+  actualSkillPlusMinus: number;
   mistakeCount: number;
   leagues: LeagueWeekDetail[];
 };
 
-export type SortField = 'week' | 'projected' | 'optimal' | 'pointsLeft' | 'mistakes';
+export type SortField = 'week' | 'projected' | 'optimal' | 'pointsLeft' | 'actualPointsLeft' | 'mistakes';
 export type SortDir = 'asc' | 'desc';
+
+/** Sum of actualDiff across all mistakes in a weekly decision */
+function weekActualSkill(w: WeeklyDecision): number {
+  return w.optimal.mistakes.reduce((s, m) => s + (m.actualDiff ?? 0), 0);
+}
 
 export function aggregateWeekly(summaries: SeasonDecisionSummary[]): AggWeek[] {
   const byWeek = new Map<number, AggWeek>();
   for (const s of summaries) {
     for (const w of s.weeklyDecisions) {
-      const e = byWeek.get(w.week) || { week: w.week, projected: 0, optimal: 0, pointsLeft: 0, mistakeCount: 0, leagues: [] };
+      const e = byWeek.get(w.week) || {
+        week: w.week, projected: 0, optimal: 0, pointsLeft: 0,
+        actualPointsLeft: 0, actualSkillPlusMinus: 0, mistakeCount: 0, leagues: [],
+      };
       const proj = w.optimal.actualLineup.reduce((a, b) => a + b.projectedPoints, 0);
       const opt = w.optimal.optimalLineup.reduce((a, b) => a + b.projectedPoints, 0);
+      const skill = weekActualSkill(w);
       e.projected += proj;
       e.optimal += opt;
       e.pointsLeft += w.optimal.pointsLeftOnBench;
+      e.actualPointsLeft += w.optimal.actualPointsLeftOnBench;
+      e.actualSkillPlusMinus += skill;
       e.mistakeCount += w.optimal.mistakes.length;
       e.leagues.push({
         leagueId: w.leagueId || s.leagueId,
@@ -41,6 +56,8 @@ export function aggregateWeekly(summaries: SeasonDecisionSummary[]): AggWeek[] {
         projected: proj,
         optimal: opt,
         pointsLeft: w.optimal.pointsLeftOnBench,
+        actualPointsLeft: w.optimal.actualPointsLeftOnBench,
+        actualSkillPlusMinus: skill,
         mistakeCount: w.optimal.mistakes.length,
         decision: w,
       });
@@ -71,6 +88,7 @@ export function sortValue(row: AggWeek, field: SortField): number {
     case 'projected': return row.projected;
     case 'optimal': return row.optimal;
     case 'pointsLeft': return row.pointsLeft;
+    case 'actualPointsLeft': return row.actualPointsLeft;
     case 'mistakes': return row.mistakeCount;
   }
 }

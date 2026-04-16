@@ -94,7 +94,7 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
             const allWeekly = decSummary.weeklyDecisions;
             const optWeeks = allWeekly.filter(w => w.isOptimal).length;
             accuracy = allWeekly.length > 0 ? (optWeeks / allWeekly.length) * 100 : 0;
-            pointsLeft = decSummary.totalPointsLeftOnBench;
+            pointsLeft = decSummary.totalActualPointsLeftOnBench;
             decResults.push({ year, accuracy, pointsLeft });
           }
 

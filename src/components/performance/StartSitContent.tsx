@@ -59,8 +59,8 @@ export default function StartSitContent() {
     }
   };
 
-  // Compute summary stats
-  const allMistakes = summaries.flatMap(s => s.worstMistakes).sort((a, b) => b.pointsDiff - a.pointsDiff);
+  // Compute summary stats — all metrics use ACTUAL point outcomes, not projected
+  const allMistakes = summaries.flatMap(s => s.worstMistakes);
 
   // Net actual points lost: sum actualDiff for all mistakes (negative = user lost pts)
   const totalActualLost = allMistakes.reduce((s, m) => {
@@ -77,7 +77,10 @@ export default function StartSitContent() {
   const posAccuracy = mergePositionAccuracy(summaries);
   const worstPosition = posAccuracy.length > 0 ? posAccuracy[0].position : '—';
   const weeklyRows = aggregateWeekly(summaries);
-  const topMistakes = allMistakes.slice(0, WORST_MISTAKES_COUNT);
+  // Top 5 worst mistakes sorted by most negative actualDiff (worst actual outcomes)
+  const topMistakes = [...allMistakes]
+    .sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0))
+    .slice(0, WORST_MISTAKES_COUNT);
 
   const handleSort = (field: SortField) => {
     setSortDir(sortField === field && sortDir === 'asc' ? 'desc' : 'asc');

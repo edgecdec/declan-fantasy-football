@@ -187,7 +187,7 @@ export default function HistoricalContent() {
             const allWeekly = decisionSummaries.flatMap(s => s.weeklyDecisions);
             const optWeeks = allWeekly.filter(w => w.isOptimal).length;
             const acc = allWeekly.length > 0 ? (optWeeks / allWeekly.length) * 100 : 0;
-            const ptsLeft = decisionSummaries.reduce((s, d) => s + d.totalPointsLeftOnBench, 0);
+            const ptsLeft = decisionSummaries.reduce((s, d) => s + d.totalActualPointsLeftOnBench, 0);
             decResults.push({ year, accuracy: acc, pointsLeft: ptsLeft, leagues: decisionSummaries.length });
           }
 

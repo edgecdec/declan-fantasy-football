@@ -156,6 +156,11 @@ export function calculateOptimalLineup(
   const actualTotal = actualLineup.reduce((s, p) => s + p.projectedPoints, 0);
   const pointsLeftOnBench = optimalTotal - actualTotal;
 
+  // Actual points left on bench (using real outcomes)
+  const optimalActualTotal = optimalLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+  const actualActualTotal = actualLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+  const actualPointsLeftOnBench = optimalActualTotal - actualActualTotal;
+
   // Find mistakes: players in optimal but not in actual starters
   const actualStarterSet = new Set(actualStarters);
   const optimalStarterSet = new Set(optimalLineup.map(s => s.playerId));
@@ -193,13 +198,12 @@ export function calculateOptimalLineup(
     }
   }
 
-  mistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
+  mistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
-  return { optimalLineup, actualLineup, pointsLeftOnBench, mistakes };
+  return { optimalLineup, actualLineup, pointsLeftOnBench, actualPointsLeftOnBench, mistakes };
 }
 
 const DEFAULT_REGULAR_SEASON_WEEKS = 14;
-const WORST_MISTAKES_LIMIT = 5;
 
 /**
  * Analyze start/sit decisions for a user across all regular season weeks in a league.
@@ -273,6 +277,7 @@ export async function analyzeStartSitDecisions(
   if (weeklyDecisions.length === 0) return null;
 
   const totalPointsLeft = weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+  const totalActualPointsLeft = weeklyDecisions.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
   const accuracy = (optimalWeeks / weeklyDecisions.length) * 100;
 
   // Build position accuracy from starter slot counts and mistake counts
@@ -290,18 +295,18 @@ export async function analyzeStartSitDecisions(
     })
     .sort((a, b) => a.accuracy - b.accuracy);
 
-  allMistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
-  const worstMistakes = allMistakes.slice(0, WORST_MISTAKES_LIMIT);
+  allMistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
   return {
     leagueId,
     leagueName: league.name,
     season,
     totalPointsLeftOnBench: totalPointsLeft,
+    totalActualPointsLeftOnBench: totalActualPointsLeft,
     decisionAccuracy: accuracy,
     weeklyDecisions,
     positionAccuracy,
-    worstMistakes,
+    worstMistakes: allMistakes,
   };
 }
 
@@ -382,6 +387,7 @@ export async function analyzeLeagueAllManagers(
   for (const [, mgr] of managerData) {
     if (mgr.weeklyDecisions.length === 0) continue;
     const totalPointsLeft = mgr.weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+    const totalActualPointsLeft = mgr.weeklyDecisions.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
     const accuracy = (mgr.optimalWeeks / mgr.weeklyDecisions.length) * 100;
 
     const slotTotals = new Map<string, number>();
@@ -396,17 +402,18 @@ export async function analyzeLeagueAllManagers(
       })
       .sort((a, b) => a.accuracy - b.accuracy);
 
-    mgr.allMistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
+    mgr.allMistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
     results.push({
       leagueId,
       leagueName: league.name,
       season,
       totalPointsLeftOnBench: totalPointsLeft,
+      totalActualPointsLeftOnBench: totalActualPointsLeft,
       decisionAccuracy: accuracy,
       weeklyDecisions: mgr.weeklyDecisions,
       positionAccuracy,
-      worstMistakes: mgr.allMistakes.slice(0, WORST_MISTAKES_LIMIT),
+      worstMistakes: mgr.allMistakes,
       userId: mgr.ownerId,
     });
   }
