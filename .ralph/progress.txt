@@ -475,3 +475,11 @@
 - Added "Leaguemate Comparison →" link from LeagueBreakdown accordion headers to the drilldown page
 - Lesson: When analyzing all managers, fetch shared data (matchups, projections) once and loop rosters — avoids redundant API calls
 - Lesson: The `allRosterStats` field from `analyzePositionalBenchmarks` already has per-manager data, so the efficiency tab just needed to display it in table form
+
+## TASK-058: Build Historical tab in Skill Hub with all-time trends
+- Date: 2026-04-16
+- Created HistoricalContent component for /skill?tab=historical — combines year-over-year decision accuracy trends, positional efficiency trends, all-time MVPs/LVPs, positional edge heatmap, and per-season summary table. All data loads progressively as each season completes.
+- Created LeagueHistoricalContent component for /skill/league/[leagueId]?tab=historical — traces the league's previous_league_id chain to show the same data scoped to a single league's history.
+- Added Historical tab to both the main skill hub page and the league drilldown page.
+- Reused existing components: PlayerImpactList, PositionalHeatmap, SmartTable, StartsTooltip.
+- Lessons: The old /performance/positional/history page had all the positional/MVP logic already — the main work was adding decision accuracy integration and wiring it into the new component structure. Keeping the two HistoricalContent components separate (global vs league-scoped) is cleaner than trying to make one component handle both cases.

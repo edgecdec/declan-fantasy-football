@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import HistoryIcon from '@mui/icons-material/History';
 import PageHeader from '@/components/common/PageHeader';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
@@ -16,10 +17,12 @@ import { analyzeLeagueAllManagers } from '@/services/stats/lineupOptimizer';
 import { SeasonDecisionSummary } from '@/types/lineup';
 import LeagueEfficiencyTable from '@/components/performance/LeagueEfficiencyTable';
 import LeagueDecisionsTable from '@/components/performance/LeagueDecisionsTable';
+import LeagueHistoricalContent from '@/components/performance/LeagueHistoricalContent';
 
 const TABS = [
   { value: 'efficiency', label: 'Positional Efficiency', icon: <BarChartIcon /> },
   { value: 'decisions', label: 'Start/Sit Decisions', icon: <CompareArrowsIcon /> },
+  { value: 'historical', label: 'Historical', icon: <HistoryIcon /> },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -129,6 +132,15 @@ function LeagueDrilldownContent() {
             </Typography>
           )}
         </>
+      )}
+
+      {currentTab === 'historical' && user && (
+        <LeagueHistoricalContent leagueId={leagueId} userId={user.user_id} />
+      )}
+      {currentTab === 'historical' && !user && (
+        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 8 }}>
+          Log in to view historical analysis.
+        </Typography>
       )}
     </Container>
   );

@@ -16,6 +16,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import PageHeader from '@/components/common/PageHeader';
 import PositionalBenchmarksContent from '@/components/performance/PositionalBenchmarksContent';
 import StartSitContent from '@/components/performance/StartSitContent';
+import HistoricalContent from '@/components/performance/HistoricalContent';
 
 const TABS = [
   { value: 'efficiency', label: 'Positional Efficiency', icon: <BarChartIcon /> },
@@ -53,15 +54,7 @@ function SkillHubContent() {
 
       {currentTab === 'decisions' && <StartSitContent />}
 
-      {currentTab === 'historical' && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <HistoryIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h5" gutterBottom>Historical Analysis</Typography>
-          <Typography color="text.secondary">
-            Coming soon — all-time positional trends and career MVPs/LVPs.
-          </Typography>
-        </Box>
-      )}
+      {currentTab === 'historical' && <HistoricalContent />}
     </Container>
   );
 }
