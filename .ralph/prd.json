@@ -492,7 +492,7 @@
       "title": "Build Start/Sit Decisions tab in the Skill Hub",
       "spec": "specs/code-style.md",
       "priority": 56,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-053", "TASK-055"],
       "description": "Build the 'Start/Sit Decisions' tab content at /skill?tab=decisions. The tab shows: (1) SUMMARY CARDS at the top — total points left on bench this season, overall decision accuracy %, worst position for decisions. (2) WEEKLY BREAKDOWN TABLE — for each week, show: week number, your projected score vs optimal projected score, points left on bench, and number of mistakes. Expandable rows (MUI Accordion) that show the actual vs optimal lineup side by side for that week, with mistakes highlighted in red. (3) POSITION ACCURACY CHART — bar chart or radar chart showing decision accuracy % by position (QB, RB, WR, TE, FLEX). (4) WORST MISTAKES LIST — top 5 biggest single-slot mistakes across the season (e.g. 'Week 5: Started Player A (proj 8.2) over Player B (proj 15.1) at RB — cost 6.9 projected points'). Load data progressively as each week completes. Sortable columns on the weekly table."
     },

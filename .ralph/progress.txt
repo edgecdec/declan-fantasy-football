@@ -453,3 +453,14 @@
 - Position accuracy tracks mistakes per slot type (QB, RB, FLEX, etc.) correctly handling multiple slots of the same type
 - Sleeper league objects have `roster_positions` and `scoring_settings` fields not typed in `SleeperLeague` — accessed via type assertion cast
 - Lessons: Keep slot-level accuracy tracking simple — count total slot-weeks and subtract mistake count rather than trying to track per-instance correctness
+
+## TASK-056: Build Start/Sit Decisions tab in the Skill Hub
+- Date: 2026-04-16
+- Created StartSitContent.tsx (main component), StartSitPanels.tsx (sub-components: WeeklyBreakdown, PositionAccuracyChart, WorstMistakesList, WeekDetailRow), and types/startSit.ts (shared types + aggregation helpers).
+- Replaced placeholder in /skill?tab=decisions with the full implementation.
+- Features: 3 summary cards (projected pts left on bench, optimal lineup rate, worst decision position), sortable weekly breakdown table with collapsible detail rows showing actual vs optimal mistakes, position accuracy bar chart (green/amber/red thresholds), top 5 worst mistakes list.
+- Progressive loading with league progress indicator.
+- File splitting was necessary to stay under ~150 lines per file — extracted data helpers into types/startSit.ts and all sub-components into StartSitPanels.tsx.
+- Recharts Tooltip formatter type needs `number | undefined` parameter type, not just `number`.
+- Nova Act testing: page loads, tab navigation works, analysis starts automatically. The analysis takes >60 seconds for users with many leagues (14 leagues × 14+ weekly projection API calls each) so Nova Act browser test timing out is expected.
+- Lesson: For data-heavy features, consider progressive rendering (show partial data as each league completes) rather than waiting for all to complete. Current implementation waits for all via analyzeMultiLeagueSeason. Future improvement: could modify to stream results incrementally.

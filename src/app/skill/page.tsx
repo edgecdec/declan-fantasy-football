@@ -15,6 +15,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import HistoryIcon from '@mui/icons-material/History';
 import PageHeader from '@/components/common/PageHeader';
 import PositionalBenchmarksContent from '@/components/performance/PositionalBenchmarksContent';
+import StartSitContent from '@/components/performance/StartSitContent';
 
 const TABS = [
   { value: 'efficiency', label: 'Positional Efficiency', icon: <BarChartIcon /> },
@@ -50,15 +51,7 @@ function SkillHubContent() {
 
       {currentTab === 'efficiency' && <PositionalBenchmarksContent />}
 
-      {currentTab === 'decisions' && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <CompareArrowsIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h5" gutterBottom>Start/Sit Decisions</Typography>
-          <Typography color="text.secondary">
-            Coming soon — analyze your weekly lineup decisions vs the optimal lineup.
-          </Typography>
-        </Box>
-      )}
+      {currentTab === 'decisions' && <StartSitContent />}
 
       {currentTab === 'historical' && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
