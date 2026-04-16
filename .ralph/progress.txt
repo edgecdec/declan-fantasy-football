@@ -512,3 +512,24 @@
 - Updated aggregateWeekly in startSit.ts to compute actual-based week/league totals.
 - Updated LeagueDecisionsTable and both historical content components to use actual-based points left.
 - Lesson: The `worstMistakes` field was previously truncated to 5 per league which silently discarded data needed for cross-league aggregation. Always be careful about truncation in service layers — let the UI decide how much to show.
+
+## TASK-062: Rebuild Start/Sit Decisions from scratch — solver is fundamentally broken
+**Date:** 2026-04-16
+**Status:** Done
+
+### What was done
+- Completely rewrote src/services/stats/lineupOptimizer.ts from scratch
+- The old solver ignored position eligibility — it could put kickers in QB slots, defenses in RB slots, etc.
+- New solver uses a correct greedy algorithm: fills most-restrictive single-position slots first (K, DEF, QB, TE, RB, WR), then flex slots (REC_FLEX, FLEX, SUPER_FLEX), always picking the highest-projected eligible player remaining
+- SLOT_ELIGIBILITY map correctly defines: QB→QB only, RB→RB only, WR→WR only, TE→TE only, FLEX→RB/WR/TE, REC_FLEX→WR/TE, SUPER_FLEX→QB/RB/WR/TE, K→K only, DEF→DEF only
+- BN, IR, TAXI slots properly filtered out as bench slots
+- Completely rewrote StartSitContent.tsx with nested Week→League→Lineup drill-down using MUI Accordion/Collapse
+- All summary metrics use ACTUAL point outcomes (not projected): Actual Pts Lost, Times Beat Projections, Net Skill Score, Worst Position
+- Added "Should Have Trusted Sleeper 😬" section (top 5 worst actual outcomes)
+- Added "Genius Calls 🧠" section (top 5 best actual outcomes where user beat projections)
+- Maintained all exported function signatures (analyzeStartSitDecisions, analyzeLeagueAllManagers, analyzeMultiLeagueSeason, analyzeLeagueChainHistory) so league drilldown, HistoricalContent, and LeagueHistoricalContent continue to work
+
+### Lessons learned
+- The greedy approach works well for fantasy lineup optimization because roster sizes are small and position-locked slots outnumber flex slots
+- Key insight: fill single-position slots first to avoid wasting elite players on flex slots (e.g. don't put your best QB in SUPER_FLEX when you still need to fill the QB slot)
+- StartSitPanels.tsx and types/startSit.ts are now dead code (no imports) — can be cleaned up in a future task

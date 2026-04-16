@@ -8,9 +8,10 @@ import playerData from '../../../data/sleeper_players.json';
 type PlayerRecord = { first_name: string; last_name: string; position: string };
 const players = (playerData as unknown as { players: Record<string, PlayerRecord> }).players ?? {};
 
-const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+/** Non-bench slot types to fill */
+const BENCH_SLOTS = new Set(['BN', 'IR', 'TAXI']);
 
-/** Positions eligible for each roster slot */
+/** Position eligibility per roster slot */
 const SLOT_ELIGIBILITY: Record<string, string[]> = {
   QB: ['QB'],
   RB: ['RB'],
@@ -19,13 +20,20 @@ const SLOT_ELIGIBILITY: Record<string, string[]> = {
   K: ['K'],
   DEF: ['DEF'],
   FLEX: ['RB', 'WR', 'TE'],
-  SUPER_FLEX: ['QB', 'RB', 'WR', 'TE'],
   REC_FLEX: ['WR', 'TE'],
+  SUPER_FLEX: ['QB', 'RB', 'WR', 'TE'],
   IDP_FLEX: ['DL', 'LB', 'DB'],
+  DL: ['DL'],
+  LB: ['LB'],
+  DB: ['DB'],
 };
 
-/** Slots ordered most-restrictive first for greedy assignment */
-const SLOT_PRIORITY: string[] = ['K', 'DEF', 'QB', 'TE', 'RB', 'WR', 'REC_FLEX', 'FLEX', 'SUPER_FLEX', 'IDP_FLEX'];
+/** Fill most-restrictive slots first to avoid wasting elite players on flex */
+const SLOT_PRIORITY: string[] = [
+  'K', 'DEF', 'QB', 'TE', 'RB', 'WR',
+  'DL', 'LB', 'DB',
+  'REC_FLEX', 'FLEX', 'SUPER_FLEX', 'IDP_FLEX',
+];
 
 function getPlayerPosition(playerId: string): string {
   return players[playerId]?.position || 'UNKNOWN';
@@ -36,60 +44,55 @@ function getPlayerName(playerId: string): string {
   return p ? `${p.first_name} ${p.last_name}` : playerId;
 }
 
-/** Calculate projected points for a player using league scoring settings */
+/** Calculate projected points for a single player using league scoring */
 export function calculateProjectedPoints(
   projection: SleeperProjection | undefined,
-  scoringSettings: Record<string, number>
+  scoringSettings: Record<string, number>,
 ): number {
   if (!projection) return 0;
   let total = 0;
   for (const stat in scoringSettings) {
-    if (stat in projection) {
-      total += projection[stat] * scoringSettings[stat];
-    }
+    if (stat in projection) total += projection[stat] * scoringSettings[stat];
   }
   return total;
 }
 
+type PlayerCandidate = { playerId: string; position: string; projectedPoints: number };
+
 /**
- * Solve optimal lineup from a pool of players into roster slots.
- * Uses greedy approach filling most-restrictive slots first.
+ * Greedy optimal lineup solver.
+ * Fills most-restrictive single-position slots first, then flex slots,
+ * always picking the highest-projected eligible player remaining.
  */
-function solveLineup(
-  playerPool: Array<{ playerId: string; position: string; projectedPoints: number }>,
-  rosterPositions: string[]
-): LineupSlot[] {
-  // Group slots by type, ordered by priority
-  const slotsByType: Array<{ slotName: string; count: number }> = [];
+function solveLineup(pool: PlayerCandidate[], rosterPositions: string[]): LineupSlot[] {
+  // Count starting slots grouped by type, ordered by priority
   const slotCounts = new Map<string, number>();
   for (const slot of rosterPositions) {
-    if (slot === 'BN') continue; // skip bench
+    if (BENCH_SLOTS.has(slot)) continue;
     slotCounts.set(slot, (slotCounts.get(slot) || 0) + 1);
   }
 
-  for (const slotName of SLOT_PRIORITY) {
-    const count = slotCounts.get(slotName);
-    if (count) slotsByType.push({ slotName, count });
-    slotCounts.delete(slotName);
+  const orderedSlots: Array<{ name: string; count: number }> = [];
+  for (const name of SLOT_PRIORITY) {
+    const count = slotCounts.get(name);
+    if (count) { orderedSlots.push({ name, count }); slotCounts.delete(name); }
   }
-  // Handle any remaining slot types not in SLOT_PRIORITY
-  for (const [slotName, count] of slotCounts) {
-    slotsByType.push({ slotName, count });
-  }
+  // Any remaining unknown slot types
+  for (const [name, count] of slotCounts) orderedSlots.push({ name, count });
 
-  // Sort player pool by projected points descending
-  const available = [...playerPool].sort((a, b) => b.projectedPoints - a.projectedPoints);
+  // Sort pool descending by projected points
+  const available = [...pool].sort((a, b) => b.projectedPoints - a.projectedPoints);
   const used = new Set<string>();
   const lineup: LineupSlot[] = [];
 
-  for (const { slotName, count } of slotsByType) {
-    const eligible = SLOT_ELIGIBILITY[slotName] || [slotName];
+  for (const { name, count } of orderedSlots) {
+    const eligible = SLOT_ELIGIBILITY[name] || [name];
     for (let i = 0; i < count; i++) {
       const best = available.find(p => !used.has(p.playerId) && eligible.includes(p.position));
       if (best) {
         used.add(best.playerId);
         lineup.push({
-          slot: slotName,
+          slot: name,
           playerId: best.playerId,
           playerName: getPlayerName(best.playerId),
           position: best.position,
@@ -98,19 +101,11 @@ function solveLineup(
       }
     }
   }
-
   return lineup;
 }
 
 /**
- * Calculate optimal lineup and compare to actual lineup.
- *
- * @param rosterPlayerIds All player IDs on the roster (starters + bench from matchup)
- * @param rosterPositions League roster_positions array (e.g. ['QB','RB','RB','WR','WR','TE','FLEX','K','DEF','BN',...])
- * @param projections Map of player_id -> stat projections for this week
- * @param scoringSettings League scoring_settings (stat key -> point value)
- * @param actualStarters The starters array from the matchup (ordered by roster slot)
- * @param playersPoints Optional map of player_id -> actual points scored
+ * Calculate optimal lineup and compare to actual.
  */
 export function calculateOptimalLineup(
   rosterPlayerIds: string[],
@@ -118,28 +113,22 @@ export function calculateOptimalLineup(
   projections: Record<string, SleeperProjection>,
   scoringSettings: Record<string, number>,
   actualStarters: string[],
-  playersPoints?: Record<string, number>
+  playersPoints?: Record<string, number>,
 ): OptimalLineupResult {
-  // Build player pool with projected points
-  const playerPool = rosterPlayerIds
+  // Build candidate pool
+  const pool: PlayerCandidate[] = rosterPlayerIds
     .filter(id => id && id !== '0')
     .map(id => ({
       playerId: id,
       position: getPlayerPosition(id),
       projectedPoints: calculateProjectedPoints(projections[id], scoringSettings),
-    }))
-    .filter(p => VALID_POSITIONS.includes(p.position));
+    }));
 
-  // Solve optimal lineup
-  const optimalLineup = solveLineup(playerPool, rosterPositions);
+  const optimalLineup = solveLineup(pool, rosterPositions);
+  for (const slot of optimalLineup) slot.actualPoints = playersPoints?.[slot.playerId];
 
-  // Attach actual points to optimal lineup
-  for (const slot of optimalLineup) {
-    slot.actualPoints = playersPoints?.[slot.playerId];
-  }
-
-  // Build actual lineup from starters
-  const starterSlots = rosterPositions.filter(s => s !== 'BN');
+  // Build actual lineup from starters array (each index maps to same-index starter slot)
+  const starterSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
   const actualLineup: LineupSlot[] = actualStarters
     .slice(0, starterSlots.length)
     .map((playerId, i) => ({
@@ -151,30 +140,29 @@ export function calculateOptimalLineup(
       actualPoints: playersPoints?.[playerId],
     }));
 
-  // Calculate points left on bench
-  const optimalTotal = optimalLineup.reduce((s, p) => s + p.projectedPoints, 0);
-  const actualTotal = actualLineup.reduce((s, p) => s + p.projectedPoints, 0);
-  const pointsLeftOnBench = optimalTotal - actualTotal;
+  // Projected points left on bench
+  const optProj = optimalLineup.reduce((s, p) => s + p.projectedPoints, 0);
+  const actProj = actualLineup.reduce((s, p) => s + p.projectedPoints, 0);
+  const pointsLeftOnBench = optProj - actProj;
 
-  // Actual points left on bench (using real outcomes)
-  const optimalActualTotal = optimalLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
-  const actualActualTotal = actualLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
-  const actualPointsLeftOnBench = optimalActualTotal - actualActualTotal;
+  // Actual points left on bench
+  const optActual = optimalLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+  const actActual = actualLineup.reduce((s, p) => s + (p.actualPoints ?? 0), 0);
+  const actualPointsLeftOnBench = optActual - actActual;
 
-  // Find mistakes: players in optimal but not in actual starters
-  const actualStarterSet = new Set(actualStarters);
-  const optimalStarterSet = new Set(optimalLineup.map(s => s.playerId));
+  // Find mistakes: slots where actual differs from optimal
+  const actualSet = new Set(actualStarters);
+  const optimalSet = new Set(optimalLineup.map(s => s.playerId));
   const mistakes: LineupMistake[] = [];
 
   for (const optSlot of optimalLineup) {
-    if (actualStarterSet.has(optSlot.playerId)) continue;
-    // Find the actual starter in this slot type who was suboptimal
+    if (actualSet.has(optSlot.playerId)) continue;
     const actualInSlot = actualLineup.find(
-      a => a.slot === optSlot.slot && !optimalStarterSet.has(a.playerId)
+      a => a.slot === optSlot.slot && !optimalSet.has(a.playerId),
     );
     if (actualInSlot) {
-      const actualStartedPts = playersPoints?.[actualInSlot.playerId];
-      const actualOptimalPts = playersPoints?.[optSlot.playerId];
+      const startedActual = playersPoints?.[actualInSlot.playerId];
+      const optimalActual = playersPoints?.[optSlot.playerId];
       mistakes.push({
         slot: optSlot.slot,
         started: {
@@ -182,18 +170,18 @@ export function calculateOptimalLineup(
           playerName: actualInSlot.playerName,
           position: actualInSlot.position,
           projectedPoints: actualInSlot.projectedPoints,
-          actualPoints: actualStartedPts,
+          actualPoints: startedActual,
         },
         shouldHaveStarted: {
           playerId: optSlot.playerId,
           playerName: optSlot.playerName,
           position: optSlot.position,
           projectedPoints: optSlot.projectedPoints,
-          actualPoints: actualOptimalPts,
+          actualPoints: optimalActual,
         },
         pointsDiff: optSlot.projectedPoints - actualInSlot.projectedPoints,
-        actualDiff: actualStartedPts != null && actualOptimalPts != null
-          ? actualStartedPts - actualOptimalPts : undefined,
+        actualDiff: startedActual != null && optimalActual != null
+          ? startedActual - optimalActual : undefined,
       });
     }
   }
@@ -205,14 +193,12 @@ export function calculateOptimalLineup(
 
 const DEFAULT_REGULAR_SEASON_WEEKS = 14;
 
-/**
- * Analyze start/sit decisions for a user across all regular season weeks in a league.
- */
+/** Analyze one user across all regular-season weeks in one league */
 export async function analyzeStartSitDecisions(
   leagueId: string,
   userId: string,
   season: string,
-  onWeekComplete?: (week: number, total: number) => void
+  onWeekComplete?: (week: number, total: number) => void,
 ): Promise<SeasonDecisionSummary | null> {
   const league = await SleeperService.getLeague(leagueId);
   if (!league) return null;
@@ -233,10 +219,10 @@ export async function analyzeStartSitDecisions(
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
 
-  const weeklyDecisions: WeeklyDecision[] = [];
+  const weekly: WeeklyDecision[] = [];
   const allMistakes: LineupMistake[] = [];
   let optimalWeeks = 0;
-  const positionMistakes = new Map<string, number>();
+  const posMistakes = new Map<string, number>();
 
   for (let week = 1; week <= totalWeeks; week++) {
     const [matchups, projections] = await Promise.all([
@@ -244,81 +230,61 @@ export async function analyzeStartSitDecisions(
       SleeperService.getWeeklyProjections(season, week),
     ]);
 
-    const userMatchup = matchups.find(m => m.roster_id === userRoster.roster_id);
-    if (!userMatchup || !userMatchup.starters?.length || !userMatchup.players?.length) {
+    const um = matchups.find(m => m.roster_id === userRoster.roster_id);
+    if (!um?.starters?.length || !um?.players?.length) {
       onWeekComplete?.(week, totalWeeks);
       continue;
     }
 
     const result = calculateOptimalLineup(
-      userMatchup.players,
-      rosterPositions,
-      projections,
-      scoringSettings,
-      userMatchup.starters,
-      userMatchup.players_points,
+      um.players, rosterPositions, projections, scoringSettings, um.starters, um.players_points,
     );
 
     const isOptimal = result.mistakes.length === 0;
     if (isOptimal) optimalWeeks++;
 
-    weeklyDecisions.push({ week, leagueId, leagueName: league.name, optimal: result, isOptimal });
+    weekly.push({ week, leagueId, leagueName: league.name, optimal: result, isOptimal });
     allMistakes.push(...result.mistakes);
-
-    // Track per-position mistakes
-    for (const m of result.mistakes) {
-      const entry = positionMistakes.get(m.slot) || 0;
-      positionMistakes.set(m.slot, entry + 1);
-    }
+    for (const m of result.mistakes) posMistakes.set(m.slot, (posMistakes.get(m.slot) || 0) + 1);
 
     onWeekComplete?.(week, totalWeeks);
   }
 
-  if (weeklyDecisions.length === 0) return null;
+  if (weekly.length === 0) return null;
 
-  const totalPointsLeft = weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
-  const totalActualPointsLeft = weeklyDecisions.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
-  const accuracy = (optimalWeeks / weeklyDecisions.length) * 100;
+  const totalPtsLeft = weekly.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+  const totalActualPtsLeft = weekly.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
+  const accuracy = (optimalWeeks / weekly.length) * 100;
 
-  // Build position accuracy from starter slot counts and mistake counts
-  const starterSlots = rosterPositions.filter(s => s !== 'BN');
+  const starterSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
   const slotTotals = new Map<string, number>();
-  for (const slot of starterSlots) {
-    slotTotals.set(slot, (slotTotals.get(slot) || 0) + weeklyDecisions.length);
-  }
+  for (const slot of starterSlots) slotTotals.set(slot, (slotTotals.get(slot) || 0) + weekly.length);
 
   const positionAccuracy: PositionAccuracy[] = Array.from(slotTotals.entries())
     .map(([position, total]) => {
-      const mistakes = positionMistakes.get(position) || 0;
-      const correct = total - mistakes;
-      return { position, correct, total, accuracy: total > 0 ? (correct / total) * 100 : 100 };
+      const mistakes = posMistakes.get(position) || 0;
+      return { position, correct: total - mistakes, total, accuracy: total > 0 ? ((total - mistakes) / total) * 100 : 100 };
     })
     .sort((a, b) => a.accuracy - b.accuracy);
 
   allMistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
   return {
-    leagueId,
-    leagueName: league.name,
-    season,
-    totalPointsLeftOnBench: totalPointsLeft,
-    totalActualPointsLeftOnBench: totalActualPointsLeft,
+    leagueId, leagueName: league.name, season,
+    totalPointsLeftOnBench: totalPtsLeft,
+    totalActualPointsLeftOnBench: totalActualPtsLeft,
     decisionAccuracy: accuracy,
-    weeklyDecisions,
+    weeklyDecisions: weekly,
     positionAccuracy,
     worstMistakes: allMistakes,
   };
 }
 
-/**
- * Analyze start/sit decisions for ALL managers in a single league.
- * Fetches matchups/projections once, then loops all rosters — much more efficient
- * than calling analyzeStartSitDecisions per user.
- */
+/** Analyze all managers in a single league (shared matchup/projection fetches) */
 export async function analyzeLeagueAllManagers(
   leagueId: string,
   season: string,
-  onWeekComplete?: (week: number, total: number) => void
+  onWeekComplete?: (week: number, total: number) => void,
 ): Promise<SeasonDecisionSummary[]> {
   const league = await SleeperService.getLeague(leagueId);
   if (!league) return [];
@@ -336,23 +302,20 @@ export async function analyzeLeagueAllManagers(
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
 
-  // Per-manager accumulators keyed by roster_id
-  const managerData = new Map<number, {
+  type MgrAccum = {
     ownerId: string;
-    weeklyDecisions: WeeklyDecision[];
-    allMistakes: LineupMistake[];
+    weekly: WeeklyDecision[];
+    mistakes: LineupMistake[];
     optimalWeeks: number;
-    positionMistakes: Map<string, number>;
-  }>();
+    posMistakes: Map<string, number>;
+  };
 
+  const mgrs = new Map<number, MgrAccum>();
   for (const r of rosters) {
     if (!r.owner_id) continue;
-    managerData.set(r.roster_id, {
-      ownerId: r.owner_id,
-      weeklyDecisions: [],
-      allMistakes: [],
-      optimalWeeks: 0,
-      positionMistakes: new Map(),
+    mgrs.set(r.roster_id, {
+      ownerId: r.owner_id, weekly: [], mistakes: [],
+      optimalWeeks: 0, posMistakes: new Map(),
     });
   }
 
@@ -363,7 +326,7 @@ export async function analyzeLeagueAllManagers(
     ]);
 
     for (const matchup of matchups) {
-      const mgr = managerData.get(matchup.roster_id);
+      const mgr = mgrs.get(matchup.roster_id);
       if (!mgr || !matchup.starters?.length || !matchup.players?.length) continue;
 
       const result = calculateOptimalLineup(
@@ -371,49 +334,43 @@ export async function analyzeLeagueAllManagers(
       );
       const isOptimal = result.mistakes.length === 0;
       if (isOptimal) mgr.optimalWeeks++;
-      mgr.weeklyDecisions.push({ week, optimal: result, isOptimal });
-      mgr.allMistakes.push(...result.mistakes);
-      for (const m of result.mistakes) {
-        mgr.positionMistakes.set(m.slot, (mgr.positionMistakes.get(m.slot) || 0) + 1);
-      }
+      mgr.weekly.push({ week, optimal: result, isOptimal });
+      mgr.mistakes.push(...result.mistakes);
+      for (const m of result.mistakes) mgr.posMistakes.set(m.slot, (mgr.posMistakes.get(m.slot) || 0) + 1);
     }
 
     onWeekComplete?.(week, totalWeeks);
   }
 
-  const starterSlots = rosterPositions.filter(s => s !== 'BN');
+  const starterSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
   const results: SeasonDecisionSummary[] = [];
 
-  for (const [, mgr] of managerData) {
-    if (mgr.weeklyDecisions.length === 0) continue;
-    const totalPointsLeft = mgr.weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
-    const totalActualPointsLeft = mgr.weeklyDecisions.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
-    const accuracy = (mgr.optimalWeeks / mgr.weeklyDecisions.length) * 100;
+  for (const [, mgr] of mgrs) {
+    if (mgr.weekly.length === 0) continue;
+    const totalPtsLeft = mgr.weekly.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+    const totalActualPtsLeft = mgr.weekly.reduce((s, w) => s + w.optimal.actualPointsLeftOnBench, 0);
+    const accuracy = (mgr.optimalWeeks / mgr.weekly.length) * 100;
 
     const slotTotals = new Map<string, number>();
-    for (const slot of starterSlots) {
-      slotTotals.set(slot, (slotTotals.get(slot) || 0) + mgr.weeklyDecisions.length);
-    }
+    for (const slot of starterSlots) slotTotals.set(slot, (slotTotals.get(slot) || 0) + mgr.weekly.length);
+
     const positionAccuracy: PositionAccuracy[] = Array.from(slotTotals.entries())
       .map(([position, total]) => {
-        const mistakes = mgr.positionMistakes.get(position) || 0;
-        const correct = total - mistakes;
-        return { position, correct, total, accuracy: total > 0 ? (correct / total) * 100 : 100 };
+        const mistakes = mgr.posMistakes.get(position) || 0;
+        return { position, correct: total - mistakes, total, accuracy: total > 0 ? ((total - mistakes) / total) * 100 : 100 };
       })
       .sort((a, b) => a.accuracy - b.accuracy);
 
-    mgr.allMistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
+    mgr.mistakes.sort((a, b) => (a.actualDiff ?? 0) - (b.actualDiff ?? 0));
 
     results.push({
-      leagueId,
-      leagueName: league.name,
-      season,
-      totalPointsLeftOnBench: totalPointsLeft,
-      totalActualPointsLeftOnBench: totalActualPointsLeft,
+      leagueId, leagueName: league.name, season,
+      totalPointsLeftOnBench: totalPtsLeft,
+      totalActualPointsLeftOnBench: totalActualPtsLeft,
       decisionAccuracy: accuracy,
-      weeklyDecisions: mgr.weeklyDecisions,
+      weeklyDecisions: mgr.weekly,
       positionAccuracy,
-      worstMistakes: mgr.allMistakes,
+      worstMistakes: mgr.mistakes,
       userId: mgr.ownerId,
     });
   }
@@ -421,14 +378,12 @@ export async function analyzeLeagueAllManagers(
   return results;
 }
 
-/**
- * Aggregate start/sit analysis across multiple leagues for a single season.
- */
+/** Aggregate across multiple leagues for one user in one season */
 export async function analyzeMultiLeagueSeason(
   leagues: SleeperLeague[],
   userId: string,
   season: string,
-  onLeagueComplete?: (completed: number, total: number) => void
+  onLeagueComplete?: (completed: number, total: number) => void,
 ): Promise<SeasonDecisionSummary[]> {
   const results: SeasonDecisionSummary[] = [];
   for (let i = 0; i < leagues.length; i++) {
@@ -439,13 +394,11 @@ export async function analyzeMultiLeagueSeason(
   return results;
 }
 
-/**
- * Aggregate start/sit analysis across all seasons of a single league chain.
- */
+/** Aggregate across all seasons of a single league chain */
 export async function analyzeLeagueChainHistory(
   currentLeagueId: string,
   userId: string,
-  onSeasonComplete?: (season: string, completed: number, total: number) => void
+  onSeasonComplete?: (season: string, completed: number, total: number) => void,
 ): Promise<SeasonDecisionSummary[]> {
   const history = await SleeperService.getLeagueHistory(currentLeagueId);
   const results: SeasonDecisionSummary[] = [];
