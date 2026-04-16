@@ -57,7 +57,14 @@ export default function LeagueBreakdown({ item, onToggle, onViewImpacts }: Leagu
         </Tooltip>
         <Accordion sx={{ flexGrow: 1 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="h6">{res.leagueName}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6">{res.leagueName}</Typography>
+              <Link href={`/skill/league/${res.leagueId}`} passHref onClick={(e) => e.stopPropagation()}>
+                <Button variant="text" size="small" sx={{ textTransform: 'none', minWidth: 'auto' }}>
+                  Leaguemate Comparison →
+                </Button>
+              </Link>
+            </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Grid container spacing={4}>

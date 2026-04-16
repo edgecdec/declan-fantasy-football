@@ -501,7 +501,7 @@
       "title": "Build league drilldown page with leaguemate comparison at /skill/league/[leagueId]",
       "spec": "specs/code-style.md",
       "priority": 57,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-053", "TASK-055"],
       "description": "Create /skill/league/[leagueId] page that shows the same tab structure as /skill but scoped to a single league, AND includes all league members for comparison. On the 'Positional Efficiency' tab: show every manager's efficiency at each position in a sortable table/chart so you can compare your positional strength vs leaguemates. On the 'Start/Sit Decisions' tab: show a leaderboard of all managers ranked by decision accuracy and points left on bench — who's the best/worst at setting their lineup? Run the optimal lineup analysis for EVERY manager in the league (not just the user). Highlight the current user's row with the rainbow effect. This creates a compelling 'am I a good manager compared to my competition?' view. Link to this page from anywhere a league name appears in the skill hub (clicking a league name navigates here)."
     },

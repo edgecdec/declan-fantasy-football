@@ -42,4 +42,5 @@ export type SeasonDecisionSummary = {
   weeklyDecisions: WeeklyDecision[];
   positionAccuracy: PositionAccuracy[];
   worstMistakes: LineupMistake[];
+  userId?: string;
 };

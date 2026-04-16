@@ -464,3 +464,14 @@
 - Recharts Tooltip formatter type needs `number | undefined` parameter type, not just `number`.
 - Nova Act testing: page loads, tab navigation works, analysis starts automatically. The analysis takes >60 seconds for users with many leagues (14 leagues × 14+ weekly projection API calls each) so Nova Act browser test timing out is expected.
 - Lesson: For data-heavy features, consider progressive rendering (show partial data as each league completes) rather than waiting for all to complete. Current implementation waits for all via analyzeMultiLeagueSeason. Future improvement: could modify to stream results incrementally.
+
+## TASK-057 — Build league drilldown page with leaguemate comparison (2026-04-16)
+- Created /skill/league/[leagueId] page with two tabs: Positional Efficiency and Start/Sit Decisions
+- Added `analyzeLeagueAllManagers()` to lineupOptimizer.ts — fetches matchups/projections once per week then loops all rosters, much more efficient than per-user calls
+- Created `LeagueEfficiencyTable` component: sortable table showing every manager's positional efficiency diff vs league average (per starter)
+- Created `LeagueDecisionsTable` component: sortable leaderboard of all managers ranked by optimal lineup rate and projected points left on bench
+- Both tables highlight the current user's row with animated rainbow gradient
+- Added `userId` optional field to `SeasonDecisionSummary` type for league-wide analysis
+- Added "Leaguemate Comparison →" link from LeagueBreakdown accordion headers to the drilldown page
+- Lesson: When analyzing all managers, fetch shared data (matchups, projections) once and loop rosters — avoids redundant API calls
+- Lesson: The `allRosterStats` field from `analyzePositionalBenchmarks` already has per-manager data, so the efficiency tab just needed to display it in table form

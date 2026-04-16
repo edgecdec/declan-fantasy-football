@@ -291,6 +291,115 @@ export async function analyzeStartSitDecisions(
 }
 
 /**
+ * Analyze start/sit decisions for ALL managers in a single league.
+ * Fetches matchups/projections once, then loops all rosters — much more efficient
+ * than calling analyzeStartSitDecisions per user.
+ */
+export async function analyzeLeagueAllManagers(
+  leagueId: string,
+  season: string,
+  onWeekComplete?: (week: number, total: number) => void
+): Promise<SeasonDecisionSummary[]> {
+  const league = await SleeperService.getLeague(leagueId);
+  if (!league) return [];
+
+  const rosters = await SleeperService.getRosters(leagueId);
+  const leagueAny = league as SleeperLeague & {
+    roster_positions?: string[];
+    scoring_settings?: Record<string, number>;
+  };
+  const rosterPositions = leagueAny.roster_positions;
+  const scoringSettings = leagueAny.scoring_settings;
+  if (!rosterPositions || !scoringSettings) return [];
+
+  const totalWeeks = league.settings.playoff_week_start
+    ? league.settings.playoff_week_start - 1
+    : DEFAULT_REGULAR_SEASON_WEEKS;
+
+  // Per-manager accumulators keyed by roster_id
+  const managerData = new Map<number, {
+    ownerId: string;
+    weeklyDecisions: WeeklyDecision[];
+    allMistakes: LineupMistake[];
+    optimalWeeks: number;
+    positionMistakes: Map<string, number>;
+  }>();
+
+  for (const r of rosters) {
+    if (!r.owner_id) continue;
+    managerData.set(r.roster_id, {
+      ownerId: r.owner_id,
+      weeklyDecisions: [],
+      allMistakes: [],
+      optimalWeeks: 0,
+      positionMistakes: new Map(),
+    });
+  }
+
+  for (let week = 1; week <= totalWeeks; week++) {
+    const [matchups, projections] = await Promise.all([
+      SleeperService.getMatchups(leagueId, week),
+      SleeperService.getWeeklyProjections(season, week),
+    ]);
+
+    for (const matchup of matchups) {
+      const mgr = managerData.get(matchup.roster_id);
+      if (!mgr || !matchup.starters?.length || !matchup.players?.length) continue;
+
+      const result = calculateOptimalLineup(
+        matchup.players, rosterPositions, projections, scoringSettings, matchup.starters,
+      );
+      const isOptimal = result.mistakes.length === 0;
+      if (isOptimal) mgr.optimalWeeks++;
+      mgr.weeklyDecisions.push({ week, optimal: result, isOptimal });
+      mgr.allMistakes.push(...result.mistakes);
+      for (const m of result.mistakes) {
+        mgr.positionMistakes.set(m.slot, (mgr.positionMistakes.get(m.slot) || 0) + 1);
+      }
+    }
+
+    onWeekComplete?.(week, totalWeeks);
+  }
+
+  const starterSlots = rosterPositions.filter(s => s !== 'BN');
+  const results: SeasonDecisionSummary[] = [];
+
+  for (const [, mgr] of managerData) {
+    if (mgr.weeklyDecisions.length === 0) continue;
+    const totalPointsLeft = mgr.weeklyDecisions.reduce((s, w) => s + w.optimal.pointsLeftOnBench, 0);
+    const accuracy = (mgr.optimalWeeks / mgr.weeklyDecisions.length) * 100;
+
+    const slotTotals = new Map<string, number>();
+    for (const slot of starterSlots) {
+      slotTotals.set(slot, (slotTotals.get(slot) || 0) + mgr.weeklyDecisions.length);
+    }
+    const positionAccuracy: PositionAccuracy[] = Array.from(slotTotals.entries())
+      .map(([position, total]) => {
+        const mistakes = mgr.positionMistakes.get(position) || 0;
+        const correct = total - mistakes;
+        return { position, correct, total, accuracy: total > 0 ? (correct / total) * 100 : 100 };
+      })
+      .sort((a, b) => a.accuracy - b.accuracy);
+
+    mgr.allMistakes.sort((a, b) => b.pointsDiff - a.pointsDiff);
+
+    results.push({
+      leagueId,
+      leagueName: league.name,
+      season,
+      totalPointsLeftOnBench: totalPointsLeft,
+      decisionAccuracy: accuracy,
+      weeklyDecisions: mgr.weeklyDecisions,
+      positionAccuracy,
+      worstMistakes: mgr.allMistakes.slice(0, WORST_MISTAKES_LIMIT),
+      userId: mgr.ownerId,
+    });
+  }
+
+  return results;
+}
+
+/**
  * Aggregate start/sit analysis across multiple leagues for a single season.
  */
 export async function analyzeMultiLeagueSeason(
