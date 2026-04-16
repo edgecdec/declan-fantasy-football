@@ -61,9 +61,65 @@ function resolveDraftPick(
       round: dp.round,
       resolvedPick: `${match.round}.${String(match.draft_slot).padStart(2, '0')}`,
       resolvedPlayer: name,
+      resolvedPlayerId: match.player_id,
+      resolvedPosition: getPlayerPosition(match.player_id) ?? undefined,
     };
   }
   return { season: dp.season, round: dp.round };
+}
+
+function calculateResolvedPickEfficiency(
+  pick: TradeDraftPick,
+  tradeWeek: number,
+  totalWeeks: number,
+  allMatchups: Map<number, SleeperMatchup[]>,
+  getAvg: (week: number, position: string) => number,
+  receivingRosterId: number,
+): TradeDraftPick {
+  if (!pick.resolvedPlayerId || !pick.resolvedPosition) return pick;
+
+  const weeklyBreakdown: PlayerWeekEfficiency[] = [];
+  let totalSeasonEff = 0;
+  let totalSeasonWeeks = 0;
+
+  for (let w = tradeWeek + 1; w <= totalWeeks; w++) {
+    const weekMatchups = allMatchups.get(w) || [];
+    for (const m of weekMatchups) {
+      if (!m.starters?.length) continue;
+      const starterIdx = m.starters.indexOf(pick.resolvedPlayerId);
+      if (starterIdx === -1) continue;
+      const pts = (m as Record<string, unknown>).starters_points as number[] | undefined;
+      const points = pts?.[starterIdx] ?? 0;
+      const leagueAvg = getAvg(w, pick.resolvedPosition);
+      const eff = points - leagueAvg;
+      totalSeasonEff += eff;
+      totalSeasonWeeks++;
+      if (m.roster_id === receivingRosterId) {
+        weeklyBreakdown.push({ week: w, points, leagueAvg, efficiency: eff });
+      }
+      break;
+    }
+  }
+
+  const totalEff = weeklyBreakdown.reduce((s, wb) => s + wb.efficiency, 0);
+  const lastStartedWeek = weeklyBreakdown.length > 0 ? weeklyBreakdown[weeklyBreakdown.length - 1].week : null;
+  const departureWeek = lastStartedWeek != null && lastStartedWeek < totalWeeks ? lastStartedWeek + 1 : null;
+
+  return {
+    ...pick,
+    efficiency: {
+      playerId: pick.resolvedPlayerId,
+      name: pick.resolvedPlayer || 'Unknown',
+      position: pick.resolvedPosition,
+      weeksStarted: weeklyBreakdown.length,
+      totalEfficiency: totalEff,
+      avgEfficiency: weeklyBreakdown.length > 0 ? totalEff / weeklyBreakdown.length : 0,
+      totalSeasonEfficiency: totalSeasonEff,
+      totalSeasonWeeksStarted: totalSeasonWeeks,
+      weeklyBreakdown,
+      departureWeek,
+    },
+  };
 }
 
 function evaluateSidePlayers(
@@ -74,11 +130,16 @@ function evaluateSidePlayers(
   getAvg: (week: number, position: string) => number,
   draftPicksByRound: Map<string, SleeperDraftPick[]>
 ): TradeEfficiencySide {
+  const resolvedPicks = (side.draftPicks ?? []).map((dp) => {
+    const resolved = resolveDraftPick(dp, draftPicksByRound);
+    return calculateResolvedPickEfficiency(resolved, tradeWeek, totalWeeks, allMatchups, getAvg, side.rosterId);
+  });
+
   const result: TradeEfficiencySide = {
     rosterId: side.rosterId,
     username: side.username,
     players: [],
-    draftPicks: (side.draftPicks ?? []).map((dp) => resolveDraftPick(dp, draftPicksByRound)),
+    draftPicks: resolvedPicks,
     faabItems: (side.faab ?? []).map((amount) => ({ amount })),
     totalEfficiency: 0,
   };
@@ -135,6 +196,13 @@ function evaluateSidePlayers(
       departureWeek,
     });
     result.totalEfficiency += totalSeasonEff;
+  }
+
+  // Add resolved draft pick efficiency to side total
+  for (const dp of resolvedPicks) {
+    if (dp.efficiency) {
+      result.totalEfficiency += dp.efficiency.totalSeasonEfficiency;
+    }
   }
 
   return result;

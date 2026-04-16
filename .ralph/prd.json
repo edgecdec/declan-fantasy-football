@@ -519,7 +519,7 @@
       "title": "Evaluate pre-season draft pick trades by the player the pick became",
       "spec": "specs/code-style.md",
       "priority": 59,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-037"],
       "description": "On /league-history/[leagueId]/trades, when a trade involves draft picks that have already been used (the draft happened), the picks currently show as 'N/A' for efficiency even though we know which player was selected. Fix: if a traded pick resolved to an actual player (e.g. '2025 Round 7 Pick → 7.09: Patrick Mahomes'), calculate that player's positional efficiency for the rest of the season as if the player themselves were traded. Use the same efficiency calculation as regular player trades — find the player in starters across all weeks after the trade, compute points vs league positional average, sum it up. Display the efficiency numbers in the same columns instead of N/A. This way a pre-season pick trade like '2025 Round 4 Pick → 4.03: Mike Evans' shows Mike Evans' actual season efficiency, making the trade evaluable. The pick label should still show it was a pick (e.g. '2025 Rd 4 → Mike Evans') but the efficiency columns should show real numbers. Only apply this when the pick has resolved to a player — future unresolved picks remain N/A. Test against league 1206336001794920448 which has pre-season pick trades."
     },

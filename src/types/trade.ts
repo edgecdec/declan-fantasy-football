@@ -23,6 +23,9 @@ export type TradeDraftPick = {
   round: number;
   resolvedPick?: string;
   resolvedPlayer?: string;
+  resolvedPlayerId?: string;
+  resolvedPosition?: string;
+  efficiency?: PlayerTradeEfficiency;
 };
 
 export type TradeFaab = {

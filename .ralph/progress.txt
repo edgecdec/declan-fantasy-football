@@ -495,3 +495,10 @@
 - Redesigned summary cards: Actual Pts Lost, Times Beat Projections, Net Skill Score, Worst Position.
 - Updated AggWeek type to include `leagues: LeagueWeekDetail[]` instead of flat `decisions` array.
 - Lesson: Always verify API response format against the actual live endpoint before assuming the shape. The Sleeper API is undocumented and response formats can differ from expectations.
+
+## TASK-059: Evaluate pre-season draft pick trades by the player the pick became
+- Date: 2026-04-16
+- Changes: src/types/trade.ts (added efficiency fields to TradeDraftPick), src/services/stats/tradeEfficiency.ts (added calculateResolvedPickEfficiency function, integrated into evaluateSidePlayers), src/app/league-history/[leagueId]/trades/page.tsx (render real efficiency for resolved picks)
+- Approach: When resolveDraftPick finds the player a pick became, we now store the playerId and position. A new calculateResolvedPickEfficiency function runs the same efficiency calculation as regular player trades (points vs league positional avg for each week started post-trade). The efficiency is attached to the TradeDraftPick and included in the side's total. The UI shows position chip, weeks started, team/total/avg efficiency for resolved picks instead of N/A. Unresolved picks still show N/A.
+- Verified: Nova Act test confirmed resolved picks display real efficiency values on league 1206336001794920448 (e.g. "2025 Rd 1 → Saquon Barkley" shows RB chip and efficiency numbers).
+- Lesson: The existing code structure made this straightforward — resolveDraftPick already identified the player, just needed to carry the ID through and run the same calculation pattern used for regular player trades.

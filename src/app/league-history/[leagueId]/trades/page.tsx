@@ -95,23 +95,42 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                 <TableCell align="right"><EfficiencyValue value={p.avgEfficiency} /></TableCell>
               </TableRow>
             ))}
-            {(side.draftPicks ?? []).map((dp, i) => (
+            {(side.draftPicks ?? []).map((dp, i) => {
+              const eff = dp.efficiency;
+              return (
               <TableRow key={`pick-${i}`}>
                 <TableCell>
-                  {dp.season} Round {dp.round} Pick
+                  {dp.season} Rd {dp.round}
                   {dp.resolvedPick && (
-                    <Typography component="span" variant="body2" color="text.secondary"> → {dp.resolvedPick}: {dp.resolvedPlayer}</Typography>
+                    <Typography component="span" variant="body2" color="text.secondary"> → {dp.resolvedPlayer}</Typography>
+                  )}
+                  {eff?.departureWeek != null && (
+                    <Tooltip title={`Left roster in Week ${eff.departureWeek}`} arrow>
+                      <Typography component="span" sx={{ color: 'warning.main', cursor: 'help', ml: 0.5 }}>*</Typography>
+                    </Tooltip>
                   )}
                 </TableCell>
                 <TableCell align="center">
-                  <Chip label="PICK" size="small" sx={{ bgcolor: 'action.selected', fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
+                  <Chip label={eff?.position || 'PICK'} size="small" sx={{ bgcolor: eff ? getPositionColor(eff.position) : 'action.selected', color: eff ? '#fff' : undefined, fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />
                 </TableCell>
-                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                {eff ? (
+                  <>
+                    <TableCell align="right">{eff.weeksStarted}</TableCell>
+                    <TableCell align="right"><EfficiencyValue value={eff.totalEfficiency} /></TableCell>
+                    <TableCell align="right"><EfficiencyValue value={eff.totalSeasonEfficiency} /></TableCell>
+                    <TableCell align="right"><EfficiencyValue value={eff.avgEfficiency} /></TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                    <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                    <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                    <TableCell align="right"><Typography variant="body2" color="text.secondary">N/A</Typography></TableCell>
+                  </>
+                )}
               </TableRow>
-            ))}
+              );
+            })}
             {(side.faabItems ?? []).map((fb, i) => (
               <TableRow key={`faab-${i}`}>
                 <TableCell>${fb.amount} FAAB</TableCell>
