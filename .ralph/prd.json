@@ -474,7 +474,7 @@
       "title": "Create optimal lineup solver service using Sleeper projections",
       "spec": "specs/code-style.md",
       "priority": 54,
-      "status": "open",
+      "status": "done",
       "dependencies": [],
       "description": "Create src/services/stats/lineupOptimizer.ts. Core function: calculateOptimalLineup(rosterPlayerIds, rosterPositions, projections, scoringSettings) that returns the lineup maximizing projected points. Inputs: (1) Array of player IDs on the user's roster (starters + bench from matchup data). (2) League roster positions array (e.g. ['QB','RB','RB','WR','WR','TE','FLEX','K','DEF']). (3) Weekly projections from Sleeper API (GET /projections/nfl/regular/{season}/{week}). (4) League scoring_settings to calculate custom projected points per player (multiply each stat projection by the scoring weight and sum). The solver must handle FLEX (RB/WR/TE eligible) and SUPER_FLEX (QB/RB/WR/TE eligible) slots correctly. Algorithm: since roster sizes are small (~10 slots), use a greedy approach — fill position-locked slots first (QB, K, DEF), then fill RB/WR/TE slots with best available at each position, then fill FLEX/SUPER_FLEX with the best remaining eligible player. Return: { optimalLineup: [{slot, playerId, playerName, position, projectedPoints}], actualLineup: same format, pointsLeftOnBench: number, mistakes: [{slot, started, shouldHaveStarted, pointsDiff}] }."
     },

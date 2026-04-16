@@ -131,6 +131,12 @@ export type SleeperWaiverBudget = {
   amount: number;
 };
 
+/** Raw stat projections keyed by stat name (e.g. pass_yd, rush_td, rec) */
+export type SleeperProjection = Record<string, number>;
+
+/** Map of player_id -> projection stats for a single week */
+export type SleeperWeeklyProjections = Record<string, SleeperProjection>;
+
 export type SleeperTransaction = {
   transaction_id: string;
   type: string; // 'trade', 'free_agent', 'waiver'
@@ -583,5 +589,26 @@ export const SleeperService = {
     }
 
     return results;
+  },
+
+  async getWeeklyProjections(season: string, week: number): Promise<SleeperWeeklyProjections> {
+    const cacheKey = `projections_${season}_${week}`;
+    const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/projections/nfl/regular/${season}/${week}`);
+      if (!res.ok) return {};
+      const data: Array<{ player_id: string; stats: SleeperProjection }> = await res.json();
+      const mapped: SleeperWeeklyProjections = {};
+      for (const entry of data) {
+        if (entry.player_id && entry.stats) mapped[entry.player_id] = entry.stats;
+      }
+      CacheService.set(cacheKey, mapped, { storage: 'session', ttl: 1000 * 60 * 60 });
+      return mapped;
+    } catch (e) {
+      console.error(`Error fetching projections for ${season} week ${week}`, e);
+      return {};
+    }
   }
 };
