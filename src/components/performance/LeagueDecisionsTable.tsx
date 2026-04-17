@@ -34,7 +34,7 @@ export default function LeagueDecisionsTable({
   currentUserId?: string;
   leagueId: string;
 }) {
-  const [sortField, setSortField] = React.useState<SortField>('skillEff');
+  const [sortField, setSortField] = React.useState<SortField>('netSkill');
   const [sortDir, setSortDir] = React.useState<SortDir>('desc');
   const [userMap, setUserMap] = React.useState<Record<string, { displayName: string; avatar: string }>>({});
 

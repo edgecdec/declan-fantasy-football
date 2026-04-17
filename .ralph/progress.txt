@@ -580,3 +580,9 @@
 - Used cursor:help on the span to indicate hoverable element
 - Needed to pass totalActualStarted, totalActualOptimal, and totalDecisions through the ManagerRow type
 - Lesson: MUI Tooltip needs a DOM element child (not just text) — wrapping in <span> works cleanly
+
+## TASK-068: Sort Start/Sit leaderboard by Net Skill +/- by default (2026-04-17)
+- Changed default sort in LeagueDecisionsTable.tsx from 'skillEff' to 'netSkill'
+- Net Skill +/- is fairer because it accounts for volume — high efficiency on a low-scoring roster matters less than moderate efficiency on a high-scoring one
+- All columns remain sortable via header clicks; only the initial default changed
+- Single-line change, minimal risk

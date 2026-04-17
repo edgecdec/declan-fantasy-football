@@ -600,7 +600,7 @@
       "title": "Sort Start/Sit leaderboard by Net Skill +/- by default instead of Skill Efficiency %",
       "spec": "specs/code-style.md",
       "priority": 68,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-063"],
       "description": "On the Start/Sit leaderboard at /skill/league/[leagueId]?tab=decisions and the aggregate /skill?tab=decisions, change the default sort column from Skill Efficiency % to Net Skill +/- (descending). Net Skill is more fair because it accounts for volume — a manager with 103% on a low-scoring roster contributed less skill than a manager with 102% on a high-scoring roster. All columns should still be sortable by clicking the header (per the existing sortable columns pattern), this just changes the initial default."
     },
