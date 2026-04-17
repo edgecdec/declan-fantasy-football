@@ -602,3 +602,14 @@
 - Total season efficiency (across all teams) still spans the full season for the resolved player.
 - Added `retradedWeek` field to `TradeDraftPick` type and "(traded again)" tooltip indicator in the UI.
 - Lesson: The pick's `rosterId` (original owner) is the stable identifier across all trades of the same pick — only `owner_id` changes per transaction. Using `(season, round, rosterId)` as the composite key correctly identifies the same pick across multiple transactions.
+
+## TASK-072: Replace traded players table with manager trade leaderboard and drill-down
+- Date: 2026-04-17
+- Created ManagerTradeLeaderboard component at src/components/analytics/ManagerTradeLeaderboard.tsx
+- 3-level drill-down: Level 1 = sortable manager leaderboard (Rank, Manager, Trades, Won, Lost, Total +/-, Best, Worst), Level 2 = individual trades per manager with week/opponent/margin/W-L chips, Level 3 = full trade detail with players and efficiency on each side
+- Replaced TradedPlayersSummary import and usage in the trades page
+- Used MUI Accordion for Level 2→3 nesting, and table row expansion for Level 1→2
+- Trade margin threshold of ±1 for win/loss classification (same as TradeVerdict)
+- Level 2 trades sorted by absolute margin (most impactful first)
+- Individual trade cards below the leaderboard remain for chronological/impact browsing
+- Lesson: Using table row expansion (Fragment + conditional row) for Level 1 is cleaner than Accordion inside a table — keeps the table structure intact while allowing inline expansion

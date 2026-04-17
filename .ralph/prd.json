@@ -620,7 +620,7 @@
       "priority": 70,
       "status": "done",
       "dependencies": ["TASK-035"],
-      "description": "At the top of /league-history/[leagueId]/trades, before the individual trade list, add a sortable summary table showing every player who was involved in a trade throughout the league. Columns: Player Name, Position, Times Traded, Total Efficiency +/-, Team Eff, Total Eff, Traded By (who gave them up), Traded To (who received them). If a player was traded multiple times, show one row per trade instance or aggregate with a note. Sort by Total Efficiency +/- descending by default. This gives a quick overview of which traded players had the biggest impact across the entire league's trade activity."
+      "description": "Rewrite the top section of /league-history/[leagueId]/trades. Replace the current layout with a manager trade leaderboard and drill-down structure:\n\nLEVEL 1 — MANAGER LEADERBOARD TABLE (top of page): Sortable table showing every manager in the league ranked by trade performance. Columns: Rank, Manager, Total Trades, Trades Won (their side had higher total eff), Trades Lost, Total +/- (sum of all their trade margins), Best Trade +/- (their single best trade margin), Worst Trade +/- (their single worst). A trade's margin for a manager = their side's total efficiency minus the other side's total efficiency. Sort by Total +/- descending by default. Color positive green, negative red.\n\nLEVEL 2 — MANAGER CARD (click a manager row to expand): Shows all of that manager's individual trades as cards/rows. Each trade shows: week, opponent username, the manager's side total eff, opponent's side total eff, margin +/-, and a win/loss indicator.\n\nLEVEL 3 — TRADE DETAIL (click a trade card to expand): Shows the full trade breakdown with players on each side, positions, efficiency numbers — the same detail view that currently exists for individual trades.\n\nUse MUI Accordion for the nested expansion. Each level shows its own aggregate stats so users can scan without expanding. The individual trade list below the leaderboard can remain as-is for users who want to browse all trades chronologically/by impact."
     },
     {
       "id": "TASK-071",
@@ -630,6 +630,15 @@
       "status": "done",
       "dependencies": ["TASK-069"],
       "description": "A draft pick can be traded more than once before the draft happens (e.g. Team A trades their 1st round pick to Team B, then Team B trades that same pick to Team C). Currently the trade evaluator only looks at each transaction in isolation, so the same pick may show up in multiple trades without connecting them. Fix: when resolving draft picks to the player they became, trace the full chain of ownership. The pick's original roster_id stays the same across all trades — only the owner_id changes. So if the same (season, round, roster_id) appears in multiple transactions, each trade should show the pick with the correct resolved player, and the efficiency should be attributed correctly to each trade in the chain. Also display a note like '(traded again)' on picks that were subsequently re-traded, similar to the asterisk pattern for re-traded players from TASK-038."
+    },
+    {
+      "id": "TASK-072",
+      "title": "Replace traded players table with manager trade leaderboard and drill-down",
+      "spec": "specs/code-style.md",
+      "priority": 72,
+      "status": "done",
+      "dependencies": ["TASK-070"],
+      "description": "On /league-history/[leagueId]/trades, TASK-070 added a traded players summary table at the top. Replace it with a manager trade leaderboard and nested drill-down:\n\nLEVEL 1 — MANAGER LEADERBOARD TABLE (top of page): Sortable table showing every manager in the league ranked by trade performance. Columns: Rank, Manager, Total Trades, Trades Won (their side had higher total eff), Trades Lost, Total +/- (sum of all their trade margins), Best Trade +/- (their single best trade margin), Worst Trade +/- (their single worst). A trade's margin for a manager = their side's total efficiency minus the other side's total efficiency. Sort by Total +/- descending by default. Color positive green, negative red.\n\nLEVEL 2 — MANAGER CARD (click a manager row to expand): Shows all of that manager's individual trades as cards/rows. Each trade shows: week, opponent username, the manager's side total eff, opponent's side total eff, margin +/-, and a win/loss indicator.\n\nLEVEL 3 — TRADE DETAIL (click a trade card to expand): Shows the full trade breakdown with players on each side, positions, efficiency numbers — the same detail view that currently exists for individual trades.\n\nUse MUI Accordion for the nested expansion. Each level shows its own aggregate stats so users can scan without expanding. The individual trade list below the leaderboard can remain as-is for users who want to browse all trades chronologically/by impact."
     }
   ]
 }

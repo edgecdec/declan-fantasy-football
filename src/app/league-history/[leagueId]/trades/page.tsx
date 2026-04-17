@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TradedPlayersSummary from '@/components/analytics/TradedPlayersSummary';
+import ManagerTradeLeaderboard from '@/components/analytics/ManagerTradeLeaderboard';
 import SortIcon from '@mui/icons-material/Sort';
 import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
@@ -281,7 +281,7 @@ export default function TradeEvaluatorPage() {
 
       {!loading && trades.length > 0 && (
         <>
-          <TradedPlayersSummary trades={trades} />
+          <ManagerTradeLeaderboard trades={trades} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <ToggleButtonGroup
               value={sortMode}
