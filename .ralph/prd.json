@@ -657,6 +657,24 @@
       "status": "done",
       "dependencies": ["TASK-072"],
       "description": "On /league-history/[leagueId]/trades, the manager trade leaderboard only shows managers who made at least one trade. Managers with 0 trades are missing entirely. Fix: fetch all rosters/users for the league and include every manager in the leaderboard. Managers with no trades should show 0 for all columns (Total Trades: 0, Won: 0, Lost: 0, Total +/-: 0.0, Best: N/A, Worst: N/A). They should appear at the bottom of the table when sorted by Total +/- descending."
+    },
+    {
+      "id": "TASK-075",
+      "title": "Add historical trade leaderboard across all seasons of the same league",
+      "spec": "specs/code-style.md",
+      "priority": 75,
+      "status": "done",
+      "dependencies": ["TASK-072"],
+      "description": "On /league-history/[leagueId]/trades, add a 'Historical' toggle (same pattern as draft efficiency TASK-046/052). When toggled on, trace the league's previous_league_id chain to find all prior seasons. Run the trade evaluation for each season and aggregate the manager trade leaderboard across all years. The historical leaderboard shows: Manager, Total Trades (all-time), Trades Won, Trades Lost, All-Time Total +/-, Best Single Trade +/-, Worst Single Trade +/-, Seasons Active. This shows who has been the best trader over the league's entire history. Load progressively as each season completes. The per-season data should also be visible — add a year-by-year breakdown table below the all-time leaderboard showing each manager's trade performance per season."
+    },
+    {
+      "id": "TASK-076",
+      "title": "Add head-to-head trade heatmap showing all-time +/- between managers",
+      "spec": "specs/code-style.md",
+      "priority": 76,
+      "status": "open",
+      "dependencies": ["TASK-075"],
+      "description": "On /league-history/[leagueId]/trades (with historical toggle on), add a head-to-head trade heatmap matrix below the historical leaderboard. This is similar to the existing head-to-head matchup matrix on /league-history but for trades instead of games. The matrix is an N×N grid where rows and columns are managers. Each cell shows the total +/- margin from all trades between those two managers across all seasons. For example, if edgecdec traded with Junebugge 5 times over 3 seasons and the net result was +45.2 in edgecdec's favor, the cell at (edgecdec, Junebugge) shows +45.2 (green) and (Junebugge, edgecdec) shows -45.2 (red). Use a color gradient from red (negative) through white (neutral) to green (positive) — same heatmap pattern as the existing PositionalHeatmap.tsx component. On hover, show a tooltip with: number of trades between the two managers, total +/-, best trade, worst trade. Diagonal cells are empty (can't trade with yourself). This reveals who consistently fleeces who in trades over the league's lifetime."
     }
   ]
 }

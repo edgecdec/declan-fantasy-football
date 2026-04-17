@@ -7,10 +7,12 @@ import {
   TradeEfficiencySide,
   TradeEfficiencyResult,
   LeagueTradeEfficiencyResult,
+  SeasonTradeStats,
+  HistoricalTradeData,
 } from '@/types/trade';
 import playerData from '../../../data/sleeper_players.json';
 
-export type { PlayerWeekEfficiency, PlayerTradeEfficiency, TradeEfficiencySide, TradeEfficiencyResult, LeagueTradeEfficiencyResult } from '@/types/trade';
+export type { PlayerWeekEfficiency, PlayerTradeEfficiency, TradeEfficiencySide, TradeEfficiencyResult, LeagueTradeEfficiencyResult, SeasonTradeStats, HistoricalTradeData } from '@/types/trade';
 
 const DEFAULT_REGULAR_SEASON_WEEKS = 14;
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
@@ -374,4 +376,74 @@ export async function evaluateTradeEfficiency(
 
   CacheService.set(cacheKey, result, { storage: 'session' });
   return result;
+}
+
+const TRADE_WIN_THRESHOLD = 1;
+
+function buildSeasonStats(
+  seasonResult: LeagueTradeEfficiencyResult,
+): SeasonTradeStats {
+  const managerStats: SeasonTradeStats['managerStats'] = {};
+  for (const trade of seasonResult.trades) {
+    for (let i = 0; i < 2; i++) {
+      const mySide = trade.sides[i];
+      const oppSide = trade.sides[1 - i];
+      const margin = mySide.totalEfficiency - oppSide.totalEfficiency;
+      if (!managerStats[mySide.username]) {
+        managerStats[mySide.username] = { totalMargin: 0, tradesWon: 0, tradesLost: 0, totalTrades: 0 };
+      }
+      const s = managerStats[mySide.username];
+      s.totalTrades++;
+      s.totalMargin += margin;
+      if (margin > TRADE_WIN_THRESHOLD) s.tradesWon++;
+      else if (margin < -TRADE_WIN_THRESHOLD) s.tradesLost++;
+    }
+  }
+  return {
+    season: seasonResult.season,
+    leagueId: seasonResult.leagueId,
+    leagueName: seasonResult.leagueName,
+    tradeCount: seasonResult.trades.length,
+    managerStats,
+  };
+}
+
+export async function fetchHistoricalTradeEfficiency(
+  leagueId: string,
+  onProgress: (data: HistoricalTradeData) => void,
+): Promise<HistoricalTradeData> {
+  const cacheKey = `hist_trade_eff_${leagueId}`;
+  const cached = CacheService.get<HistoricalTradeData>(cacheKey, 'session');
+  if (cached) {
+    onProgress(cached);
+    return cached;
+  }
+
+  const leagueHistory = await SleeperService.getLeagueHistory(leagueId);
+  const priorLeagues = leagueHistory.filter(
+    (l) => l.league_id !== leagueId && l.status === 'complete',
+  );
+
+  const seasons: SeasonTradeStats[] = [];
+  const allTrades: TradeEfficiencyResult[] = [];
+  const allRosterToUsername: Record<number, string> = {};
+
+  for (const league of priorLeagues) {
+    try {
+      const result = await evaluateTradeEfficiency(league.league_id, league.season);
+      if (result.trades.length === 0) continue;
+
+      seasons.push(buildSeasonStats(result));
+      allTrades.push(...result.trades);
+      Object.assign(allRosterToUsername, result.rosterToUsername);
+
+      onProgress({ seasons: [...seasons], allTrades: [...allTrades], allRosterToUsername: { ...allRosterToUsername } });
+    } catch {
+      // Skip seasons that fail
+    }
+  }
+
+  const final: HistoricalTradeData = { seasons, allTrades, allRosterToUsername };
+  CacheService.set(cacheKey, final, { storage: 'session' });
+  return final;
 }

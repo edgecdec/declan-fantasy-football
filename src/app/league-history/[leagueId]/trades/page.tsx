@@ -24,12 +24,14 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ManagerTradeLeaderboard from '@/components/analytics/ManagerTradeLeaderboard';
+import HistoricalTradeLeaderboard from '@/components/analytics/HistoricalTradeLeaderboard';
 import SortIcon from '@mui/icons-material/Sort';
+import HistoryIcon from '@mui/icons-material/History';
 import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
 import { SleeperService } from '@/services/sleeper/sleeperService';
-import { evaluateTradeEfficiency } from '@/services/stats/tradeEfficiency';
-import { TradeEfficiencyResult, TradeEfficiencySide } from '@/types/trade';
+import { evaluateTradeEfficiency, fetchHistoricalTradeEfficiency } from '@/services/stats/tradeEfficiency';
+import { TradeEfficiencyResult, TradeEfficiencySide, HistoricalTradeData } from '@/types/trade';
 import { getPositionColor } from '@/constants/colors';
 import useTableSort from '@/hooks/useTableSort';
 
@@ -211,6 +213,9 @@ export default function TradeEvaluatorPage() {
   const [rosterToUsername, setRosterToUsername] = React.useState<Record<number, string>>({});
   const [error, setError] = React.useState('');
   const [sortMode, setSortMode] = React.useState<'impact' | 'chronological'>('impact');
+  const [showHistorical, setShowHistorical] = React.useState(false);
+  const [historicalData, setHistoricalData] = React.useState<HistoricalTradeData | null>(null);
+  const [historicalLoading, setHistoricalLoading] = React.useState(false);
 
   const sortedTrades = React.useMemo(() => {
     const copy = [...trades];
@@ -250,6 +255,23 @@ export default function TradeEvaluatorPage() {
     return () => { cancelled = true; };
   }, [leagueId]);
 
+  React.useEffect(() => {
+    if (!showHistorical || historicalData || !leagueId) return;
+    let cancelled = false;
+    setHistoricalLoading(true);
+
+    fetchHistoricalTradeEfficiency(
+      leagueId,
+      (partial) => { if (!cancelled) setHistoricalData(partial); },
+    ).then((final) => {
+      if (!cancelled) { setHistoricalData(final); setHistoricalLoading(false); }
+    }).catch(() => {
+      if (!cancelled) setHistoricalLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [showHistorical, historicalData, leagueId]);
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <PageHeader
@@ -283,6 +305,20 @@ export default function TradeEvaluatorPage() {
 
       {!loading && trades.length > 0 && (
         <>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <ToggleButtonGroup size="small">
+              <ToggleButton
+                value="historical"
+                selected={showHistorical}
+                onChange={() => setShowHistorical((v) => !v)}
+              >
+                <HistoryIcon sx={{ mr: 0.5, fontSize: 18 }} /> Historical
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+          {showHistorical && (
+            <HistoricalTradeLeaderboard data={historicalData} loading={historicalLoading} />
+          )}
           <ManagerTradeLeaderboard trades={trades} rosterToUsername={rosterToUsername} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <ToggleButtonGroup

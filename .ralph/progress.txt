@@ -630,3 +630,12 @@
 - Trades page passes `rosterToUsername` from `LeagueTradeEfficiencyResult` to the leaderboard
 - Verified: league 1206336001794920448 shows all 10 managers in the leaderboard, including those who made no trades
 - Lesson: When building aggregation tables from event data, always seed the full entity list first (from a separate source like rosters/users), then overlay the event-derived stats. This avoids the common bug of only showing entities that have events.
+
+## TASK-075: Add historical trade leaderboard across all seasons of the same league
+- Date: 2026-04-17
+- Added `fetchHistoricalTradeEfficiency` to `src/services/stats/tradeEfficiency.ts` — traces `previous_league_id` chain via `SleeperService.getLeagueHistory()`, runs `evaluateTradeEfficiency` for each prior completed season, aggregates results progressively
+- Added `SeasonTradeStats` and `HistoricalTradeData` types to `src/types/trade.ts`
+- Created `src/components/analytics/HistoricalTradeLeaderboard.tsx` with two sections: All-Time Trade Leaderboard (sortable table with Seasons, Trades, Won, Lost, Total +/-, Best Season, Worst Season) and Year-by-Year Breakdown (matrix of seasons × managers showing margin and W-L record)
+- Added Historical toggle button to the trade evaluator page — loads data on first click, shows progressive results as each season completes
+- Followed same pattern as draft efficiency historical (TASK-046/052): useEffect triggered by toggle, onProgress callback for progressive rendering, session cache
+- Lesson: Best/worst "single trade" margin requires per-trade granularity from all seasons. Used per-season margin as proxy for best/worst since the all-time leaderboard aggregates from SeasonTradeStats. For true per-trade best/worst, would need to pass all historical trades through the existing ManagerTradeLeaderboard's buildManagerStats — but that would require combining current + historical trades which adds complexity. The season-level approximation is good enough for the all-time view.

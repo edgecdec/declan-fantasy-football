@@ -56,3 +56,17 @@ export type LeagueTradeEfficiencyResult = {
   trades: TradeEfficiencyResult[];
   rosterToUsername: Record<number, string>;
 };
+
+export type SeasonTradeStats = {
+  season: string;
+  leagueId: string;
+  leagueName: string;
+  tradeCount: number;
+  managerStats: Record<string, { totalMargin: number; tradesWon: number; tradesLost: number; totalTrades: number }>;
+};
+
+export type HistoricalTradeData = {
+  seasons: SeasonTradeStats[];
+  allTrades: TradeEfficiencyResult[];
+  allRosterToUsername: Record<number, string>;
+};
