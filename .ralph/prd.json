@@ -582,7 +582,7 @@
       "title": "Display Skill Efficiency as +/- percentage relative to 100%",
       "spec": "specs/code-style.md",
       "priority": 66,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-063"],
       "description": "On all Start/Sit views (leaderboard, summary cards, aggregate page), display Skill Efficiency rounded to 2 decimal places instead of 1. Examples: 103.2% becomes '103.17%', 97.2% becomes '97.24%'. Keep the raw 100-based percentage format. The sort still uses the raw unrounded value (per TASK-065)."
     }

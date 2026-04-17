@@ -150,7 +150,7 @@ export default function LeagueDecisionsTable({
                     </Box>
                   </TableCell>
                   <TableCell align="right" sx={{ color: row.skillEfficiency >= 100 ? 'success.main' : 'error.main', fontWeight: 600 }}>
-                    {row.skillEfficiency.toFixed(1)}%
+                    {row.skillEfficiency.toFixed(2)}%
                   </TableCell>
                   <TableCell align="right" sx={{ color: row.netSkillPlusMinus >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
                     {row.netSkillPlusMinus >= 0 ? '+' : ''}{row.netSkillPlusMinus.toFixed(1)}

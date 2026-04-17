@@ -444,7 +444,7 @@ export default function StartSitContent() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="h4" color={avgSkillEfficiency >= 100 ? 'success.main' : 'error.main'}>
-                  {avgSkillEfficiency.toFixed(1)}%
+                  {avgSkillEfficiency.toFixed(2)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">Skill Efficiency</Typography>
               </Paper>

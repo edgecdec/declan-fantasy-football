@@ -559,3 +559,8 @@
 - Added Net Skill +/- as tiebreaker when two managers have identical Skill Efficiency %.
 - The sort already used unrounded values; the issue was managers with genuinely equal efficiency values had no deterministic tiebreak.
 - Lesson: When sorting by a primary metric that users see rounded, always add a meaningful tiebreaker to avoid confusing rank ordering.
+
+## TASK-066 — Display Skill Efficiency to 2 decimal places (2026-04-16)
+- Changed `.toFixed(1)` to `.toFixed(2)` in two files: StartSitContent.tsx (summary card) and LeagueDecisionsTable.tsx (leaderboard table).
+- Only 2 spots needed updating — grep confirmed no other toFixed calls on skillEfficiency.
+- Lesson: Simple formatting tasks are fast — grep first, confirm scope, change, validate, ship.
