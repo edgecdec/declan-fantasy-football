@@ -47,11 +47,18 @@ function calcPositionalAvg(matchups: SleeperMatchup[], position: string): number
 
 function resolveDraftPick(
   dp: { season: string; round: number; rosterId: number },
-  draftPicksByRound: Map<string, SleeperDraftPick[]>
+  draftPicksByRound: Map<string, SleeperDraftPick[]>,
+  rosterIdToDraftSlot: Map<number, number>,
 ): TradeDraftPick {
   const key = `${dp.season}_${dp.round}`;
   const roundPicks = draftPicksByRound.get(key) || [];
-  const match = roundPicks.find((p) => p.roster_id === dp.rosterId);
+  // Match by draft_slot (original slot owner) since draft picks data uses
+  // roster_id = who MADE the pick (current owner), not the original slot owner.
+  // The transaction's rosterId is the original slot owner.
+  const draftSlot = rosterIdToDraftSlot.get(dp.rosterId);
+  const match = draftSlot != null
+    ? roundPicks.find((p) => p.draft_slot === draftSlot)
+    : roundPicks.find((p) => p.roster_id === dp.rosterId); // fallback
   if (match) {
     const name = match.metadata
       ? `${match.metadata.first_name} ${match.metadata.last_name}`
@@ -173,11 +180,12 @@ function evaluateSidePlayers(
   allMatchups: Map<number, SleeperMatchup[]>,
   getAvg: (week: number, position: string) => number,
   draftPicksByRound: Map<string, SleeperDraftPick[]>,
+  rosterIdToDraftSlot: Map<number, number>,
   pickTimeline: PickTradeTimeline,
   transactionId: string,
 ): TradeEfficiencySide {
   const resolvedPicks = (side.draftPicks ?? []).map((dp) => {
-    const resolved = resolveDraftPick(dp, draftPicksByRound);
+    const resolved = resolveDraftPick(dp, draftPicksByRound, rosterIdToDraftSlot);
     const retradedWeek = getRetradedWeek(pickTimeline, dp, transactionId);
     const endWeek = retradedWeek != null ? retradedWeek : totalWeeks;
     const withEff = calculateResolvedPickEfficiency(resolved, tradeWeek, endWeek, totalWeeks, allMatchups, getAvg, side.rosterId);
@@ -258,25 +266,39 @@ function evaluateSidePlayers(
   return result;
 }
 
+type DraftPicksResult = {
+  picksByRound: Map<string, SleeperDraftPick[]>;
+  rosterIdToDraftSlot: Map<number, number>;
+};
+
 async function fetchDraftPicksByRound(
   leagueId: string,
   season: string
-): Promise<Map<string, SleeperDraftPick[]>> {
-  const map = new Map<string, SleeperDraftPick[]>();
+): Promise<DraftPicksResult> {
+  const picksByRound = new Map<string, SleeperDraftPick[]>();
+  const rosterIdToDraftSlot = new Map<number, number>();
   try {
     const drafts = await SleeperService.getLeagueDrafts(leagueId);
     const seasonDraft = drafts.find((d) => d.season === season && d.status === 'complete');
-    if (!seasonDraft) return map;
+    if (!seasonDraft) return { picksByRound, rosterIdToDraftSlot };
+    // getLeagueDrafts doesn't include slot_to_roster_id — fetch full draft details
+    const fullDraft = await SleeperService.getDraft(seasonDraft.draft_id);
+    const slotMap = fullDraft?.slot_to_roster_id ?? seasonDraft.slot_to_roster_id;
+    if (slotMap) {
+      for (const [slot, rosterId] of Object.entries(slotMap)) {
+        rosterIdToDraftSlot.set(rosterId, Number(slot));
+      }
+    }
     const picks = await SleeperService.getDraftPicks(seasonDraft.draft_id);
     for (const p of picks) {
       const key = `${season}_${p.round}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
+      if (!picksByRound.has(key)) picksByRound.set(key, []);
+      picksByRound.get(key)!.push(p);
     }
   } catch {
-    // Draft may not exist yet — return empty map
+    // Draft may not exist yet — return empty
   }
-  return map;
+  return { picksByRound, rosterIdToDraftSlot };
 }
 
 async function getLastPlayoffWeek(leagueId: string, playoffWeekStart: number): Promise<number> {
@@ -307,7 +329,7 @@ export async function evaluateTradeEfficiency(
   const lastWeek = await getLastPlayoffWeek(leagueId, playoffWeekStart);
   const totalWeeks = lastWeek;
 
-  const [fetched, draftPicksByRound] = await Promise.all([
+  const [fetched, draftPicksResult] = await Promise.all([
     Promise.all(
       Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) =>
         SleeperService.getMatchups(leagueId, w)
@@ -315,6 +337,8 @@ export async function evaluateTradeEfficiency(
     ),
     fetchDraftPicksByRound(leagueId, season),
   ]);
+
+  const { picksByRound: draftPicksByRound, rosterIdToDraftSlot } = draftPicksResult;
 
   const allMatchups = new Map<number, SleeperMatchup[]>();
   fetched.forEach((m, i) => allMatchups.set(i + 1, m));
@@ -335,8 +359,8 @@ export async function evaluateTradeEfficiency(
     week: trade.week,
     timestamp: trade.timestamp,
     sides: [
-      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, pickTimeline, trade.transactionId),
-      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, pickTimeline, trade.transactionId),
+      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
+      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
     ],
   }));
 

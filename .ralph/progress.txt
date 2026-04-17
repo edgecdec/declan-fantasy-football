@@ -613,3 +613,11 @@
 - Level 2 trades sorted by absolute margin (most impactful first)
 - Individual trade cards below the leaderboard remain for chronological/impact browsing
 - Lesson: Using table row expansion (Fragment + conditional row) for Level 1 is cleaner than Accordion inside a table — keeps the table structure intact while allowing inline expansion
+
+## TASK-073: Fix draft pick trade sides STILL swapped (2026-04-17)
+- Root cause: `resolveDraftPick` was matching draft picks by `roster_id` (who MADE the pick), but the transaction's `roster_id` means the original slot owner. These differ when picks are traded.
+- Fix: Match by `draft_slot` instead. Built a reverse map from `slot_to_roster_id` (roster_id → draft_slot) and used it to find the correct draft pick.
+- Critical discovery: `getLeagueDrafts()` does NOT return `slot_to_roster_id` — it's null. Must use `getDraft(draft_id)` (the individual draft endpoint) to get this field. Initial fix deployed with empty map, causing fallback to the old broken logic.
+- Lesson: Always verify that API list endpoints return the same fields as detail endpoints. The Sleeper `/league/{id}/drafts` endpoint strips `slot_to_roster_id` from the response.
+- Lesson: When fixing data mapping bugs, test with actual API data, not just code review. The first deploy appeared correct in code but failed because of the missing field.
+- Verified: edgecdec now correctly shows Saquon Barkley (Rd 1) and Junebugge shows Bijan Robinson (Rd 1) on the trade evaluator page.
