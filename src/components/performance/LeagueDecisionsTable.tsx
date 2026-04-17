@@ -72,7 +72,10 @@ export default function LeagueDecisionsTable({
     const s = [...rows].sort((a, b) => {
       switch (sortField) {
         case 'name': return a.displayName.localeCompare(b.displayName) * dir;
-        case 'skillEff': return (a.skillEfficiency - b.skillEfficiency) * dir;
+        case 'skillEff': {
+          const diff = a.skillEfficiency - b.skillEfficiency;
+          return diff !== 0 ? diff * dir : (a.netSkillPlusMinus - b.netSkillPlusMinus) * dir;
+        }
         case 'netSkill': return (a.netSkillPlusMinus - b.netSkillPlusMinus) * dir;
         case 'netSkillWk': return (a.netSkillPerWeek - b.netSkillPerWeek) * dir;
         case 'optimalWeeks': return (a.optimalWeeks - b.optimalWeeks) * dir;

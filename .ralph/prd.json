@@ -567,6 +567,24 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: On /skill?tab=efficiency (Positional Efficiency tab in the Manager Skill Hub), entering a username and clicking Analyze causes the page to crash with 'Application error: a client-side exception has occurred'. This was the migrated positional benchmarks code from TASK-053. Read the browser console error to identify the root cause — likely an undefined property access, missing null check, or a breaking change introduced during the migration. Check the component that renders the efficiency tab, trace the data fetching and rendering flow, and fix the crash. Test with username 'edgecdec' for 2025."
+    },
+    {
+      "id": "TASK-065",
+      "title": "Fix Start/Sit leaderboard sorting — use unrounded values with Net Skill tiebreak",
+      "spec": "specs/code-style.md",
+      "priority": 65,
+      "status": "done",
+      "dependencies": ["TASK-063"],
+      "description": "On the Start/Sit leaderboard at /skill/league/[leagueId]?tab=decisions, sorting is incorrect — egruis has a higher Net Skill (+57.5) than AggressiveIyAvg (+56.9) but ranks below them despite showing the same rounded Skill Efficiency (103.2%). Fix: sort by the unrounded Skill Efficiency % first (use the full precision float, not the displayed rounded value). If two managers have the same Skill Efficiency to full precision (very unlikely), tiebreak by Net Skill +/- descending (higher is better). Display can still show one decimal place but the sort must use the raw value."
+    },
+    {
+      "id": "TASK-066",
+      "title": "Display Skill Efficiency as +/- percentage relative to 100%",
+      "spec": "specs/code-style.md",
+      "priority": 66,
+      "status": "open",
+      "dependencies": ["TASK-063"],
+      "description": "On all Start/Sit views (leaderboard, summary cards, aggregate page), display Skill Efficiency rounded to 2 decimal places instead of 1. Examples: 103.2% becomes '103.17%', 97.2% becomes '97.24%'. Keep the raw 100-based percentage format. The sort still uses the raw unrounded value (per TASK-065)."
     }
   ]
 }
