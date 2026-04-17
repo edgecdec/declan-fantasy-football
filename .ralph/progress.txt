@@ -564,3 +564,10 @@
 - Changed `.toFixed(1)` to `.toFixed(2)` in two files: StartSitContent.tsx (summary card) and LeagueDecisionsTable.tsx (leaderboard table).
 - Only 2 spots needed updating — grep confirmed no other toFixed calls on skillEfficiency.
 - Lesson: Simple formatting tasks are fast — grep first, confirm scope, change, validate, ship.
+
+## TASK-069: Fix draft pick trades showing on wrong side (2026-04-17)
+- Root cause: In `parseTrade()` in tradeAnalyzer.ts, draft picks were being placed on the `previous_owner_id` side (the team giving away the pick) instead of the `owner_id` side (the team receiving the pick).
+- Players were correctly placed on the receiving side via `tx.adds` (which maps player → receiving roster_id), but draft picks used the wrong field.
+- Fix: Changed `sideMap.get(dp.previous_owner_id)` to `sideMap.get(dp.owner_id)` — one line change.
+- Sleeper transaction draft_picks fields: `roster_id` = original pick owner (whose draft slot), `previous_owner_id` = who had the pick before this trade, `owner_id` = who receives the pick in this trade.
+- Lesson: When displaying "Team X received:", all assets (players, picks, FAAB) must use the receiving roster_id. Players use `tx.adds[playerId]`, picks use `dp.owner_id`, FAAB uses `wb.receiver`. The pattern should be consistent across all asset types.

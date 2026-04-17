@@ -65,8 +65,8 @@ function parseTrade(
   }
 
   for (const dp of tx.draft_picks ?? []) {
-    const ownerSide = sideMap.get(dp.owner_id);
-    ownerSide?.draftPicks.push({ season: dp.season, round: dp.round, rosterId: dp.roster_id });
+    const receivingSide = sideMap.get(dp.owner_id);
+    receivingSide?.draftPicks.push({ season: dp.season, round: dp.round, rosterId: dp.roster_id });
   }
 
   for (const wb of tx.waiver_budget ?? []) {

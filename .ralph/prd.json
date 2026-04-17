@@ -585,6 +585,51 @@
       "status": "done",
       "dependencies": ["TASK-063"],
       "description": "On all Start/Sit views (leaderboard, summary cards, aggregate page), display Skill Efficiency rounded to 2 decimal places instead of 1. Examples: 103.2% becomes '103.17%', 97.2% becomes '97.24%'. Keep the raw 100-based percentage format. The sort still uses the raw unrounded value (per TASK-065)."
+    },
+    {
+      "id": "TASK-067",
+      "title": "Add detailed tooltip when hovering Skill Efficiency % on leaderboard",
+      "spec": "specs/code-style.md",
+      "priority": 67,
+      "status": "open",
+      "dependencies": ["TASK-063"],
+      "description": "On the Start/Sit leaderboard and summary cards, when hovering over the Skill Efficiency % value, show a MUI Tooltip with the full calculation breakdown: the exact unrounded percentage (e.g. 103.1742%), total actual points scored by starters, total actual points the optimal lineup would have scored, the formula 'Actual (1876.2) / Optimal (1681.4) × 100 = 111.59%', number of weeks analyzed, and total number of start/sit decisions evaluated. This gives users transparency into how the number is derived without cluttering the main display."
+    },
+    {
+      "id": "TASK-068",
+      "title": "Sort Start/Sit leaderboard by Net Skill +/- by default instead of Skill Efficiency %",
+      "spec": "specs/code-style.md",
+      "priority": 68,
+      "status": "open",
+      "dependencies": ["TASK-063"],
+      "description": "On the Start/Sit leaderboard at /skill/league/[leagueId]?tab=decisions and the aggregate /skill?tab=decisions, change the default sort column from Skill Efficiency % to Net Skill +/- (descending). Net Skill is more fair because it accounts for volume — a manager with 103% on a low-scoring roster contributed less skill than a manager with 102% on a high-scoring roster. All columns should still be sortable by clicking the header (per the existing sortable columns pattern), this just changes the initial default."
+    },
+    {
+      "id": "TASK-069",
+      "title": "Fix draft pick trades showing on wrong side — picks are swapped between teams",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "done",
+      "dependencies": ["TASK-059"],
+      "description": "Bug: On /league-history/[leagueId]/trades, draft pick trades show the picks on the WRONG side. Example: edgecdec drafted Saquon Barkley and James Conner, but the trade shows Junebugge receiving those picks and edgecdec receiving Bijan Robinson and Mike Evans (which Junebugge drafted). The sides are swapped. The Sleeper transaction draft_picks array has roster_id (the original pick owner) and owner_id (who the pick was traded TO). The current code is likely confusing these — roster_id is who GAVE UP the pick, owner_id is who RECEIVED it. Fix the trade parsing in src/services/stats/tradeAnalyzer.ts: for each draft pick in the transaction, the pick should appear on the RECEIVING side (owner_id), not the giving side (roster_id). The player who was drafted with that pick is determined by matching the pick's round + roster_id against the draft picks data. Test against league 1206336001794920448 — edgecdec should show as receiving Saquon Barkley (Rd 1) and James Conner (Rd 4), not Junebugge. IMPORTANT: Player trades (non-pick) already display on the correct sides — do NOT change the player trade side logic, only fix the draft pick side assignment. Also note that a pick can be traded multiple times before the draft (e.g. Team A's 1st rounder traded to Team B, then Team B trades it to Team C). The same (season, round, roster_id) pick may appear in multiple transactions with different owner_ids. Each transaction should show the pick on the correct receiving side for THAT specific trade. The roster_id (original pick owner) stays constant across all trades of the same pick — only owner_id changes per transaction."
+    },
+    {
+      "id": "TASK-070",
+      "title": "Add aggregate traded players table at top of trade evaluator page",
+      "spec": "specs/code-style.md",
+      "priority": 70,
+      "status": "open",
+      "dependencies": ["TASK-035"],
+      "description": "At the top of /league-history/[leagueId]/trades, before the individual trade list, add a sortable summary table showing every player who was involved in a trade throughout the league. Columns: Player Name, Position, Times Traded, Total Efficiency +/-, Team Eff, Total Eff, Traded By (who gave them up), Traded To (who received them). If a player was traded multiple times, show one row per trade instance or aggregate with a note. Sort by Total Efficiency +/- descending by default. This gives a quick overview of which traded players had the biggest impact across the entire league's trade activity."
+    },
+    {
+      "id": "TASK-071",
+      "title": "Handle draft picks that are traded multiple times across transactions",
+      "spec": "specs/code-style.md",
+      "priority": 71,
+      "status": "open",
+      "dependencies": ["TASK-069"],
+      "description": "A draft pick can be traded more than once before the draft happens (e.g. Team A trades their 1st round pick to Team B, then Team B trades that same pick to Team C). Currently the trade evaluator only looks at each transaction in isolation, so the same pick may show up in multiple trades without connecting them. Fix: when resolving draft picks to the player they became, trace the full chain of ownership. The pick's original roster_id stays the same across all trades — only the owner_id changes. So if the same (season, round, roster_id) appears in multiple transactions, each trade should show the pick with the correct resolved player, and the efficiency should be attributed correctly to each trade in the chain. Also display a note like '(traded again)' on picks that were subsequently re-traded, similar to the asterisk pattern for re-traded players from TASK-038."
     }
   ]
 }
