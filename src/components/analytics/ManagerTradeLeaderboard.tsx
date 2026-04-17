@@ -43,8 +43,17 @@ type ManagerTradeRow = {
   trade: TradeEfficiencyResult;
 };
 
-function buildManagerStats(trades: TradeEfficiencyResult[]): ManagerTradeStats[] {
+function buildManagerStats(trades: TradeEfficiencyResult[], rosterToUsername?: Record<number, string>): ManagerTradeStats[] {
   const map = new Map<string, ManagerTradeStats>();
+
+  // Seed all managers from roster map so 0-trade managers appear
+  if (rosterToUsername) {
+    for (const username of Object.values(rosterToUsername)) {
+      if (!map.has(username)) {
+        map.set(username, { username, totalTrades: 0, tradesWon: 0, tradesLost: 0, totalMargin: 0, bestMargin: 0, worstMargin: 0, trades: [] });
+      }
+    }
+  }
 
   for (const trade of trades) {
     for (let i = 0; i < 2; i++) {
@@ -70,8 +79,13 @@ function buildManagerStats(trades: TradeEfficiencyResult[]): ManagerTradeStats[]
         existing.tradesWon += won ? 1 : 0;
         existing.tradesLost += lost ? 1 : 0;
         existing.totalMargin += margin;
-        existing.bestMargin = Math.max(existing.bestMargin, margin);
-        existing.worstMargin = Math.min(existing.worstMargin, margin);
+        if (existing.trades.length === 0) {
+          existing.bestMargin = margin;
+          existing.worstMargin = margin;
+        } else {
+          existing.bestMargin = Math.max(existing.bestMargin, margin);
+          existing.worstMargin = Math.min(existing.worstMargin, margin);
+        }
         existing.trades.push(row);
       } else {
         map.set(mySide.username, {
@@ -177,8 +191,8 @@ function ManagerTrades({ stats }: { stats: ManagerTradeStats }) {
   );
 }
 
-export default function ManagerTradeLeaderboard({ trades }: { trades: TradeEfficiencyResult[] }) {
-  const stats = React.useMemo(() => buildManagerStats(trades), [trades]);
+export default function ManagerTradeLeaderboard({ trades, rosterToUsername }: { trades: TradeEfficiencyResult[]; rosterToUsername?: Record<number, string> }) {
+  const stats = React.useMemo(() => buildManagerStats(trades, rosterToUsername), [trades, rosterToUsername]);
   const { sorted, order, orderBy, handleSort } = useTableSort(stats, 'totalMargin');
   const [expanded, setExpanded] = React.useState<string | false>(false);
 
@@ -232,8 +246,8 @@ export default function ManagerTradeLeaderboard({ trades }: { trades: TradeEffic
                   <TableCell align="center" sx={{ color: 'success.main' }}>{m.tradesWon}</TableCell>
                   <TableCell align="center" sx={{ color: 'error.main' }}>{m.tradesLost}</TableCell>
                   <TableCell align="right"><EffVal value={m.totalMargin} /></TableCell>
-                  <TableCell align="right"><EffVal value={m.bestMargin} /></TableCell>
-                  <TableCell align="right"><EffVal value={m.worstMargin} /></TableCell>
+                  <TableCell align="right">{m.totalTrades > 0 ? <EffVal value={m.bestMargin} /> : <Typography component="span" color="text.secondary" fontSize="inherit">N/A</Typography>}</TableCell>
+                  <TableCell align="right">{m.totalTrades > 0 ? <EffVal value={m.worstMargin} /> : <Typography component="span" color="text.secondary" fontSize="inherit">N/A</Typography>}</TableCell>
                 </TableRow>
                 {expanded === m.username && (
                   <TableRow>

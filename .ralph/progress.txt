@@ -621,3 +621,12 @@
 - Lesson: Always verify that API list endpoints return the same fields as detail endpoints. The Sleeper `/league/{id}/drafts` endpoint strips `slot_to_roster_id` from the response.
 - Lesson: When fixing data mapping bugs, test with actual API data, not just code review. The first deploy appeared correct in code but failed because of the missing field.
 - Verified: edgecdec now correctly shows Saquon Barkley (Rd 1) and Junebugge shows Bijan Robinson (Rd 1) on the trade evaluator page.
+
+## TASK-074: Show all league managers in trade leaderboard, including those with 0 trades
+- Date: 2026-04-17
+- Added optional `rosterToUsername` prop to ManagerTradeLeaderboard component
+- `buildManagerStats` now seeds all managers from the roster map before processing trades, so managers with 0 trades appear with zeroed stats
+- Best/Worst columns show "N/A" for managers with no trades instead of misleading 0.0 values
+- Trades page passes `rosterToUsername` from `LeagueTradeEfficiencyResult` to the leaderboard
+- Verified: league 1206336001794920448 shows all 10 managers in the leaderboard, including those who made no trades
+- Lesson: When building aggregation tables from event data, always seed the full entity list first (from a separate source like rosters/users), then overlay the event-derived stats. This avoids the common bug of only showing entities that have events.

@@ -648,6 +648,15 @@
       "status": "done",
       "dependencies": [],
       "description": "Bug: TASK-069 was marked done but draft pick trades are STILL showing on the wrong side. Concrete example from league 1206336001794920448: edgecdec drafted Saquon Barkley (Rd 1) and James Conner (Rd 4) — meaning edgecdec RECEIVED those picks in the trade. But the page shows Junebugge as receiving Saquon/Conner and edgecdec as receiving Bijan Robinson/Mike Evans. It's backwards. Player trades on the same page display correctly — only draft pick sides are wrong. Read the ACTUAL code in src/services/stats/tradeAnalyzer.ts right now. Find where draft_picks from the Sleeper transaction are assigned to sides. The Sleeper transaction draft_picks array has: roster_id = the original pick slot owner (whose draft position it is), owner_id = who currently owns the pick AFTER the trade. In a trade transaction, the pick is moving FROM the previous_owner_id TO the owner_id. So the pick should appear on the side of owner_id (the receiver). The other side of the trade (previous_owner_id) is the one giving it up. Debug by logging the raw draft_picks data from a known trade and comparing roster_id, owner_id, and previous_owner_id to verify which field means what. Do NOT just flip a boolean — understand the data model first, then fix. ADDITIONAL BUG: Some picks show N/A even though a player was definitely drafted (e.g. '2025 Rd 3' for edgecdec shows N/A). This happens when a pick was traded multiple times — the roster_id in the transaction may not match the roster_id in the draft picks data because the pick's original owner slot is what the draft uses. To resolve a traded pick to the player drafted: use the draft picks data (GET /draft/{draft_id}/picks) and match on (round + draft_slot) or (round + roster_id where roster_id is the ORIGINAL pick owner, not the current owner). The draft assistant already handles this via GET /league/{id}/traded_picks and GET /draft/{id}/traded_picks — look at how DraftBoard.tsx and the draft page resolve pick ownership and reuse that same logic in the trade evaluator. The key insight: the draft picks array uses the original roster_id (the team whose draft slot it was), regardless of who traded for it."
+    },
+    {
+      "id": "TASK-074",
+      "title": "Show all league managers in trade leaderboard, including those with 0 trades",
+      "spec": "specs/code-style.md",
+      "priority": 74,
+      "status": "done",
+      "dependencies": ["TASK-072"],
+      "description": "On /league-history/[leagueId]/trades, the manager trade leaderboard only shows managers who made at least one trade. Managers with 0 trades are missing entirely. Fix: fetch all rosters/users for the league and include every manager in the leaderboard. Managers with no trades should show 0 for all columns (Total Trades: 0, Won: 0, Lost: 0, Total +/-: 0.0, Best: N/A, Worst: N/A). They should appear at the bottom of the table when sorted by Total +/- descending."
     }
   ]
 }

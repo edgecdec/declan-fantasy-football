@@ -208,6 +208,7 @@ export default function TradeEvaluatorPage() {
   const [leagueName, setLeagueName] = React.useState('');
   const [season, setSeason] = React.useState('');
   const [trades, setTrades] = React.useState<TradeEfficiencyResult[]>([]);
+  const [rosterToUsername, setRosterToUsername] = React.useState<Record<number, string>>({});
   const [error, setError] = React.useState('');
   const [sortMode, setSortMode] = React.useState<'impact' | 'chronological'>('impact');
 
@@ -238,6 +239,7 @@ export default function TradeEvaluatorPage() {
         setLeagueName(result.leagueName);
         setSeason(result.season);
         setTrades(result.trades);
+        setRosterToUsername(result.rosterToUsername);
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
@@ -281,7 +283,7 @@ export default function TradeEvaluatorPage() {
 
       {!loading && trades.length > 0 && (
         <>
-          <ManagerTradeLeaderboard trades={trades} />
+          <ManagerTradeLeaderboard trades={trades} rosterToUsername={rosterToUsername} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <ToggleButtonGroup
               value={sortMode}
