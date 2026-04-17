@@ -618,7 +618,7 @@
       "title": "Add aggregate traded players table at top of trade evaluator page",
       "spec": "specs/code-style.md",
       "priority": 70,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-035"],
       "description": "At the top of /league-history/[leagueId]/trades, before the individual trade list, add a sortable summary table showing every player who was involved in a trade throughout the league. Columns: Player Name, Position, Times Traded, Total Efficiency +/-, Team Eff, Total Eff, Traded By (who gave them up), Traded To (who received them). If a player was traded multiple times, show one row per trade instance or aggregate with a note. Sort by Total Efficiency +/- descending by default. This gives a quick overview of which traded players had the biggest impact across the entire league's trade activity."
     },

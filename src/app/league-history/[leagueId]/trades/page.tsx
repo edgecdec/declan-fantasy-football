@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TradedPlayersSummary from '@/components/analytics/TradedPlayersSummary';
 import SortIcon from '@mui/icons-material/Sort';
 import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
@@ -274,21 +275,24 @@ export default function TradeEvaluatorPage() {
       )}
 
       {!loading && trades.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <ToggleButtonGroup
-            value={sortMode}
-            exclusive
-            onChange={(_, v) => { if (v) setSortMode(v); }}
-            size="small"
-          >
-            <ToggleButton value="impact">
-              <TrendingUpIcon sx={{ mr: 0.5, fontSize: 18 }} /> Most Impactful
-            </ToggleButton>
-            <ToggleButton value="chronological">
-              <SortIcon sx={{ mr: 0.5, fontSize: 18 }} /> Chronological
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+        <>
+          <TradedPlayersSummary trades={trades} />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <ToggleButtonGroup
+              value={sortMode}
+              exclusive
+              onChange={(_, v) => { if (v) setSortMode(v); }}
+              size="small"
+            >
+              <ToggleButton value="impact">
+                <TrendingUpIcon sx={{ mr: 0.5, fontSize: 18 }} /> Most Impactful
+              </ToggleButton>
+              <ToggleButton value="chronological">
+                <SortIcon sx={{ mr: 0.5, fontSize: 18 }} /> Chronological
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        </>
       )}
 
       {sortedTrades.map((trade) => (

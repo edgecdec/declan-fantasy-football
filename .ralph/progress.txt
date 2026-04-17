@@ -586,3 +586,11 @@
 - Net Skill +/- is fairer because it accounts for volume — high efficiency on a low-scoring roster matters less than moderate efficiency on a high-scoring one
 - All columns remain sortable via header clicks; only the initial default changed
 - Single-line change, minimal risk
+
+## TASK-070: Add aggregate traded players summary table at top of trade evaluator page
+- Date: 2026-04-17
+- Created TradedPlayersSummary component at src/components/analytics/TradedPlayersSummary.tsx
+- Aggregates all players (including resolved draft picks) across all trades into a sortable summary table
+- Shows Player, Position, Times Traded, Team Eff, Total Eff, Traded By, Traded To columns
+- Placed above the sort toggle and individual trade cards on the trades page
+- Lessons: Extracting into a separate component kept the page file manageable (already at 299 lines). The useTableSort hook made adding sortable columns trivial. Draft picks with resolved players needed to be included alongside regular player trades for completeness.
