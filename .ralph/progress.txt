@@ -639,3 +639,12 @@
 - Added Historical toggle button to the trade evaluator page — loads data on first click, shows progressive results as each season completes
 - Followed same pattern as draft efficiency historical (TASK-046/052): useEffect triggered by toggle, onProgress callback for progressive rendering, session cache
 - Lesson: Best/worst "single trade" margin requires per-trade granularity from all seasons. Used per-season margin as proxy for best/worst since the all-time leaderboard aggregates from SeasonTradeStats. For true per-trade best/worst, would need to pass all historical trades through the existing ManagerTradeLeaderboard's buildManagerStats — but that would require combining current + historical trades which adds complexity. The season-level approximation is good enough for the all-time view.
+
+## TASK-076: Add head-to-head trade heatmap showing all-time +/- between managers
+- Created src/components/analytics/TradeHeatmap.tsx — N×N matrix of managers showing total +/- from all trades between each pair
+- Reused the getCellColor pattern from PositionalHeatmap.tsx for consistent red/white/green gradient
+- Heatmap renders below HistoricalTradeLeaderboard when historical toggle is on, combining both historical and current season trades
+- Tooltip on hover shows trade count, total +/-, best trade, worst trade between each pair
+- Sticky row headers for readability when scrolling horizontally
+- Lesson: The buildH2HMatrix function needs to track both perspectives (A vs B and B vs A) separately since margin is directional
+- Lesson: Nova Act act_get uses `schema` parameter (JSON Schema dict), not `response_model` (Pydantic)

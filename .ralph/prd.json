@@ -672,9 +672,18 @@
       "title": "Add head-to-head trade heatmap showing all-time +/- between managers",
       "spec": "specs/code-style.md",
       "priority": 76,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-075"],
       "description": "On /league-history/[leagueId]/trades (with historical toggle on), add a head-to-head trade heatmap matrix below the historical leaderboard. This is similar to the existing head-to-head matchup matrix on /league-history but for trades instead of games. The matrix is an N×N grid where rows and columns are managers. Each cell shows the total +/- margin from all trades between those two managers across all seasons. For example, if edgecdec traded with Junebugge 5 times over 3 seasons and the net result was +45.2 in edgecdec's favor, the cell at (edgecdec, Junebugge) shows +45.2 (green) and (Junebugge, edgecdec) shows -45.2 (red). Use a color gradient from red (negative) through white (neutral) to green (positive) — same heatmap pattern as the existing PositionalHeatmap.tsx component. On hover, show a tooltip with: number of trades between the two managers, total +/-, best trade, worst trade. Diagonal cells are empty (can't trade with yourself). This reveals who consistently fleeces who in trades over the league's lifetime."
+    },
+    {
+      "id": "TASK-077",
+      "title": "Fix historical trade toggle — include current season and fix progressive loading",
+      "spec": "specs/anti-patterns.md",
+      "priority": 77,
+      "status": "open",
+      "dependencies": ["TASK-075"],
+      "description": "Two bugs with the historical toggle on /league-history/[leagueId]/trades: (1) The current season is excluded from the historical data — the previous_league_id chain only finds past seasons. The current league (the one the user is already viewing) must also be included in the historical aggregation. Start with the current leagueId, then trace backwards via previous_league_id. (2) When pressing the Historical toggle, the data doesn't progressively update — the leaderboard and heatmap stay empty/stale until all seasons finish loading, and sometimes require a page refresh to see results. Fix: update React state after EACH season completes (same progressive rendering pattern as TASK-024). Each time a season's trade data finishes processing, re-aggregate the leaderboard and re-render. The user should see the table grow as each season loads in."
     }
   ]
 }

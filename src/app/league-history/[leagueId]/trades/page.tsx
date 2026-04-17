@@ -25,6 +25,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ManagerTradeLeaderboard from '@/components/analytics/ManagerTradeLeaderboard';
 import HistoricalTradeLeaderboard from '@/components/analytics/HistoricalTradeLeaderboard';
+import TradeHeatmap from '@/components/analytics/TradeHeatmap';
 import SortIcon from '@mui/icons-material/Sort';
 import HistoryIcon from '@mui/icons-material/History';
 import Link from 'next/link';
@@ -318,6 +319,9 @@ export default function TradeEvaluatorPage() {
           </Box>
           {showHistorical && (
             <HistoricalTradeLeaderboard data={historicalData} loading={historicalLoading} />
+          )}
+          {showHistorical && historicalData && (
+            <TradeHeatmap historicalTrades={historicalData.allTrades} currentTrades={trades} />
           )}
           <ManagerTradeLeaderboard trades={trades} rosterToUsername={rosterToUsername} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
