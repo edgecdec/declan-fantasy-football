@@ -627,7 +627,7 @@
       "title": "Handle draft picks that are traded multiple times across transactions",
       "spec": "specs/code-style.md",
       "priority": 71,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-069"],
       "description": "A draft pick can be traded more than once before the draft happens (e.g. Team A trades their 1st round pick to Team B, then Team B trades that same pick to Team C). Currently the trade evaluator only looks at each transaction in isolation, so the same pick may show up in multiple trades without connecting them. Fix: when resolving draft picks to the player they became, trace the full chain of ownership. The pick's original roster_id stays the same across all trades — only the owner_id changes. So if the same (season, round, roster_id) appears in multiple transactions, each trade should show the pick with the correct resolved player, and the efficiency should be attributed correctly to each trade in the chain. Also display a note like '(traded again)' on picks that were subsequently re-traded, similar to the asterisk pattern for re-traded players from TASK-038."
     }

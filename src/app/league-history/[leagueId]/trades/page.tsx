@@ -110,6 +110,11 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
                       <Typography component="span" sx={{ color: 'warning.main', cursor: 'help', ml: 0.5 }}>*</Typography>
                     </Tooltip>
                   )}
+                  {dp.retradedWeek != null && (
+                    <Tooltip title={`Pick traded again in Week ${dp.retradedWeek}`} arrow>
+                      <Typography component="span" variant="caption" sx={{ color: 'info.main', cursor: 'help', ml: 0.5 }}>(traded again)</Typography>
+                    </Tooltip>
+                  )}
                 </TableCell>
                 <TableCell align="center">
                   <Chip label={eff?.position || 'PICK'} size="small" sx={{ bgcolor: eff ? getPositionColor(eff.position) : 'action.selected', color: eff ? '#fff' : undefined, fontWeight: 'bold', height: 20, fontSize: '0.7rem' }} />

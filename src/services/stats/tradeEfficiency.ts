@@ -68,9 +68,52 @@ function resolveDraftPick(
   return { season: dp.season, round: dp.round };
 }
 
+type PickTradeEntry = { transactionId: string; week: number; timestamp: number };
+type PickTradeTimeline = Map<string, PickTradeEntry[]>;
+
+function pickTimelineKey(season: string, round: number, rosterId: number): string {
+  return `${season}_${round}_${rosterId}`;
+}
+
+function buildPickTradeTimeline(trades: TradeData[]): PickTradeTimeline {
+  const timeline: PickTradeTimeline = new Map();
+  for (const trade of trades) {
+    for (const side of trade.sides) {
+      for (const dp of side.draftPicks ?? []) {
+        const key = pickTimelineKey(dp.season, dp.round, dp.rosterId);
+        if (!timeline.has(key)) timeline.set(key, []);
+        timeline.get(key)!.push({
+          transactionId: trade.transactionId,
+          week: trade.week,
+          timestamp: trade.timestamp,
+        });
+      }
+    }
+  }
+  // Sort each pick's trades chronologically
+  for (const entries of timeline.values()) {
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  return timeline;
+}
+
+function getRetradedWeek(
+  timeline: PickTradeTimeline,
+  dp: { season: string; round: number; rosterId: number },
+  currentTransactionId: string,
+): number | undefined {
+  const key = pickTimelineKey(dp.season, dp.round, dp.rosterId);
+  const entries = timeline.get(key);
+  if (!entries || entries.length < 2) return undefined;
+  const idx = entries.findIndex((e) => e.transactionId === currentTransactionId);
+  if (idx === -1 || idx >= entries.length - 1) return undefined;
+  return entries[idx + 1].week;
+}
+
 function calculateResolvedPickEfficiency(
   pick: TradeDraftPick,
   tradeWeek: number,
+  endWeek: number,
   totalWeeks: number,
   allMatchups: Map<number, SleeperMatchup[]>,
   getAvg: (week: number, position: string) => number,
@@ -94,7 +137,8 @@ function calculateResolvedPickEfficiency(
       const eff = points - leagueAvg;
       totalSeasonEff += eff;
       totalSeasonWeeks++;
-      if (m.roster_id === receivingRosterId) {
+      // Only count team-specific efficiency within the ownership window
+      if (m.roster_id === receivingRosterId && w <= endWeek) {
         weeklyBreakdown.push({ week: w, points, leagueAvg, efficiency: eff });
       }
       break;
@@ -103,7 +147,7 @@ function calculateResolvedPickEfficiency(
 
   const totalEff = weeklyBreakdown.reduce((s, wb) => s + wb.efficiency, 0);
   const lastStartedWeek = weeklyBreakdown.length > 0 ? weeklyBreakdown[weeklyBreakdown.length - 1].week : null;
-  const departureWeek = lastStartedWeek != null && lastStartedWeek < totalWeeks ? lastStartedWeek + 1 : null;
+  const departureWeek = lastStartedWeek != null && lastStartedWeek < endWeek ? lastStartedWeek + 1 : null;
 
   return {
     ...pick,
@@ -128,11 +172,17 @@ function evaluateSidePlayers(
   totalWeeks: number,
   allMatchups: Map<number, SleeperMatchup[]>,
   getAvg: (week: number, position: string) => number,
-  draftPicksByRound: Map<string, SleeperDraftPick[]>
+  draftPicksByRound: Map<string, SleeperDraftPick[]>,
+  pickTimeline: PickTradeTimeline,
+  transactionId: string,
 ): TradeEfficiencySide {
   const resolvedPicks = (side.draftPicks ?? []).map((dp) => {
     const resolved = resolveDraftPick(dp, draftPicksByRound);
-    return calculateResolvedPickEfficiency(resolved, tradeWeek, totalWeeks, allMatchups, getAvg, side.rosterId);
+    const retradedWeek = getRetradedWeek(pickTimeline, dp, transactionId);
+    const endWeek = retradedWeek != null ? retradedWeek : totalWeeks;
+    const withEff = calculateResolvedPickEfficiency(resolved, tradeWeek, endWeek, totalWeeks, allMatchups, getAvg, side.rosterId);
+    if (retradedWeek != null) withEff.retradedWeek = retradedWeek;
+    return withEff;
   });
 
   const result: TradeEfficiencySide = {
@@ -278,13 +328,15 @@ export async function evaluateTradeEfficiency(
     return avgCache.get(key)!;
   }
 
+  const pickTimeline = buildPickTradeTimeline(tradeResult.trades);
+
   const trades: TradeEfficiencyResult[] = tradeResult.trades.map((trade) => ({
     transactionId: trade.transactionId,
     week: trade.week,
     timestamp: trade.timestamp,
     sides: [
-      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound),
-      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound),
+      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, pickTimeline, trade.transactionId),
+      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, pickTimeline, trade.transactionId),
     ],
   }));
 

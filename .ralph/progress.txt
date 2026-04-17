@@ -594,3 +594,11 @@
 - Shows Player, Position, Times Traded, Team Eff, Total Eff, Traded By, Traded To columns
 - Placed above the sort toggle and individual trade cards on the trades page
 - Lessons: Extracting into a separate component kept the page file manageable (already at 299 lines). The useTableSort hook made adding sortable columns trivial. Draft picks with resolved players needed to be included alongside regular player trades for completeness.
+
+## TASK-071: Handle draft picks traded multiple times across transactions
+- Date: 2026-04-17
+- Built a pick trade timeline by scanning all trades for matching (season, round, rosterId) tuples and sorting chronologically by timestamp.
+- For re-traded picks, the team-specific efficiency window now ends at the re-trade week instead of end-of-season.
+- Total season efficiency (across all teams) still spans the full season for the resolved player.
+- Added `retradedWeek` field to `TradeDraftPick` type and "(traded again)" tooltip indicator in the UI.
+- Lesson: The pick's `rosterId` (original owner) is the stable identifier across all trades of the same pick — only `owner_id` changes per transaction. Using `(season, round, rosterId)` as the composite key correctly identifies the same pick across multiple transactions.

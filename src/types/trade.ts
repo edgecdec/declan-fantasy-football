@@ -26,6 +26,7 @@ export type TradeDraftPick = {
   resolvedPlayerId?: string;
   resolvedPosition?: string;
   efficiency?: PlayerTradeEfficiency;
+  retradedWeek?: number;
 };
 
 export type TradeFaab = {
