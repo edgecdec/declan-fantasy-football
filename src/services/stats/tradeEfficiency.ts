@@ -420,15 +420,15 @@ export async function fetchHistoricalTradeEfficiency(
   }
 
   const leagueHistory = await SleeperService.getLeagueHistory(leagueId);
-  const priorLeagues = leagueHistory.filter(
-    (l) => l.league_id !== leagueId && l.status === 'complete',
+  const eligibleLeagues = leagueHistory.filter(
+    (l) => l.status === 'complete' || l.status === 'in_season',
   );
 
   const seasons: SeasonTradeStats[] = [];
   const allTrades: TradeEfficiencyResult[] = [];
   const allRosterToUsername: Record<number, string> = {};
 
-  for (const league of priorLeagues) {
+  for (const league of eligibleLeagues) {
     try {
       const result = await evaluateTradeEfficiency(league.league_id, league.season);
       if (result.trades.length === 0) continue;

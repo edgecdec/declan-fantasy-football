@@ -648,3 +648,11 @@
 - Sticky row headers for readability when scrolling horizontally
 - Lesson: The buildH2HMatrix function needs to track both perspectives (A vs B and B vs A) separately since margin is directional
 - Lesson: Nova Act act_get uses `schema` parameter (JSON Schema dict), not `response_model` (Pydantic)
+
+## TASK-077: Fix historical trade toggle — include current season and fix progressive loading
+- Date: 2026-04-17
+- Bug 1 fix: In `fetchHistoricalTradeEfficiency`, the filter `l.league_id !== leagueId` excluded the current season from historical aggregation. Changed to include all leagues with status 'complete' or 'in_season' from the `getLeagueHistory` chain (which already starts with the current league).
+- Bug 2 fix: The `useEffect` for historical fetching had `historicalData` in its dependency array. When `onProgress` called `setHistoricalData(partial)`, it changed `historicalData`, causing the effect to re-run. The cleanup function set `cancelled = true`, killing the in-flight fetch. The new invocation then saw `historicalData` as truthy and returned early. Fixed by removing `historicalData` from deps and using a `useRef` to track whether fetch has been initiated.
+- Also spread the partial/final objects in `setHistoricalData({ ...partial })` to ensure React detects new references for re-rendering.
+- Lesson: Never put state that is updated by an async callback into the dependency array of the effect that starts that async operation — it creates a self-canceling loop. Use a ref to track "has started" instead.
+- Lesson: When building progressive loading with `onProgress` callbacks, the React effect cleanup pattern can silently kill the fetch if deps include the progressively-updated state. This is a common trap.

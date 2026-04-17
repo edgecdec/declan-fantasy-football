@@ -217,6 +217,7 @@ export default function TradeEvaluatorPage() {
   const [showHistorical, setShowHistorical] = React.useState(false);
   const [historicalData, setHistoricalData] = React.useState<HistoricalTradeData | null>(null);
   const [historicalLoading, setHistoricalLoading] = React.useState(false);
+  const historicalFetchedRef = React.useRef(false);
 
   const sortedTrades = React.useMemo(() => {
     const copy = [...trades];
@@ -257,21 +258,22 @@ export default function TradeEvaluatorPage() {
   }, [leagueId]);
 
   React.useEffect(() => {
-    if (!showHistorical || historicalData || !leagueId) return;
+    if (!showHistorical || historicalFetchedRef.current || !leagueId) return;
+    historicalFetchedRef.current = true;
     let cancelled = false;
     setHistoricalLoading(true);
 
     fetchHistoricalTradeEfficiency(
       leagueId,
-      (partial) => { if (!cancelled) setHistoricalData(partial); },
+      (partial) => { if (!cancelled) setHistoricalData({ ...partial }); },
     ).then((final) => {
-      if (!cancelled) { setHistoricalData(final); setHistoricalLoading(false); }
+      if (!cancelled) { setHistoricalData({ ...final }); setHistoricalLoading(false); }
     }).catch(() => {
       if (!cancelled) setHistoricalLoading(false);
     });
 
     return () => { cancelled = true; };
-  }, [showHistorical, historicalData, leagueId]);
+  }, [showHistorical, leagueId]);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

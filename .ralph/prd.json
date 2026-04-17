@@ -681,7 +681,7 @@
       "title": "Fix historical trade toggle — include current season and fix progressive loading",
       "spec": "specs/anti-patterns.md",
       "priority": 77,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-075"],
       "description": "Two bugs with the historical toggle on /league-history/[leagueId]/trades: (1) The current season is excluded from the historical data — the previous_league_id chain only finds past seasons. The current league (the one the user is already viewing) must also be included in the historical aggregation. Start with the current leagueId, then trace backwards via previous_league_id. (2) When pressing the Historical toggle, the data doesn't progressively update — the leaderboard and heatmap stay empty/stale until all seasons finish loading, and sometimes require a page refresh to see results. Fix: update React state after EACH season completes (same progressive rendering pattern as TASK-024). Each time a season's trade data finishes processing, re-aggregate the leaderboard and re-render. The user should see the table grow as each season loads in."
     }
