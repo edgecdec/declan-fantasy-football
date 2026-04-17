@@ -38,22 +38,22 @@ function EffVal({ value }: { value: number }) {
   );
 }
 
-function buildAllTimeStats(seasons: SeasonTradeStats[]): AllTimeManagerStats[] {
+function buildAllTimeStats(seasons: SeasonTradeStats[], ownerIdToUsername: Record<string, string>): AllTimeManagerStats[] {
   const map = new Map<string, AllTimeManagerStats>();
   for (const season of seasons) {
-    for (const [username, s] of Object.entries(season.managerStats)) {
-      const existing = map.get(username);
+    for (const [ownerId, s] of Object.entries(season.managerStats)) {
+      const displayName = ownerIdToUsername[ownerId] || ownerId;
+      const existing = map.get(ownerId);
       if (existing) {
         existing.totalTrades += s.totalTrades;
         existing.tradesWon += s.tradesWon;
         existing.tradesLost += s.tradesLost;
         existing.totalMargin += s.totalMargin;
         existing.seasonsActive++;
-        // Best/worst need per-trade granularity — approximate from season totals
-        // We'll use the season's total margin as a proxy for best/worst season
+        existing.username = displayName; // always use latest name
       } else {
-        map.set(username, {
-          username,
+        map.set(ownerId, {
+          username: displayName,
           totalTrades: s.totalTrades,
           tradesWon: s.tradesWon,
           tradesLost: s.tradesLost,
@@ -67,8 +67,8 @@ function buildAllTimeStats(seasons: SeasonTradeStats[]): AllTimeManagerStats[] {
   }
   // Recalculate best/worst season margin per manager
   for (const season of seasons) {
-    for (const [username, s] of Object.entries(season.managerStats)) {
-      const m = map.get(username);
+    for (const [ownerId, s] of Object.entries(season.managerStats)) {
+      const m = map.get(ownerId);
       if (!m) continue;
       if (s.totalMargin > m.bestMargin) m.bestMargin = s.totalMargin;
       if (s.totalMargin < m.worstMargin) m.worstMargin = s.totalMargin;
@@ -78,7 +78,7 @@ function buildAllTimeStats(seasons: SeasonTradeStats[]): AllTimeManagerStats[] {
 }
 
 function AllTimeLeaderboard({ data }: { data: HistoricalTradeData }) {
-  const stats = React.useMemo(() => buildAllTimeStats(data.seasons), [data.seasons]);
+  const stats = React.useMemo(() => buildAllTimeStats(data.seasons, data.ownerIdToUsername), [data.seasons, data.ownerIdToUsername]);
   const { sorted, order, orderBy, handleSort } = useTableSort(stats, 'totalMargin');
 
   return (
@@ -143,13 +143,17 @@ function AllTimeLeaderboard({ data }: { data: HistoricalTradeData }) {
 }
 
 function SeasonBreakdownTable({ data }: { data: HistoricalTradeData }) {
-  const allManagers = React.useMemo(() => {
+  const allManagerIds = React.useMemo(() => {
     const set = new Set<string>();
     for (const s of data.seasons) {
-      for (const username of Object.keys(s.managerStats)) set.add(username);
+      for (const ownerId of Object.keys(s.managerStats)) set.add(ownerId);
     }
-    return Array.from(set).sort();
-  }, [data.seasons]);
+    return Array.from(set).sort((a, b) => {
+      const nameA = data.ownerIdToUsername[a] || a;
+      const nameB = data.ownerIdToUsername[b] || b;
+      return nameA.localeCompare(nameB);
+    });
+  }, [data.seasons, data.ownerIdToUsername]);
 
   const sortedSeasons = React.useMemo(
     () => [...data.seasons].sort((a, b) => b.season.localeCompare(a.season)),
@@ -165,8 +169,8 @@ function SeasonBreakdownTable({ data }: { data: HistoricalTradeData }) {
             <TableRow>
               <TableCell>Season</TableCell>
               <TableCell align="center">Trades</TableCell>
-              {allManagers.map((m) => (
-                <TableCell key={m} align="right">{m}</TableCell>
+              {allManagerIds.map((id) => (
+                <TableCell key={id} align="right">{data.ownerIdToUsername[id] || id}</TableCell>
               ))}
             </TableRow>
           </TableHead>
@@ -175,13 +179,13 @@ function SeasonBreakdownTable({ data }: { data: HistoricalTradeData }) {
               <TableRow key={s.season} hover>
                 <TableCell sx={{ fontWeight: 'bold' }}>{s.season}</TableCell>
                 <TableCell align="center">{s.tradeCount}</TableCell>
-                {allManagers.map((m) => {
-                  const ms = s.managerStats[m];
+                {allManagerIds.map((id) => {
+                  const ms = s.managerStats[id];
                   if (!ms || ms.totalTrades === 0) {
-                    return <TableCell key={m} align="right"><Typography variant="body2" color="text.secondary">—</Typography></TableCell>;
+                    return <TableCell key={id} align="right"><Typography variant="body2" color="text.secondary">—</Typography></TableCell>;
                   }
                   return (
-                    <TableCell key={m} align="right">
+                    <TableCell key={id} align="right">
                       <EffVal value={ms.totalMargin} />
                       <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
                         ({ms.tradesWon}W-{ms.tradesLost}L)

@@ -323,7 +323,7 @@ export default function TradeEvaluatorPage() {
             <HistoricalTradeLeaderboard data={historicalData} loading={historicalLoading} />
           )}
           {showHistorical && historicalData && (
-            <TradeHeatmap historicalTrades={historicalData.allTrades} currentTrades={trades} />
+            <TradeHeatmap historicalTrades={historicalData.allTrades} currentTrades={trades} ownerIdToUsername={historicalData.ownerIdToUsername} />
           )}
           <ManagerTradeLeaderboard trades={trades} rosterToUsername={rosterToUsername} />
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>

@@ -684,6 +684,15 @@
       "status": "done",
       "dependencies": ["TASK-075"],
       "description": "Two bugs with the historical toggle on /league-history/[leagueId]/trades: (1) The current season is excluded from the historical data — the previous_league_id chain only finds past seasons. The current league (the one the user is already viewing) must also be included in the historical aggregation. Start with the current leagueId, then trace backwards via previous_league_id. (2) When pressing the Historical toggle, the data doesn't progressively update — the leaderboard and heatmap stay empty/stale until all seasons finish loading, and sometimes require a page refresh to see results. Fix: update React state after EACH season completes (same progressive rendering pattern as TASK-024). Each time a season's trade data finishes processing, re-aggregate the leaderboard and re-render. The user should see the table grow as each season loads in."
+    },
+    {
+      "id": "TASK-078",
+      "title": "Use owner_id not display_name to track managers across historical seasons",
+      "spec": "specs/code-style.md",
+      "priority": 78,
+      "status": "done",
+      "dependencies": ["TASK-075"],
+      "description": "Bug: When aggregating historical data across seasons, managers are tracked by display_name which can change between seasons (e.g. 'egruis' and 'kach0w' are the same person). Fix: use the Sleeper owner_id (user_id) as the unique key for aggregating manager data across seasons — not display_name or username. When building the historical trade leaderboard, heatmap, and any cross-season aggregation, group by owner_id. For display, fetch the CURRENT season's users (GET /league/{current_league_id}/users) and use their current display_name. This applies everywhere historical data is aggregated: trade leaderboard (TASK-075), trade heatmap (TASK-076), and any future historical features. The roster object has owner_id which maps to the user's permanent Sleeper user_id."
     }
   ]
 }

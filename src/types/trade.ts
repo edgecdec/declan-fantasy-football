@@ -35,6 +35,7 @@ export type TradeFaab = {
 
 export type TradeEfficiencySide = {
   rosterId: number;
+  ownerId: string;
   username: string;
   players: PlayerTradeEfficiency[];
   draftPicks: TradeDraftPick[];
@@ -55,6 +56,7 @@ export type LeagueTradeEfficiencyResult = {
   season: string;
   trades: TradeEfficiencyResult[];
   rosterToUsername: Record<number, string>;
+  rosterToOwnerId: Record<number, string>;
 };
 
 export type SeasonTradeStats = {
@@ -68,5 +70,5 @@ export type SeasonTradeStats = {
 export type HistoricalTradeData = {
   seasons: SeasonTradeStats[];
   allTrades: TradeEfficiencyResult[];
-  allRosterToUsername: Record<number, string>;
+  ownerIdToUsername: Record<string, string>;
 };

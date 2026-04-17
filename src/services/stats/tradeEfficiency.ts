@@ -197,6 +197,7 @@ function evaluateSidePlayers(
 
   const result: TradeEfficiencySide = {
     rosterId: side.rosterId,
+    ownerId: side.ownerId,
     username: side.username,
     players: [],
     draftPicks: resolvedPicks,
@@ -372,6 +373,7 @@ export async function evaluateTradeEfficiency(
     season: tradeResult.season,
     trades,
     rosterToUsername: tradeResult.rosterToUsername,
+    rosterToOwnerId: tradeResult.rosterToOwnerId,
   };
 
   CacheService.set(cacheKey, result, { storage: 'session' });
@@ -389,10 +391,11 @@ function buildSeasonStats(
       const mySide = trade.sides[i];
       const oppSide = trade.sides[1 - i];
       const margin = mySide.totalEfficiency - oppSide.totalEfficiency;
-      if (!managerStats[mySide.username]) {
-        managerStats[mySide.username] = { totalMargin: 0, tradesWon: 0, tradesLost: 0, totalTrades: 0 };
+      const key = mySide.ownerId || mySide.username;
+      if (!managerStats[key]) {
+        managerStats[key] = { totalMargin: 0, tradesWon: 0, tradesLost: 0, totalTrades: 0 };
       }
-      const s = managerStats[mySide.username];
+      const s = managerStats[key];
       s.totalTrades++;
       s.totalMargin += margin;
       if (margin > TRADE_WIN_THRESHOLD) s.tradesWon++;
@@ -424,26 +427,42 @@ export async function fetchHistoricalTradeEfficiency(
     (l) => l.status === 'complete' || l.status === 'in_season',
   );
 
+  // Build ownerIdToUsername from the current (most recent) season's users
+  const currentLeague = eligibleLeagues[0];
+  const ownerIdToUsername: Record<string, string> = {};
+  if (currentLeague) {
+    const users = await SleeperService.getLeagueUsers(currentLeague.league_id);
+    for (const u of users) {
+      ownerIdToUsername[u.user_id] = u.display_name || u.username;
+    }
+  }
+
   const seasons: SeasonTradeStats[] = [];
   const allTrades: TradeEfficiencyResult[] = [];
-  const allRosterToUsername: Record<number, string> = {};
 
   for (const league of eligibleLeagues) {
     try {
       const result = await evaluateTradeEfficiency(league.league_id, league.season);
       if (result.trades.length === 0) continue;
 
+      // Backfill ownerIdToUsername from older seasons for managers not in current season
+      for (const [rosterId, username] of Object.entries(result.rosterToUsername)) {
+        const ownerId = result.rosterToOwnerId[Number(rosterId)];
+        if (ownerId && !ownerIdToUsername[ownerId]) {
+          ownerIdToUsername[ownerId] = username;
+        }
+      }
+
       seasons.push(buildSeasonStats(result));
       allTrades.push(...result.trades);
-      Object.assign(allRosterToUsername, result.rosterToUsername);
 
-      onProgress({ seasons: [...seasons], allTrades: [...allTrades], allRosterToUsername: { ...allRosterToUsername } });
+      onProgress({ seasons: [...seasons], allTrades: [...allTrades], ownerIdToUsername: { ...ownerIdToUsername } });
     } catch {
       // Skip seasons that fail
     }
   }
 
-  const final: HistoricalTradeData = { seasons, allTrades, allRosterToUsername };
+  const final: HistoricalTradeData = { seasons, allTrades, ownerIdToUsername };
   CacheService.set(cacheKey, final, { storage: 'session' });
   return final;
 }

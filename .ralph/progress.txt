@@ -656,3 +656,16 @@
 - Also spread the partial/final objects in `setHistoricalData({ ...partial })` to ensure React detects new references for re-rendering.
 - Lesson: Never put state that is updated by an async callback into the dependency array of the effect that starts that async operation — it creates a self-canceling loop. Use a ref to track "has started" instead.
 - Lesson: When building progressive loading with `onProgress` callbacks, the React effect cleanup pattern can silently kill the fetch if deps include the progressively-updated state. This is a common trap.
+
+## TASK-078: Use owner_id not display_name to track managers across historical seasons
+- Date: 2026-04-17
+- Added `ownerId` field to `TradeSide` (tradeAnalyzer.ts) and `TradeEfficiencySide` (types/trade.ts)
+- Added `rosterToOwnerId` mapping to `LeagueTradeResult` and `LeagueTradeEfficiencyResult`
+- Changed `SeasonTradeStats.managerStats` to key by `ownerId` instead of `username`
+- Replaced `HistoricalTradeData.allRosterToUsername` with `ownerIdToUsername` — built from the current (most recent) season's users, with backfill from older seasons for managers no longer in the league
+- Updated `HistoricalTradeLeaderboard.tsx`: `buildAllTimeStats` now keys by `ownerId` and resolves display names from `ownerIdToUsername`
+- Updated `SeasonBreakdownTable` to use `ownerId` as column keys with display name resolution
+- Updated `TradeHeatmap.tsx`: `buildH2HMatrix` now keys by `ownerId`, added `ownerIdToUsername` prop for display name resolution
+- Updated trades page to pass `ownerIdToUsername` to TradeHeatmap
+- Lesson: When aggregating data across seasons/time periods, always use a permanent identifier (owner_id/user_id) as the grouping key, never display names which can change. Resolve display names at render time from the most current data source.
+- Lesson: The `rosterToOwnerId` mapping is the bridge between season-specific roster_ids and permanent owner_ids. This pattern should be used anywhere cross-season aggregation is needed.

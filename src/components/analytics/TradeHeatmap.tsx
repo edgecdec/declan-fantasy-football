@@ -33,13 +33,14 @@ function buildH2HMatrix(trades: TradeEfficiencyResult[]): {
 
   for (const trade of trades) {
     const [a, b] = trade.sides;
-    managerSet.add(a.username);
-    managerSet.add(b.username);
+    const aId = a.ownerId || a.username;
+    const bId = b.ownerId || b.username;
+    managerSet.add(aId);
+    managerSet.add(bId);
 
     const margin = a.totalEfficiency - b.totalEfficiency;
 
-    // a's perspective vs b
-    const keyAB = `${a.username}|${b.username}`;
+    const keyAB = `${aId}|${bId}`;
     const cellAB = pairMap.get(keyAB) ?? { margin: 0, tradeCount: 0, bestMargin: -Infinity, worstMargin: Infinity };
     cellAB.margin += margin;
     cellAB.tradeCount++;
@@ -47,8 +48,7 @@ function buildH2HMatrix(trades: TradeEfficiencyResult[]): {
     cellAB.worstMargin = Math.min(cellAB.worstMargin, margin);
     pairMap.set(keyAB, cellAB);
 
-    // b's perspective vs a
-    const keyBA = `${b.username}|${a.username}`;
+    const keyBA = `${bId}|${aId}`;
     const cellBA = pairMap.get(keyBA) ?? { margin: 0, tradeCount: 0, bestMargin: -Infinity, worstMargin: Infinity };
     cellBA.margin -= margin;
     cellBA.tradeCount++;
@@ -80,9 +80,10 @@ function getCellColor(value: number, maxAbs: number): string {
 type Props = {
   historicalTrades: TradeEfficiencyResult[];
   currentTrades: TradeEfficiencyResult[];
+  ownerIdToUsername?: Record<string, string>;
 };
 
-export default function TradeHeatmap({ historicalTrades, currentTrades }: Props) {
+export default function TradeHeatmap({ historicalTrades, currentTrades, ownerIdToUsername = {} }: Props) {
   const allTrades = React.useMemo(
     () => [...historicalTrades, ...currentTrades],
     [historicalTrades, currentTrades],
@@ -94,6 +95,8 @@ export default function TradeHeatmap({ historicalTrades, currentTrades }: Props)
   );
 
   if (managers.length < 2) return null;
+
+  const getName = (id: string) => ownerIdToUsername[id] || id;
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
@@ -115,7 +118,7 @@ export default function TradeHeatmap({ historicalTrades, currentTrades }: Props)
                   align="center"
                   sx={{ fontWeight: 'bold', fontSize: '0.7rem', whiteSpace: 'nowrap', px: 1 }}
                 >
-                  {m}
+                  {getName(m)}
                 </TableCell>
               ))}
             </TableRow>
@@ -134,7 +137,7 @@ export default function TradeHeatmap({ historicalTrades, currentTrades }: Props)
                     zIndex: 1,
                   }}
                 >
-                  {row}
+                  {getName(row)}
                 </TableCell>
                 {managers.map((col) => {
                   if (row === col) {
@@ -163,7 +166,7 @@ export default function TradeHeatmap({ historicalTrades, currentTrades }: Props)
                       title={
                         <Box>
                           <Typography variant="body2" fontWeight="bold">
-                            {row} vs {col}
+                            {getName(row)} vs {getName(col)}
                           </Typography>
                           <Typography variant="body2">
                             Trades: {cell.tradeCount}

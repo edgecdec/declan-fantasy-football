@@ -3,6 +3,7 @@ import { CacheService } from '@/services/common/cacheService';
 
 export type TradeSide = {
   rosterId: number;
+  ownerId: string;
   username: string;
   players: string[];
   draftPicks: { season: string; round: number; rosterId: number }[];
@@ -22,6 +23,7 @@ export type LeagueTradeResult = {
   season: string;
   trades: TradeData[];
   rosterToUsername: Record<number, string>;
+  rosterToOwnerId: Record<number, string>;
 };
 
 const DEFAULT_REGULAR_SEASON_WEEKS = 14;
@@ -29,21 +31,24 @@ const DEFAULT_REGULAR_SEASON_WEEKS = 14;
 function buildRosterUsernameMap(
   users: Awaited<ReturnType<typeof SleeperService.getLeagueUsers>>,
   rosters: Awaited<ReturnType<typeof SleeperService.getRosters>>
-): Record<number, string> {
+): { rosterToUsername: Record<number, string>; rosterToOwnerId: Record<number, string> } {
   const ownerToName: Record<string, string> = {};
   for (const u of users) {
     ownerToName[u.user_id] = u.display_name || u.username;
   }
-  const map: Record<number, string> = {};
+  const rosterToUsername: Record<number, string> = {};
+  const rosterToOwnerId: Record<number, string> = {};
   for (const r of rosters) {
-    map[r.roster_id] = ownerToName[r.owner_id] || `Team ${r.roster_id}`;
+    rosterToUsername[r.roster_id] = ownerToName[r.owner_id] || `Team ${r.roster_id}`;
+    rosterToOwnerId[r.roster_id] = r.owner_id;
   }
-  return map;
+  return { rosterToUsername, rosterToOwnerId };
 }
 
 function parseTrade(
   tx: SleeperTransaction,
-  rosterToUsername: Record<number, string>
+  rosterToUsername: Record<number, string>,
+  rosterToOwnerId: Record<number, string>,
 ): TradeData | null {
   if (tx.roster_ids.length < 2) return null;
 
@@ -51,6 +56,7 @@ function parseTrade(
   for (const rid of tx.roster_ids) {
     sideMap.set(rid, {
       rosterId: rid,
+      ownerId: rosterToOwnerId[rid] || '',
       username: rosterToUsername[rid] || `Team ${rid}`,
       players: [],
       draftPicks: [],
@@ -98,7 +104,7 @@ export async function fetchLeagueTrades(
     SleeperService.getRosters(leagueId),
   ]);
 
-  const rosterToUsername = buildRosterUsernameMap(users, rosters);
+  const { rosterToUsername, rosterToOwnerId } = buildRosterUsernameMap(users, rosters);
   const totalWeeks = league?.settings?.playoff_week_start
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
@@ -112,7 +118,7 @@ export async function fetchLeagueTrades(
   for (const weekTxs of allTransactions) {
     for (const tx of weekTxs) {
       if (tx.type !== 'trade' || tx.status !== 'complete') continue;
-      const parsed = parseTrade(tx, rosterToUsername);
+      const parsed = parseTrade(tx, rosterToUsername, rosterToOwnerId);
       if (parsed) trades.push(parsed);
     }
   }
@@ -125,6 +131,7 @@ export async function fetchLeagueTrades(
     season,
     trades,
     rosterToUsername,
+    rosterToOwnerId,
   };
 
   CacheService.set(cacheKey, result, { storage: 'session' });
