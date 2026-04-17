@@ -3,7 +3,7 @@
 import * as React from 'react';
 import {
   Paper, Typography, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TableSortLabel, Avatar, Box,
+  TableHead, TableRow, TableSortLabel, Avatar, Box, Tooltip,
 } from '@mui/material';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { SeasonDecisionSummary } from '@/types/lineup';
@@ -22,6 +22,9 @@ type ManagerRow = {
   netSkillPerWeek: number;
   optimalWeeks: number;
   totalWeeks: number;
+  totalActualStarted: number;
+  totalActualOptimal: number;
+  totalDecisions: number;
 };
 
 export default function LeagueDecisionsTable({
@@ -54,6 +57,9 @@ export default function LeagueDecisionsTable({
     summaries.map(s => {
       const uid = s.userId || '';
       const meta = userMap[uid];
+      const totalDecisions = s.weeklyDecisions.reduce(
+        (sum, w) => sum + w.optimal.actualLineup.length, 0,
+      );
       return {
         userId: uid,
         displayName: meta?.displayName || uid,
@@ -63,6 +69,9 @@ export default function LeagueDecisionsTable({
         netSkillPerWeek: s.netSkillPerWeek,
         optimalWeeks: s.optimalWeeks,
         totalWeeks: s.weeklyDecisions.length,
+        totalActualStarted: s.totalActualStarted,
+        totalActualOptimal: s.totalActualOptimal,
+        totalDecisions,
       };
     }),
   [summaries, userMap]);
@@ -150,7 +159,26 @@ export default function LeagueDecisionsTable({
                     </Box>
                   </TableCell>
                   <TableCell align="right" sx={{ color: row.skillEfficiency >= 100 ? 'success.main' : 'error.main', fontWeight: 600 }}>
-                    {row.skillEfficiency.toFixed(2)}%
+                    <Tooltip
+                      arrow
+                      title={
+                        <Box sx={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                            {row.skillEfficiency.toFixed(4)}%
+                          </Typography>
+                          <div>Actual: {row.totalActualStarted.toFixed(1)} pts</div>
+                          <div>Optimal: {row.totalActualOptimal.toFixed(1)} pts</div>
+                          <div style={{ marginTop: 4, fontStyle: 'italic' }}>
+                            {row.totalActualStarted.toFixed(1)} / {row.totalActualOptimal.toFixed(1)} × 100 = {row.skillEfficiency.toFixed(4)}%
+                          </div>
+                          <div style={{ marginTop: 4 }}>
+                            {row.totalWeeks} weeks · {row.totalDecisions} decisions
+                          </div>
+                        </Box>
+                      }
+                    >
+                      <span style={{ cursor: 'help' }}>{row.skillEfficiency.toFixed(2)}%</span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell align="right" sx={{ color: row.netSkillPlusMinus >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
                     {row.netSkillPlusMinus >= 0 ? '+' : ''}{row.netSkillPlusMinus.toFixed(1)}

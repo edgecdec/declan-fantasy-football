@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
   Box, Paper, Typography, LinearProgress, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TableSortLabel, Chip, Collapse, IconButton,
+  TableSortLabel, Chip, Collapse, IconButton, Tooltip,
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -388,6 +388,11 @@ export default function StartSitContent() {
   const avgSkillEfficiency = summaries.length > 0
     ? summaries.reduce((s, sm) => s + sm.skillEfficiency, 0) / summaries.length : 100;
 
+  const totalWeeksAnalyzed = summaries.reduce((s, sm) => s + sm.weeklyDecisions.length, 0);
+  const totalDecisionsAnalyzed = summaries.reduce(
+    (s, sm) => s + sm.weeklyDecisions.reduce((ws, w) => ws + w.optimal.actualLineup.length, 0), 0,
+  );
+
   // Net Skill +/- per week averaged across leagues
   const avgNetSkillPerWeek = summaries.length > 0
     ? summaries.reduce((s, sm) => s + sm.netSkillPerWeek, 0) / summaries.length : 0;
@@ -443,9 +448,29 @@ export default function StartSitContent() {
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h4" color={avgSkillEfficiency >= 100 ? 'success.main' : 'error.main'}>
-                  {avgSkillEfficiency.toFixed(2)}%
-                </Typography>
+                <Tooltip
+                  arrow
+                  title={
+                    <Box sx={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        {avgSkillEfficiency.toFixed(4)}%
+                      </Typography>
+                      <div>Average across {summaries.length} league{summaries.length !== 1 ? 's' : ''}</div>
+                      {summaries.map(s => (
+                        <div key={s.leagueId}>
+                          {s.leagueName}: {s.skillEfficiency.toFixed(2)}% ({s.totalActualStarted.toFixed(1)} / {s.totalActualOptimal.toFixed(1)})
+                        </div>
+                      ))}
+                      <div style={{ marginTop: 4 }}>
+                        {totalWeeksAnalyzed} weeks · {totalDecisionsAnalyzed} decisions
+                      </div>
+                    </Box>
+                  }
+                >
+                  <Typography variant="h4" color={avgSkillEfficiency >= 100 ? 'success.main' : 'error.main'} sx={{ cursor: 'help' }}>
+                    {avgSkillEfficiency.toFixed(2)}%
+                  </Typography>
+                </Tooltip>
                 <Typography variant="body2" color="text.secondary">Skill Efficiency</Typography>
               </Paper>
             </Grid>

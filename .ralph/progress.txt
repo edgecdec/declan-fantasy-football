@@ -571,3 +571,12 @@
 - Fix: Changed `sideMap.get(dp.previous_owner_id)` to `sideMap.get(dp.owner_id)` — one line change.
 - Sleeper transaction draft_picks fields: `roster_id` = original pick owner (whose draft slot), `previous_owner_id` = who had the pick before this trade, `owner_id` = who receives the pick in this trade.
 - Lesson: When displaying "Team X received:", all assets (players, picks, FAAB) must use the receiving roster_id. Players use `tx.adds[playerId]`, picks use `dp.owner_id`, FAAB uses `wb.receiver`. The pattern should be consistent across all asset types.
+
+## TASK-067: Add detailed tooltip when hovering Skill Efficiency % on leaderboard
+- Date: 2026-04-17
+- Added MUI Tooltip to Skill Efficiency % in both LeagueDecisionsTable (leaderboard) and StartSitContent (aggregate summary card)
+- Leaderboard tooltip shows: full precision %, actual pts, optimal pts, formula, weeks, decisions
+- Aggregate tooltip shows: full precision %, per-league breakdown with individual efficiency and pts, total weeks/decisions
+- Used cursor:help on the span to indicate hoverable element
+- Needed to pass totalActualStarted, totalActualOptimal, and totalDecisions through the ManagerRow type
+- Lesson: MUI Tooltip needs a DOM element child (not just text) — wrapping in <span> works cleanly

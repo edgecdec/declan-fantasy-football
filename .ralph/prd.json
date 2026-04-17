@@ -591,7 +591,7 @@
       "title": "Add detailed tooltip when hovering Skill Efficiency % on leaderboard",
       "spec": "specs/code-style.md",
       "priority": 67,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-063"],
       "description": "On the Start/Sit leaderboard and summary cards, when hovering over the Skill Efficiency % value, show a MUI Tooltip with the full calculation breakdown: the exact unrounded percentage (e.g. 103.1742%), total actual points scored by starters, total actual points the optimal lineup would have scored, the formula 'Actual (1876.2) / Optimal (1681.4) × 100 = 111.59%', number of weeks analyzed, and total number of start/sit decisions evaluated. This gives users transparency into how the number is derived without cluttering the main display."
     },
