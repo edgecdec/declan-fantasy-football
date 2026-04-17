@@ -541,3 +541,16 @@
 - Aggregate /skill?tab=decisions now averages percentages across leagues instead of summing raw points.
 - The `analyzeLeagueAllManagers` already ran the solver for all managers; the 0.0 issue was because the old metrics (accuracy/pointsLeft) didn't reflect meaningful data. New metrics compute correctly from weekly lineup actuals.
 - Lesson: When metrics show 0.0, check whether the data is truly missing vs the metric formula being wrong. Here the data was computed correctly but the displayed metric didn't capture useful information.
+
+## TASK-064: Fix crash on /skill?tab=efficiency when clicking Analyze
+**Date:** 2026-04-16
+**Status:** Done
+
+**Root Cause:** In `LeagueBreakdown.tsx`, chart data was mapped using `res.userStats[pos].avgPointsPerWeek` and `res.userStats[pos].avgPointsPerStarter` without null safety. When a league exists where the user doesn't have a roster (e.g., invited but never joined, or orphaned dynasty roster), `analyzePositionalBenchmarks` returns `userStats: {}` (empty object fallback), making `userStats[pos]` undefined. Accessing `.avgPointsPerWeek` on undefined crashes React's render phase.
+
+**Fix:** Added optional chaining (`?.`) and nullish coalescing (`?? 0`) to both chart data mappings in `LeagueBreakdown.tsx`. All other files accessing `userStats[pos]` already had `if (u && l)` guards.
+
+**Lessons:**
+- Always use optional chaining when accessing nested properties from Record types that may have missing keys, especially with `|| {}` fallbacks.
+- Other code in the same codebase had the correct pattern (`if (u && l)` checks) — the LeagueBreakdown component was the only one that didn't follow the defensive pattern.
+- The crash only manifested with certain users/years because it required a league where the user had no roster data.

@@ -558,6 +558,15 @@
       "status": "done",
       "dependencies": ["TASK-062"],
       "description": "The Start/Sit leaderboard at /skill/league/[leagueId]?tab=decisions shows 0.0 for most managers, meaning it's not running the full optimal lineup analysis for everyone. Fix: run the solver (from TASK-062) for EVERY manager in the league, not just the current user.\n\nAlso fix the metrics — 'Actual Pts Lost' is confusing and not the right primary metric. Replace with:\n\n1. PRIMARY METRIC: 'Skill Efficiency %' = (sum of actual points from the manager's starters across all weeks) / (sum of actual points the optimal lineup would have scored across all weeks) × 100. This shows how close to optimal the manager played as a percentage. 100% = perfect decisions. >100% = beat Sleeper's projections. <100% = left points on bench. This is the column the leaderboard sorts by.\n\n2. SECONDARY: 'Net Skill +/-' = total actual points of started players minus total actual points of optimal players, across all weeks. Show this as a total AND as a per-week average (total / weeks played). A positive number means the user outperformed Sleeper's optimal.\n\n3. 'Optimal Weeks' = number of weeks where the user's actual lineup matched or beat the optimal lineup's actual points (count of weeks where weekly skill +/- >= 0) out of total weeks. This is the X/13 column.\n\n4. On the aggregate /skill?tab=decisions page (across all leagues), the same metrics apply but normalized: Skill Efficiency % averaged across leagues, Net Skill +/- per week averaged across leagues. Do NOT just sum across leagues with different scoring systems — average the percentages.\n\nRemove 'Actual Pts Lost' as a metric entirely. It's redundant with Net Skill +/- and confusing when positive."
+    },
+    {
+      "id": "TASK-064",
+      "title": "URGENT: Fix crash on /skill?tab=efficiency when clicking Analyze",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "done",
+      "dependencies": [],
+      "description": "Bug: On /skill?tab=efficiency (Positional Efficiency tab in the Manager Skill Hub), entering a username and clicking Analyze causes the page to crash with 'Application error: a client-side exception has occurred'. This was the migrated positional benchmarks code from TASK-053. Read the browser console error to identify the root cause — likely an undefined property access, missing null check, or a breaking change introduced during the migration. Check the component that renders the efficiency tab, trace the data fetching and rendering flow, and fix the crash. Test with username 'edgecdec' for 2025."
     }
   ]
 }

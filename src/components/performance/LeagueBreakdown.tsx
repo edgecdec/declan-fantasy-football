@@ -72,7 +72,7 @@ export default function LeagueBreakdown({ item, onToggle, onViewImpacts }: Leagu
                 <Typography variant="subtitle1" gutterBottom align="center">Average Weekly Output</Typography>
                 <Box sx={{ height: 300 }}>
                   <ResponsiveContainer>
-                    <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos].avgPointsPerWeek, Avg: res.leagueAverageStats[pos].avgPointsPerWeek }))}>
+                    <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos]?.avgPointsPerWeek ?? 0, Avg: res.leagueAverageStats[pos]?.avgPointsPerWeek ?? 0 }))}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="pos" />
                       <YAxis />
@@ -88,7 +88,7 @@ export default function LeagueBreakdown({ item, onToggle, onViewImpacts }: Leagu
                 <Typography variant="subtitle1" gutterBottom align="center">Efficiency (Points Per Start)</Typography>
                 <Box sx={{ height: 300 }}>
                   <ResponsiveContainer>
-                    <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos].avgPointsPerStarter, Avg: res.leagueAverageStats[pos].avgPointsPerStarter }))}>
+                    <BarChart data={VALID_POSITIONS.map(pos => ({ pos, You: res.userStats[pos]?.avgPointsPerStarter ?? 0, Avg: res.leagueAverageStats[pos]?.avgPointsPerStarter ?? 0 }))}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="pos" />
                       <YAxis />
