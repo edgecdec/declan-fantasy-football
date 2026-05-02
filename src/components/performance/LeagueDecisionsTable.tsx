@@ -10,7 +10,7 @@ import { SeasonDecisionSummary } from '@/types/lineup';
 
 const RAINBOW_BG = 'linear-gradient(90deg, red, orange, yellow, green, dodgerblue, blueviolet, red)';
 
-type SortField = 'rank' | 'name' | 'skillEff' | 'netSkill' | 'netSkillWk' | 'optimalWeeks';
+type SortField = 'rank' | 'name' | 'ptsScored' | 'optimalPts' | 'skillEff' | 'netSkill' | 'netSkillWk' | 'optimalWeeks';
 type SortDir = 'asc' | 'desc';
 
 type ManagerRow = {
@@ -81,6 +81,8 @@ export default function LeagueDecisionsTable({
     const s = [...rows].sort((a, b) => {
       switch (sortField) {
         case 'name': return a.displayName.localeCompare(b.displayName) * dir;
+        case 'ptsScored': return (a.totalActualStarted - b.totalActualStarted) * dir;
+        case 'optimalPts': return (a.totalActualOptimal - b.totalActualOptimal) * dir;
         case 'skillEff': {
           const diff = a.skillEfficiency - b.skillEfficiency;
           return diff !== 0 ? diff * dir : (a.netSkillPlusMinus - b.netSkillPlusMinus) * dir;
@@ -110,6 +112,16 @@ export default function LeagueDecisionsTable({
               <TableCell>
                 <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
                   Manager
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={sortField === 'ptsScored'} direction={sortField === 'ptsScored' ? sortDir : 'asc'} onClick={() => handleSort('ptsScored')}>
+                  Pts Scored
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel active={sortField === 'optimalPts'} direction={sortField === 'optimalPts' ? sortDir : 'asc'} onClick={() => handleSort('optimalPts')}>
+                  Optimal Pts
                 </TableSortLabel>
               </TableCell>
               <TableCell align="right">
@@ -158,6 +170,8 @@ export default function LeagueDecisionsTable({
                       {row.displayName}
                     </Box>
                   </TableCell>
+                  <TableCell align="right">{row.totalActualStarted.toFixed(1)}</TableCell>
+                  <TableCell align="right">{row.totalActualOptimal.toFixed(1)}</TableCell>
                   <TableCell align="right" sx={{ color: row.skillEfficiency >= 100 ? 'success.main' : 'error.main', fontWeight: 600 }}>
                     <Tooltip
                       arrow

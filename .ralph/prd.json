@@ -708,7 +708,7 @@
       "title": "Show total actual points and optimal points columns on Start/Sit leaderboard",
       "spec": "specs/code-style.md",
       "priority": 80,
-      "status": "open",
+      "status": "done",
       "dependencies": ["TASK-063"],
       "description": "On /skill/league/[leagueId]?tab=decisions, the Start/Sit leaderboard shows Skill Efficiency %, Net Skill +/-, +/- per week, and Optimal Weeks — but doesn't show the raw numbers behind the calculation. Add two columns: 'Pts Scored' (total actual points from the manager's starters across all weeks) and 'Optimal Pts' (total actual points the optimal lineup would have scored). These are already computed to calculate Skill Efficiency % — just expose them in the table. Place them after the manager name column and before the Skill Eff % column. This gives users the full picture: how much they scored, how much they could have scored, and the resulting efficiency."
     }

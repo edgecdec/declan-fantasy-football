@@ -677,3 +677,10 @@
 - Added `.filter()` before `.map()` in evaluateTradeEfficiency to skip malformed trades
 - Lesson: When dealing with data from external APIs that flows through caching, serialization, and multiple processing stages, always use optional chaining and nullish coalescing at every access point. The exact crash location in minified code is hard to pinpoint — defensive checks at all access points is the pragmatic fix.
 - Lesson: The error pattern `can't access property X, t is undefined` where X is a dynamic value (username) means a record/map lookup on an undefined object. Always guard the object before subscript access.
+
+## TASK-080: Show Pts Scored and Optimal Pts columns on Start/Sit leaderboard
+- Date: 2026-05-01
+- Added two sortable columns ('Pts Scored' and 'Optimal Pts') to LeagueDecisionsTable.tsx between Manager and Skill Efficiency %.
+- Data was already computed in ManagerRow (totalActualStarted, totalActualOptimal) and used in tooltips — just needed to expose as visible columns.
+- Minimal change: added sort fields, column headers with TableSortLabel, sort cases, and two data cells per row.
+- Lesson: When data is already available in the component's data model, exposing it in the UI is straightforward — no service changes needed.
