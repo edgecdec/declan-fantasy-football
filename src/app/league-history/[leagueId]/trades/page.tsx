@@ -46,8 +46,9 @@ function EfficiencyValue({ value }: { value: number }) {
 }
 
 function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
-  const { sorted, order, orderBy, handleSort } = useTableSort(side.players, 'totalSeasonEfficiency');
-  const hasAssets = side.players.length > 0 || (side.draftPicks ?? []).length > 0 || (side.faabItems ?? []).length > 0;
+  const { sorted, order, orderBy, handleSort } = useTableSort(side?.players ?? [], 'totalSeasonEfficiency');
+  const hasAssets = (side?.players?.length ?? 0) > 0 || (side?.draftPicks ?? []).length > 0 || (side?.faabItems ?? []).length > 0;
+  if (!side) return null;
   return (
     <Box sx={{ flex: 1, minWidth: 250 }}>
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -168,8 +169,10 @@ function TradeSideTable({ side }: { side: TradeEfficiencySide }) {
 }
 
 function TradeVerdict({ trade }: { trade: TradeEfficiencyResult }) {
-  const [a, b] = trade.sides;
-  const diff = a.totalEfficiency - b.totalEfficiency;
+  const a = trade.sides?.[0];
+  const b = trade.sides?.[1];
+  if (!a || !b) return null;
+  const diff = (a.totalEfficiency ?? 0) - (b.totalEfficiency ?? 0);
   const winner = Math.abs(diff) < 1 ? null : diff > 0 ? a.username : b.username;
 
   return (
@@ -186,6 +189,7 @@ function TradeVerdict({ trade }: { trade: TradeEfficiencyResult }) {
 }
 
 function TradeCard({ trade }: { trade: TradeEfficiencyResult }) {
+  if (!trade?.sides?.[0] || !trade?.sides?.[1]) return null;
   return (
     <Paper sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -223,8 +227,8 @@ export default function TradeEvaluatorPage() {
     const copy = [...trades];
     if (sortMode === 'impact') {
       copy.sort((a, b) => {
-        const impactA = Math.abs(a.sides[0].totalEfficiency - a.sides[1].totalEfficiency);
-        const impactB = Math.abs(b.sides[0].totalEfficiency - b.sides[1].totalEfficiency);
+        const impactA = Math.abs((a.sides?.[0]?.totalEfficiency ?? 0) - (a.sides?.[1]?.totalEfficiency ?? 0));
+        const impactB = Math.abs((b.sides?.[0]?.totalEfficiency ?? 0) - (b.sides?.[1]?.totalEfficiency ?? 0));
         return impactB - impactA;
       });
     } else {

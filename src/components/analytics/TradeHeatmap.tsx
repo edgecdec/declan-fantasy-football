@@ -32,9 +32,11 @@ function buildH2HMatrix(trades: TradeEfficiencyResult[]): {
   const managerSet = new Set<string>();
 
   for (const trade of trades) {
+    if (!trade?.sides?.[0] || !trade?.sides?.[1]) continue;
     const [a, b] = trade.sides;
     const aId = a.ownerId || a.username;
     const bId = b.ownerId || b.username;
+    if (!aId || !bId) continue;
     managerSet.add(aId);
     managerSet.add(bId);
 

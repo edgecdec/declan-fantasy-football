@@ -357,15 +357,17 @@ export async function evaluateTradeEfficiency(
 
   const pickTimeline = buildPickTradeTimeline(tradeResult.trades);
 
-  const trades: TradeEfficiencyResult[] = tradeResult.trades.map((trade) => ({
-    transactionId: trade.transactionId,
-    week: trade.week,
-    timestamp: trade.timestamp,
-    sides: [
-      evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
-      evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
-    ],
-  }));
+  const trades: TradeEfficiencyResult[] = tradeResult.trades
+    .filter((trade) => trade?.sides?.[0] && trade?.sides?.[1])
+    .map((trade) => ({
+      transactionId: trade.transactionId,
+      week: trade.week,
+      timestamp: trade.timestamp,
+      sides: [
+        evaluateSidePlayers(trade.sides[0], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
+        evaluateSidePlayers(trade.sides[1], trade.week, totalWeeks, allMatchups, getAvg, draftPicksByRound, rosterIdToDraftSlot, pickTimeline, trade.transactionId),
+      ],
+    }));
 
   const result: LeagueTradeEfficiencyResult = {
     leagueId: tradeResult.leagueId,
@@ -387,11 +389,14 @@ function buildSeasonStats(
 ): SeasonTradeStats {
   const managerStats: SeasonTradeStats['managerStats'] = {};
   for (const trade of seasonResult.trades) {
+    if (!trade?.sides?.[0] || !trade?.sides?.[1]) continue;
     for (let i = 0; i < 2; i++) {
       const mySide = trade.sides[i];
       const oppSide = trade.sides[1 - i];
-      const margin = mySide.totalEfficiency - oppSide.totalEfficiency;
+      if (!mySide || !oppSide) continue;
+      const margin = (mySide.totalEfficiency ?? 0) - (oppSide.totalEfficiency ?? 0);
       const key = mySide.ownerId || mySide.username;
+      if (!key) continue;
       if (!managerStats[key]) {
         managerStats[key] = { totalMargin: 0, tradesWon: 0, tradesLost: 0, totalTrades: 0 };
       }
@@ -446,8 +451,10 @@ export async function fetchHistoricalTradeEfficiency(
       if (result.trades.length === 0) continue;
 
       // Backfill ownerIdToUsername from older seasons for managers not in current season
-      for (const [rosterId, username] of Object.entries(result.rosterToUsername)) {
-        const ownerId = result.rosterToOwnerId[Number(rosterId)];
+      const rtu = result.rosterToUsername ?? {};
+      const rto = result.rosterToOwnerId ?? {};
+      for (const [rosterId, username] of Object.entries(rtu)) {
+        const ownerId = rto[Number(rosterId)];
         if (ownerId && !ownerIdToUsername[ownerId]) {
           ownerIdToUsername[ownerId] = username;
         }

@@ -669,3 +669,11 @@
 - Updated trades page to pass `ownerIdToUsername` to TradeHeatmap
 - Lesson: When aggregating data across seasons/time periods, always use a permanent identifier (owner_id/user_id) as the grouping key, never display names which can change. Resolve display names at render time from the most current data source.
 - Lesson: The `rosterToOwnerId` mapping is the bridge between season-specific roster_ids and permanent owner_ids. This pattern should be used anywhere cross-season aggregation is needed.
+
+## TASK-079: Fix crash on trades page — accessing property on undefined object (2026-05-01)
+- Added defensive null checks across all trade-related components and services
+- Guarded `trade.sides[i]` access in: ManagerTradeLeaderboard.buildManagerStats, tradeEfficiency.buildSeasonStats, TradeHeatmap.buildH2HMatrix, TradeVerdict, TradeCard, TradeSideTable
+- Added `?? {}` fallback for `ownerIdToUsername`, `managerStats`, `rosterToUsername`, `rosterToOwnerId` access
+- Added `.filter()` before `.map()` in evaluateTradeEfficiency to skip malformed trades
+- Lesson: When dealing with data from external APIs that flows through caching, serialization, and multiple processing stages, always use optional chaining and nullish coalescing at every access point. The exact crash location in minified code is hard to pinpoint — defensive checks at all access points is the pragmatic fix.
+- Lesson: The error pattern `can't access property X, t is undefined` where X is a dynamic value (username) means a record/map lookup on an undefined object. Always guard the object before subscript access.

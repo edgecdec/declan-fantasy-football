@@ -49,26 +49,28 @@ function buildManagerStats(trades: TradeEfficiencyResult[], rosterToUsername?: R
   // Seed all managers from roster map so 0-trade managers appear
   if (rosterToUsername) {
     for (const username of Object.values(rosterToUsername)) {
-      if (!map.has(username)) {
+      if (username && !map.has(username)) {
         map.set(username, { username, totalTrades: 0, tradesWon: 0, tradesLost: 0, totalMargin: 0, bestMargin: 0, worstMargin: 0, trades: [] });
       }
     }
   }
 
   for (const trade of trades) {
+    if (!trade?.sides?.[0] || !trade?.sides?.[1]) continue;
     for (let i = 0; i < 2; i++) {
       const mySide = trade.sides[i];
       const oppSide = trade.sides[1 - i];
-      const margin = mySide.totalEfficiency - oppSide.totalEfficiency;
+      if (!mySide?.username || !oppSide) continue;
+      const margin = (mySide.totalEfficiency ?? 0) - (oppSide.totalEfficiency ?? 0);
       const won = margin > 1;
       const lost = margin < -1;
 
       const row: ManagerTradeRow = {
         transactionId: trade.transactionId,
         week: trade.week,
-        opponent: oppSide.username,
-        myEff: mySide.totalEfficiency,
-        oppEff: oppSide.totalEfficiency,
+        opponent: oppSide.username ?? 'Unknown',
+        myEff: mySide.totalEfficiency ?? 0,
+        oppEff: oppSide.totalEfficiency ?? 0,
         margin,
         trade,
       };
@@ -115,6 +117,7 @@ function EffVal({ value }: { value: number }) {
 }
 
 function ManagerTradeDetail({ row }: { row: ManagerTradeRow }) {
+  if (!row?.trade?.sides?.[0] || !row?.trade?.sides?.[1]) return null;
   const mySideIdx = row.trade.sides[0].username === row.opponent ? 1 : 0;
   const mySide = row.trade.sides[mySideIdx];
   const oppSide = row.trade.sides[1 - mySideIdx];

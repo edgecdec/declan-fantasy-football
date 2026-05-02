@@ -693,6 +693,24 @@
       "status": "done",
       "dependencies": ["TASK-075"],
       "description": "Bug: When aggregating historical data across seasons, managers are tracked by display_name which can change between seasons (e.g. 'egruis' and 'kach0w' are the same person). Fix: use the Sleeper owner_id (user_id) as the unique key for aggregating manager data across seasons — not display_name or username. When building the historical trade leaderboard, heatmap, and any cross-season aggregation, group by owner_id. For display, fetch the CURRENT season's users (GET /league/{current_league_id}/users) and use their current display_name. This applies everywhere historical data is aggregated: trade leaderboard (TASK-075), trade heatmap (TASK-076), and any future historical features. The roster object has owner_id which maps to the user's permanent Sleeper user_id."
+    },
+    {
+      "id": "TASK-079",
+      "title": "URGENT: Fix crash on trades page — accessing property on undefined object",
+      "spec": "specs/anti-patterns.md",
+      "priority": 1,
+      "status": "done",
+      "dependencies": [],
+      "description": "Bug: /league-history/[leagueId]/trades crashes with 'TypeError: can't access property TheSebasDog, t is undefined'. This is likely from the recent TASK-073/074 changes where the code tries to access a manager name as a property on an object that hasn't been initialized. The variable 't' is undefined — probably a roster-to-name mapping or manager stats object that wasn't populated for all managers. Add defensive null checks: use optional chaining (?.) or default empty objects where manager data is accessed. Check the trade leaderboard aggregation code — it may be trying to access stats for a manager before their entry has been created in the results map. Initialize all manager entries before processing trades. Test against league 1206336001794920448."
+    },
+    {
+      "id": "TASK-080",
+      "title": "Show total actual points and optimal points columns on Start/Sit leaderboard",
+      "spec": "specs/code-style.md",
+      "priority": 80,
+      "status": "open",
+      "dependencies": ["TASK-063"],
+      "description": "On /skill/league/[leagueId]?tab=decisions, the Start/Sit leaderboard shows Skill Efficiency %, Net Skill +/-, +/- per week, and Optimal Weeks — but doesn't show the raw numbers behind the calculation. Add two columns: 'Pts Scored' (total actual points from the manager's starters across all weeks) and 'Optimal Pts' (total actual points the optimal lineup would have scored). These are already computed to calculate Skill Efficiency % — just expose them in the table. Place them after the manager name column and before the Skill Eff % column. This gives users the full picture: how much they scored, how much they could have scored, and the resulting efficiency."
     }
   ]
 }
