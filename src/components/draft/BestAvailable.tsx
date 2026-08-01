@@ -1,55 +1,29 @@
 'use client';
 
 import * as React from 'react';
-import { Box, Paper, Typography, Divider, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
-import { VBDService, LeagueSettings, Player } from '@/services/draft/vbdService';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { SleeperDraftPick } from '@/services/sleeper/sleeperService';
+import { Player } from '@/services/draft/vbdService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 import useTableSort from '@/hooks/useTableSort';
-import { useCustomRankings } from '@/context/CustomRankingsContext';
-import RankingsSelector from '@/components/draft/RankingsSelector';
 
 type Props = {
-  draft: SleeperDraft;
+  valuedPlayers: Player[];
   picks: SleeperDraftPick[];
   rosteredPlayerIds?: Set<string>;
 };
 
-export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props) {
-  const { activePlayers } = useCustomRankings();
-  const [bestAvailable, setBestAvailable] = React.useState<Player[]>([]);
+export default function BestAvailable({ valuedPlayers, picks, rosteredPlayerIds }: Props) {
   const [positionFilter, setPositionFilter] = React.useState('ALL');
 
-  React.useEffect(() => {
-    // 1. Filter out drafted and rostered players
+  const bestAvailable = React.useMemo(() => {
     const takenIds = new Set(picks.map(p => p.player_id));
-    const available = activePlayers.filter(p => {
+    return valuedPlayers.filter(p => {
       if (takenIds.has(p.player_id)) return false;
       if (rosteredPlayerIds?.has(p.player_id)) return false;
       return true;
     });
-
-    // 2. Prepare Settings
-    const settings: LeagueSettings = {
-      teams: draft.settings.teams,
-      format: 'standard', 
-      roster: {
-        QB: draft.settings.slots_qb,
-        RB: draft.settings.slots_rb,
-        WR: draft.settings.slots_wr,
-        TE: draft.settings.slots_te,
-        FLEX: draft.settings.slots_flex,
-        SUPER_FLEX: 0,
-        K: draft.settings.slots_k,
-        DEF: draft.settings.slots_def
-      }
-    };
-
-    // 3. Calculate VBD
-    const calculated = VBDService.calculate(available, settings);
-    setBestAvailable(calculated);
-
-  }, [draft, picks, rosteredPlayerIds, activePlayers]);
+  }, [valuedPlayers, picks, rosteredPlayerIds]);
 
   const filteredPlayers = React.useMemo(() => {
     if (positionFilter === 'ALL') return bestAvailable;
@@ -64,12 +38,7 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
   };
 
   return (
-    <Paper sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1 }}>
-        <Typography variant="h6">Best Available</Typography>
-        <RankingsSelector />
-      </Box>
-      
+    <Box sx={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <ToggleButtonGroup
         value={positionFilter}
         exclusive
@@ -128,9 +97,11 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
                       <Typography variant="body2" fontWeight="bold" sx={{ color: (player.vbd_value || 0) > 0 ? 'success.main' : 'text.primary' }}>
                         {(player.vbd_value || 0).toFixed(1)}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {player.projected_points} pts
-                      </Typography>
+                      {player.projected_points !== undefined && (
+                        <Typography variant="caption" color="text.secondary">
+                          {player.projected_points} pts
+                        </Typography>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -144,6 +115,6 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
           </TableBody>
         </Table>
       </TableContainer>
-    </Paper>
+    </Box>
   );
 }

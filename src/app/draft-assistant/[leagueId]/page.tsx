@@ -9,7 +9,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
-import BestAvailable from '@/components/draft/BestAvailable';
+import DraftSidePanel from '@/components/draft/DraftSidePanel';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
 import Link from 'next/link';
@@ -218,7 +218,14 @@ export default function LeagueDraftPage() {
             transition: 'all 0.3s ease',
           }}>
             <Box sx={{ height: 600, position: 'relative' }}>
-              <BestAvailable draft={selectedDraft} picks={picks} rosteredPlayerIds={rosteredPlayerIds} />
+              <DraftSidePanel
+                draft={selectedDraft}
+                picks={picks}
+                rosteredPlayerIds={rosteredPlayerIds}
+                rosterOwnerMap={rosterOwnerMap}
+                rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
+                currentUserId={user?.user_id}
+              />
             </Box>
           </Grid>
         </Grid>

@@ -9,6 +9,9 @@ export type Player = {
   adp?: number;
   vbd_value?: number;
   position_rank?: number;
+  /** Explicit value from an uploaded ranking set (e.g. dynasty trade value). When
+   *  set, this is shown as-is instead of being derived via VBD's points-over-replacement math. */
+  custom_value?: number;
 };
 
 export type LeagueSettings = {
@@ -51,6 +54,10 @@ export class VBDService {
     
     return players.map(p => {
       if (!['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(p.position)) return p;
+
+      if (p.custom_value !== undefined) {
+        return { ...p, vbd_value: p.custom_value };
+      }
 
       const proj = p.projected_points ?? this.estimatePoints(p);
       if (!proj) return p;

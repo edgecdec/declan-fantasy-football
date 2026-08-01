@@ -15,6 +15,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   tier: ['tier'],
   projected_points: ['projected_points', 'projected points', 'points', 'proj', 'fpts', 'projection', 'pts'],
   adp: ['adp'],
+  value: ['value', 'trade value', 'trade_value', 'dynasty value', 'dynasty_value', 'value_1qb_ppr'],
 };
 
 const POSITION_ALIASES: Record<string, string> = {
@@ -208,6 +209,7 @@ export function parseAndMatchRankingsCsv(csvText: string, baseRankings: Player[]
     const tier = columns.tier !== undefined ? parseNumber(row[columns.tier]) : undefined;
     const projectedPoints = columns.projected_points !== undefined ? parseNumber(row[columns.projected_points]) : undefined;
     const adp = columns.adp !== undefined ? parseNumber(row[columns.adp]) : undefined;
+    const customValue = columns.value !== undefined ? parseNumber(row[columns.value]) : undefined;
 
     const matched = matchRow(name, position, team, index);
     if (!matched) {
@@ -225,6 +227,7 @@ export function parseAndMatchRankingsCsv(csvText: string, baseRankings: Player[]
       tier: tier ?? Math.ceil(finalRank / 12),
       projected_points: projectedPoints,
       adp,
+      custom_value: customValue,
     });
   });
 
