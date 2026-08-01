@@ -6,13 +6,13 @@ import { keyframes } from '@mui/material/styles';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
-// Rotating a masked, oversized conic-gradient disc behind a thin ring (via
-// `transform: rotate`) looks like it's swirling from the center on a wide
-// rectangle -- the disc doesn't conform to the box's own shape. Animating
-// the gradient's own start angle instead keeps it perfectly conformal to
-// the cell (a real border, not a cropped spinning circle). This needs the
-// custom property registered as an <angle> so the browser can interpolate
-// it smoothly; see the `@property` GlobalStyles below.
+// border-image paints only the actual border region -- unlike a background
+// (even one clipped to border-box), it can never bleed through a
+// semi-transparent child's content area, which is what happened when the
+// gradient lived on a wrapping Box's `background` and the position tint
+// (only ~20% opaque) let it show through everywhere, not just the ring.
+// This also means the cell can stay the exact same single Paper used for
+// every other pick -- only the border properties differ.
 const RAINBOW_BORDER_WIDTH = 4;
 const ROTATE_SECONDS = 4;
 const rotateAngle = keyframes`
@@ -145,49 +145,24 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                   </>
                 );
 
-                if (isCurrentUserPick) {
-                  return (
-                    <Box
-                      key={draftSlot}
-                      sx={{
-                        position: 'relative',
-                        borderRadius: 1,
-                        height: 80,
-                        p: `${RAINBOW_BORDER_WIDTH}px`,
-                        opacity: fadeOpacity,
-                        transition: 'opacity 0.3s ease',
-                        '--rainbow-angle': '0deg',
-                        background: 'conic-gradient(from var(--rainbow-angle), red, orange, yellow, green, dodgerblue, blueviolet, red)',
-                        animation: `${rotateAngle} ${ROTATE_SECONDS}s linear infinite`,
-                      }}
-                    >
-                      <Paper
-                        sx={{
-                          position: 'relative',
-                          height: '100%',
-                          borderRadius: 'inherit',
-                          bgcolor: bgColor,
-                          p: 1,
-                          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                        }}
-                      >
-                        {cellContent}
-                      </Paper>
-                    </Box>
-                  );
-                }
-
                 return (
                   <Paper
                     key={draftSlot}
                     sx={{
                       p: 1, height: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center',
                       bgcolor: bgColor,
-                      border: isTradedToCurrentUser ? '2px solid' : '1px solid',
-                      borderColor,
                       position: 'relative',
                       opacity: fadeOpacity,
                       transition: 'opacity 0.3s ease',
+                      ...(isCurrentUserPick
+                        ? {
+                            border: `${RAINBOW_BORDER_WIDTH}px solid`,
+                            borderImageSlice: 1,
+                            '--rainbow-angle': '0deg',
+                            borderImageSource: 'conic-gradient(from var(--rainbow-angle), red, orange, yellow, green, dodgerblue, blueviolet, red)',
+                            animation: `${rotateAngle} ${ROTATE_SECONDS}s linear infinite`,
+                          }
+                        : { border: isTradedToCurrentUser ? '2px solid' : '1px solid', borderColor }),
                     }}
                   >
                     {cellContent}
