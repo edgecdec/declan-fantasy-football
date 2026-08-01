@@ -15,7 +15,11 @@ const HEADER_ALIASES: Record<string, string[]> = {
   tier: ['tier'],
   projected_points: ['projected_points', 'projected points', 'points', 'proj', 'fpts', 'projection', 'pts'],
   adp: ['adp'],
-  value: ['value', 'trade value', 'trade_value', 'dynasty value', 'dynasty_value', 'value_1qb_ppr'],
+  value: [
+    'value', 'trade value', 'trade_value', 'dynasty value', 'dynasty_value',
+    'value_1qb_ppr', 'ktc value', 'ktc_value', 'superflex value', 'sf value',
+    '1qb value', 'redraft value', 'startup value', 'market value', 'trade_value_1qb',
+  ],
 };
 
 const POSITION_ALIASES: Record<string, string> = {
@@ -91,6 +95,15 @@ function detectColumns(headerRow: string[]): Record<string, number> {
   for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
     const idx = normalizedHeaders.findIndex(h => aliases.includes(h));
     if (idx !== -1) columns[field] = idx;
+  }
+
+  // Ranking exports label their value column all sorts of ways ("KTC Value",
+  // "Superflex Trade Value", "1QB Value ($)", ...) -- fall back to a substring
+  // match so we don't silently drop a value column just because its exact
+  // header text isn't in our alias list.
+  if (columns.value === undefined) {
+    const idx = normalizedHeaders.findIndex(h => h.includes('value'));
+    if (idx !== -1) columns.value = idx;
   }
 
   return columns;
@@ -230,6 +243,15 @@ export function parseAndMatchRankingsCsv(csvText: string, baseRankings: Player[]
       custom_value: customValue,
     });
   });
+
+  // A "value" column only means something if every matched player has one --
+  // otherwise some players would show a raw trade value (thousands) next to
+  // others showing a computed VBD score (tens), which aren't comparable. If
+  // coverage isn't complete, drop custom_value for the whole set so everyone
+  // falls back to the same VBD calculation instead of mixing scales.
+  if (columns.value !== undefined && players.some(p => p.custom_value === undefined)) {
+    for (const p of players) delete p.custom_value;
+  }
 
   players.sort((a, b) => (a.rank ?? 9999) - (b.rank ?? 9999));
 

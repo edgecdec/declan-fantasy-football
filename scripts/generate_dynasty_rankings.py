@@ -82,7 +82,11 @@ def generate_dynasty_rankings():
                 'team': p['team'],
                 'rank': rank,
                 'tier': math.ceil(rank / 12),
-                'projected_points': p.get('projected_points'),
+                # K/DEF have no real dynasty trade value, but every other entry in
+                # this file carries custom_value -- mixing that with a computed VBD
+                # score here would put K/DEF on a different, incomparable scale.
+                # 0 keeps them last while keeping units consistent across the set.
+                'custom_value': 0,
             })
         print(f"Carried over {len(kickers_and_def)} K/DEF entries from redraft rankings.")
     except FileNotFoundError:
