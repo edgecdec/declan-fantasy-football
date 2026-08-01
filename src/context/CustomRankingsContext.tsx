@@ -4,12 +4,36 @@ import * as React from 'react';
 import { Player } from '@/services/draft/vbdService';
 import { parseAndMatchRankingsCsv } from '@/services/draft/rankingsCsv';
 import rankingsData from '../../data/rankings.json';
-import dynastyRankingsData from '../../data/dynasty_rankings.json';
 
 const DEFAULT_RANKINGS = rankingsData as Player[];
-const DYNASTY_RANKINGS = dynastyRankingsData as Player[];
 const STORAGE_KEY = 'declanalytics_custom_ranking_sets';
 const ACTIVE_KEY = 'declanalytics_active_ranking_set';
+export const DEFAULT_DYNASTY_VARIANT = '1qb|ppr1|te_none';
+
+// Lazily code-split each dynasty scenario so a page only ever downloads the one
+// variant it actually needs, instead of bundling all 18 into every page's JS.
+// Keys mirror dynastyVariantKey()'s "numQbs|ppr|tep" format; the import paths
+// underneath are the underscore-joined filenames generate_dynasty_rankings.py writes.
+const DYNASTY_LOADERS: Record<string, () => Promise<{ default: Player[] }>> = {
+  '1qb|ppr0|te_none': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0|te_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0|te_plus_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_none': () => import('../../data/dynasty/dynasty_1qb_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_plus_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_none': () => import('../../data/dynasty/dynasty_1qb_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_plus': () => import('../../data/dynasty/dynasty_1qb_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_plus_plus': () => import('../../data/dynasty/dynasty_1qb_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_none': () => import('../../data/dynasty/dynasty_2qb_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_plus': () => import('../../data/dynasty/dynasty_2qb_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_plus_plus': () => import('../../data/dynasty/dynasty_2qb_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_none': () => import('../../data/dynasty/dynasty_2qb_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_plus': () => import('../../data/dynasty/dynasty_2qb_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_plus_plus': () => import('../../data/dynasty/dynasty_2qb_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_none': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_plus': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_plus_plus': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+};
 
 export type RankingSet = {
   id: string;
@@ -31,6 +55,9 @@ interface CustomRankingsContextType {
   activeId: string; // 'default' | 'dynasty' | a RankingSet id
   activeName: string;
   activePlayers: Player[];
+  dynastyVariant: string;
+  dynastyLoading: boolean;
+  setDynastyVariant: (key: string) => void;
   uploadCsv: (file: File) => Promise<UploadResult>;
   selectRankingSet: (id: string) => void;
   deleteRankingSet: (id: string) => void;
@@ -41,6 +68,9 @@ const CustomRankingsContext = React.createContext<CustomRankingsContextType | un
 export function CustomRankingsProvider({ children }: { children: React.ReactNode }) {
   const [rankingSets, setRankingSets] = React.useState<RankingSet[]>([]);
   const [activeId, setActiveId] = React.useState('default');
+  const [dynastyVariant, setDynastyVariant] = React.useState(DEFAULT_DYNASTY_VARIANT);
+  const [dynastyPlayers, setDynastyPlayers] = React.useState<Player[]>([]);
+  const [dynastyLoading, setDynastyLoading] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -52,6 +82,20 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
       console.error('Failed to load custom rankings from storage', e);
     }
   }, []);
+
+  React.useEffect(() => {
+    const loader = DYNASTY_LOADERS[dynastyVariant];
+    if (!loader) return;
+
+    let cancelled = false;
+    setDynastyLoading(true);
+    loader()
+      .then(mod => { if (!cancelled) setDynastyPlayers(mod.default); })
+      .catch(e => console.error(`Failed to load dynasty variant ${dynastyVariant}`, e))
+      .finally(() => { if (!cancelled) setDynastyLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [dynastyVariant]);
 
   const persist = (sets: RankingSet[]) => {
     try {
@@ -109,7 +153,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
 
   const activeSet = rankingSets.find(s => s.id === activeId);
   const resolvedActiveId = activeSet ? activeId : (activeId === 'dynasty' ? 'dynasty' : 'default');
-  const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? DYNASTY_RANKINGS : DEFAULT_RANKINGS);
+  const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? dynastyPlayers : DEFAULT_RANKINGS);
   const activeName = activeSet ? activeSet.name : (resolvedActiveId === 'dynasty' ? 'Dynasty Rankings' : 'Default Rankings');
 
   return (
@@ -119,6 +163,9 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
         activeId: resolvedActiveId,
         activeName,
         activePlayers,
+        dynastyVariant,
+        dynastyLoading,
+        setDynastyVariant,
         uploadCsv,
         selectRankingSet,
         deleteRankingSet,

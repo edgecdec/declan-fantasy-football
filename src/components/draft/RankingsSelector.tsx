@@ -7,9 +7,10 @@ import CheckIcon from '@mui/icons-material/Check';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useCustomRankings } from '@/context/CustomRankingsContext';
+import { describeDynastyVariant } from '@/services/draft/dynastyVariant';
 
 export default function RankingsSelector() {
-  const { rankingSets, activeId, activeName, uploadCsv, selectRankingSet, deleteRankingSet } = useCustomRankings();
+  const { rankingSets, activeId, activeName, dynastyVariant, dynastyLoading, uploadCsv, selectRankingSet, deleteRankingSet } = useCustomRankings();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [uploading, setUploading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState<{ severity: 'success' | 'error'; message: string } | null>(null);
@@ -58,7 +59,12 @@ export default function RankingsSelector() {
           onClick={() => { selectRankingSet('dynasty'); setAnchorEl(null); }}
         >
           <ListItemIcon>{activeId === 'dynasty' && <CheckIcon fontSize="small" />}</ListItemIcon>
-          <ListItemText>Dynasty Rankings</ListItemText>
+          <ListItemText>
+            Dynasty Rankings
+            <Typography variant="caption" color="text.secondary" display="block">
+              {dynastyLoading ? 'Loading…' : describeDynastyVariant(dynastyVariant)}
+            </Typography>
+          </ListItemText>
         </MenuItem>
 
         {rankingSets.length > 0 && <Divider />}

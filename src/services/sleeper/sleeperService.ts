@@ -24,8 +24,11 @@ export type SleeperLeague = {
     playoff_type?: number; // 0=Consolation, 1=Toilet Bowl
     playoff_teams?: number;
     league_average_match?: number;
+    type?: number; // 0=redraft, 2=dynasty
     [key: string]: any;
   };
+  roster_positions?: string[];
+  scoring_settings?: Record<string, number>;
 };
 
 export type SleeperRoster = {

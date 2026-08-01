@@ -16,12 +16,20 @@ type Props = {
   rosterOwnerMap: Map<number, string>;
   rosterIdToOwnerIdMap: Map<number, string>;
   currentUserId?: string;
+  /** Dynasty scenario (numQbs/ppr/tep) detected from this draft's real league settings. */
+  recommendedDynastyVariant?: string | null;
 };
 
-export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId }: Props) {
-  const { activePlayers } = useCustomRankings();
+export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId, recommendedDynastyVariant }: Props) {
+  const { activePlayers, setDynastyVariant } = useCustomRankings();
   const valuedPlayers = useValuedPlayers(activePlayers, draft);
   const [tab, setTab] = React.useState(0);
+
+  // Keep "Dynasty Rankings" resolved to whatever scenario actually matches this
+  // league's settings (superflex, PPR, TE premium) rather than a fixed default.
+  React.useEffect(() => {
+    if (recommendedDynastyVariant) setDynastyVariant(recommendedDynastyVariant);
+  }, [recommendedDynastyVariant, setDynastyVariant]);
 
   return (
     <Paper sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
