@@ -1,21 +1,22 @@
 'use client';
 
 import * as React from 'react';
-import { Box, Paper, Typography, Chip } from '@mui/material';
+import { Box, Paper, Typography, Chip, GlobalStyles } from '@mui/material';
 import { keyframes } from '@mui/material/styles';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
-// Rotates clockwise around the border only -- unlike the old version, this
-// isn't oversized/bled past the ring, and every current-user cell rotates in
-// sync (no per-pick stagger), so a board full of your own picks reads as one
-// steady ring rather than several cells spinning out of phase with each other.
+// Rotating a masked, oversized conic-gradient disc behind a thin ring (via
+// `transform: rotate`) looks like it's swirling from the center on a wide
+// rectangle -- the disc doesn't conform to the box's own shape. Animating
+// the gradient's own start angle instead keeps it perfectly conformal to
+// the cell (a real border, not a cropped spinning circle). This needs the
+// custom property registered as an <angle> so the browser can interpolate
+// it smoothly; see the `@property` GlobalStyles below.
 const RAINBOW_BORDER_WIDTH = 4;
 const ROTATE_SECONDS = 4;
-const CONIC_GRADIENT = 'conic-gradient(red, orange, yellow, green, dodgerblue, blueviolet, red)';
-const rotateClockwise = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+const rotateAngle = keyframes`
+  to { --rainbow-angle: 360deg; }
 `;
 
 type Props = {
@@ -39,6 +40,15 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
 
   return (
     <Box sx={{ overflowX: 'auto', width: '100%' }}>
+      <GlobalStyles
+        styles={`
+          @property --rainbow-angle {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+          }
+        `}
+      />
       <Box sx={{ display: 'grid', gridTemplateColumns: `40px repeat(${teams}, minmax(80px, 1fr))`, gap: 0.5 }}>
         {/* Header Row */}
         <Box sx={{ textAlign: 'center', p: 1, fontWeight: 'bold' }}>Rd</Box>
@@ -142,18 +152,13 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                       sx={{
                         position: 'relative',
                         borderRadius: 1,
-                        overflow: 'hidden',
                         height: 80,
                         p: `${RAINBOW_BORDER_WIDTH}px`,
                         opacity: fadeOpacity,
                         transition: 'opacity 0.3s ease',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          inset: '-25%',
-                          background: CONIC_GRADIENT,
-                          animation: `${rotateClockwise} ${ROTATE_SECONDS}s linear infinite`,
-                        },
+                        '--rainbow-angle': '0deg',
+                        background: 'conic-gradient(from var(--rainbow-angle), red, orange, yellow, green, dodgerblue, blueviolet, red)',
+                        animation: `${rotateAngle} ${ROTATE_SECONDS}s linear infinite`,
                       }}
                     >
                       <Paper
