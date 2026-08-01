@@ -125,11 +125,15 @@ def build_variant(players, projections, pts_field, adp_field, tep_bonus, num_qbs
     # TEP bonus still shows up in projected_points (and therefore in VBD
     # "Value" once the app computes it), it just doesn't reorder the board.
     ranked_list.sort(key=lambda x: x['adp'] or 9999)
-    pos_counts = {p: 0 for p in VALID_POSITIONS}
-    for p in ranked_list:
-        pos_counts[p['position']] += 1
+
+    # Fallback estimate uses each player's overall-board tier (same value the
+    # final `tier` field gets), not a within-position count -- positions like
+    # QB in a 1QB league have very few real projections early on, so counting
+    # "Nth QB seen so far" mislabels an unprojected deep-bench/rookie QB as
+    # tier 1 (elite) just because few real QBs happened to precede them.
+    for i, p in enumerate(ranked_list):
         if p['projected_points'] is None:
-            tier = math.ceil(pos_counts[p['position']] / 12)
+            tier = math.ceil((i + 1) / 12)
             p['projected_points'] = estimate_points(p['position'], tier)
 
     final_rankings = []
