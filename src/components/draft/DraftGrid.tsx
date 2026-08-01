@@ -6,14 +6,17 @@ import { keyframes } from '@mui/material/styles';
 import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 
-const RAINBOW_CYCLE_SECONDS = 3.5;
-
-const spinGradient = keyframes`
+// Rotates clockwise around the border only -- unlike the old version, this
+// isn't oversized/bled past the ring, and every current-user cell rotates in
+// sync (no per-pick stagger), so a board full of your own picks reads as one
+// steady ring rather than several cells spinning out of phase with each other.
+const RAINBOW_BORDER_WIDTH = 4;
+const ROTATE_SECONDS = 4;
+const CONIC_GRADIENT = 'conic-gradient(red, orange, yellow, green, dodgerblue, blueviolet, red)';
+const rotateClockwise = keyframes`
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 `;
-
-const CONIC_GRADIENT = 'conic-gradient(red, orange, yellow, green, dodgerblue, blueviolet, red)';
 
 type Props = {
   draft: SleeperDraft;
@@ -60,9 +63,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
         })}
 
         {/* Draft Rounds */}
-        {(() => {
-          let userPickIdx = 0;
-          return grid.map((_row, roundIdx) => {
+        {grid.map((_row, roundIdx) => {
           const round = roundIdx + 1;
           const slotOrder = getSlotOrder(round, teams, draftType);
 
@@ -93,7 +94,6 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                 const snakePosition = slotOrder.indexOf(draftSlot);
                 const pickNumber = roundIdx * teams + snakePosition + 1;
 
-                const pickDelay = isCurrentUserPick ? userPickIdx++ : 0;
                 const isFocusedTeamPick = focusedTeam !== null && effectiveOwnerId === focusedTeam;
                 const fadeOpacity = focusedTeam !== null && !isFocusedTeamPick ? 0.1 : 1;
 
@@ -144,23 +144,22 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                         borderRadius: 1,
                         overflow: 'hidden',
                         height: 80,
+                        p: `${RAINBOW_BORDER_WIDTH}px`,
                         opacity: fadeOpacity,
                         transition: 'opacity 0.3s ease',
                         '&::before': {
                           content: '""',
                           position: 'absolute',
-                          top: '-50%', left: '-50%',
-                          width: '200%', height: '200%',
+                          inset: '-25%',
                           background: CONIC_GRADIENT,
-                          animation: `${spinGradient} ${RAINBOW_CYCLE_SECONDS}s linear infinite`,
-                          animationDelay: `${-pickDelay * 0.5}s`,
+                          animation: `${rotateClockwise} ${ROTATE_SECONDS}s linear infinite`,
                         },
                       }}
                     >
                       <Paper
                         sx={{
-                          position: 'absolute',
-                          inset: '2px',
+                          position: 'relative',
+                          height: '100%',
                           borderRadius: 'inherit',
                           bgcolor: bgColor,
                           p: 1,
@@ -192,8 +191,7 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
               })}
             </React.Fragment>
           );
-        });
-        })()}
+        })}
       </Box>
     </Box>
   );
