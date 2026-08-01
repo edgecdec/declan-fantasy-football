@@ -4,8 +4,10 @@ import * as React from 'react';
 import { Player } from '@/services/draft/vbdService';
 import { parseAndMatchRankingsCsv } from '@/services/draft/rankingsCsv';
 import rankingsData from '../../data/rankings.json';
+import dynastyRankingsData from '../../data/dynasty_rankings.json';
 
 const DEFAULT_RANKINGS = rankingsData as Player[];
+const DYNASTY_RANKINGS = dynastyRankingsData as Player[];
 const STORAGE_KEY = 'declanalytics_custom_ranking_sets';
 const ACTIVE_KEY = 'declanalytics_active_ranking_set';
 
@@ -26,7 +28,7 @@ export type UploadResult = {
 
 interface CustomRankingsContextType {
   rankingSets: RankingSet[];
-  activeId: string; // 'default' or a RankingSet id
+  activeId: string; // 'default' | 'dynasty' | a RankingSet id
   activeName: string;
   activePlayers: Player[];
   uploadCsv: (file: File) => Promise<UploadResult>;
@@ -106,14 +108,15 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
   };
 
   const activeSet = rankingSets.find(s => s.id === activeId);
-  const activePlayers = activeSet ? activeSet.players : DEFAULT_RANKINGS;
-  const activeName = activeSet ? activeSet.name : 'Default Rankings';
+  const resolvedActiveId = activeSet ? activeId : (activeId === 'dynasty' ? 'dynasty' : 'default');
+  const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? DYNASTY_RANKINGS : DEFAULT_RANKINGS);
+  const activeName = activeSet ? activeSet.name : (resolvedActiveId === 'dynasty' ? 'Dynasty Rankings' : 'Default Rankings');
 
   return (
     <CustomRankingsContext.Provider
       value={{
         rankingSets,
-        activeId: activeSet ? activeId : 'default',
+        activeId: resolvedActiveId,
         activeName,
         activePlayers,
         uploadCsv,

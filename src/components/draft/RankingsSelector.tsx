@@ -53,6 +53,16 @@ export default function RankingsSelector() {
           <ListItemText>Default Rankings</ListItemText>
         </MenuItem>
 
+        <MenuItem
+          selected={activeId === 'dynasty'}
+          onClick={() => { selectRankingSet('dynasty'); setAnchorEl(null); }}
+        >
+          <ListItemIcon>{activeId === 'dynasty' && <CheckIcon fontSize="small" />}</ListItemIcon>
+          <ListItemText>Dynasty Rankings</ListItemText>
+        </MenuItem>
+
+        {rankingSets.length > 0 && <Divider />}
+
         {rankingSets.map(set => (
           <MenuItem
             key={set.id}
