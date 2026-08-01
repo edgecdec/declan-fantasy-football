@@ -87,11 +87,14 @@ export default function DraftAssistantPage() {
       const foundDrafts = [...draftMap.values()];
       foundDrafts.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
 
-      // Classify drafts as real or mock based on league status
+      // Classify drafts as real or mock. Any league the user actually belongs to
+      // (per the /leagues endpoint) counts as real, regardless of its current
+      // status — a league sitting in "pre_draft" is still a real league, just
+      // one that hasn't drafted yet.
       const allLeagueIds = [...new Set(foundDrafts.map(d => d.league_id))];
-      const realLeagueIdSet = new Set(realLeagues.map(l => l.league_id));
+      const realLeagueIdSet = new Set(userLeagues.map(l => l.league_id));
       // Fetch league info for any draft league_ids not already known
-      const unknownIds = allLeagueIds.filter(id => !realLeagueIdSet.has(id) && !userLeagues.some(l => l.league_id === id));
+      const unknownIds = allLeagueIds.filter(id => !realLeagueIdSet.has(id));
       if (unknownIds.length > 0) {
         const extraLeagues = await Promise.all(unknownIds.map(id => SleeperService.getLeague(id)));
         for (let i = 0; i < unknownIds.length; i++) {
