@@ -57,7 +57,7 @@ export default function RankingsSelector() {
         >
           <ListItemIcon>{activeId === 'default' && <CheckIcon fontSize="small" />}</ListItemIcon>
           <ListItemText>
-            Default Rankings
+            Redraft Rankings
             <Typography variant="caption" color="text.secondary" display="block">
               {redraftLoading ? 'Loading…' : describeRedraftVariant(redraftVariant)}
             </Typography>

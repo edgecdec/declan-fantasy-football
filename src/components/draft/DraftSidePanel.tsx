@@ -27,7 +27,7 @@ export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, roster
   const valuedPlayers = useValuedPlayers(activePlayers, draft);
   const [tab, setTab] = React.useState(0);
 
-  // Keep "Dynasty Rankings"/"Default Rankings" resolved to whatever scenario
+  // Keep "Dynasty Rankings"/"Redraft Rankings" resolved to whatever scenario
   // actually matches this league's settings (superflex, PPR, TE premium)
   // rather than a fixed default.
   React.useEffect(() => {

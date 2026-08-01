@@ -191,7 +191,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
   const activeSet = rankingSets.find(s => s.id === activeId);
   const resolvedActiveId = activeSet ? activeId : (activeId === 'dynasty' ? 'dynasty' : 'default');
   const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? dynastyPlayers : redraftPlayers);
-  const activeName = activeSet ? activeSet.name : (resolvedActiveId === 'dynasty' ? 'Dynasty Rankings' : 'Default Rankings');
+  const activeName = activeSet ? activeSet.name : (resolvedActiveId === 'dynasty' ? 'Dynasty Rankings' : 'Redraft Rankings');
 
   return (
     <CustomRankingsContext.Provider

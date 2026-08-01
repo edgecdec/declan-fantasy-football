@@ -122,6 +122,15 @@ def build_variant(players, projections, pts_field, adp_field, tep_bonus, num_qbs
 
         proj = projections.get(pid, {})
         pts = proj.get(pts_field)
+
+        # Sleeper's `active` flag is unreliable for long-retired players --
+        # it's still true for e.g. Tom Brady, Drew Brees, Todd Gurley. team
+        # is null for anyone not on a current roster, which is a far more
+        # reliable signal (a player who can't be rostered can't score
+        # points), unless they still have a real projection somehow.
+        if not p.get('team') and pos != 'DEF' and pts is None:
+            continue
+
         if pts is not None and pos == 'TE':
             pts += proj.get('rec', 0) * tep_bonus
 
@@ -130,7 +139,10 @@ def build_variant(players, projections, pts_field, adp_field, tep_bonus, num_qbs
         # for every ppr bucket in the 2qb variant.
         adp = proj.get('adp_2qb') if num_qbs == 2 else proj.get(adp_field)
         if adp is None or adp == 999:
-            adp = p.get('search_rank', 9999)
+            # search_rank can be badly stale for players no longer on any
+            # roster (this is exactly the Tom Brady/Todd Gurley problem) --
+            # only trust it for players who still have a current team.
+            adp = p.get('search_rank', 9999) if p.get('team') else 9999
 
         ranked_list.append({
             'player_id': pid,
