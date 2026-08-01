@@ -4,6 +4,7 @@ import { GoogleAnalytics } from '@next/third-parties/google';
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 import AppLayout from '@/components/layout/AppLayout';
 import { UserProvider } from '@/context/UserContext';
+import { CustomRankingsProvider } from '@/context/CustomRankingsContext';
 
 const FOOTBALL_FAVICON = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>';
 
@@ -24,9 +25,11 @@ export default function RootLayout({
         <GoogleAnalytics gaId="G-KC140X1TPV" />
         <ThemeRegistry>
           <UserProvider>
-            <AppLayout>
-              {children}
-            </AppLayout>
+            <CustomRankingsProvider>
+              <AppLayout>
+                {children}
+              </AppLayout>
+            </CustomRankingsProvider>
           </UserProvider>
         </ThemeRegistry>
       </body>

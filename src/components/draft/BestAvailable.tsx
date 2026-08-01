@@ -6,9 +6,8 @@ import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperServic
 import { VBDService, LeagueSettings, Player } from '@/services/draft/vbdService';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
 import useTableSort from '@/hooks/useTableSort';
-import rankingsData from '../../../data/rankings.json';
-
-const RANKINGS = rankingsData as Player[];
+import { useCustomRankings } from '@/context/CustomRankingsContext';
+import RankingsSelector from '@/components/draft/RankingsSelector';
 
 type Props = {
   draft: SleeperDraft;
@@ -17,13 +16,14 @@ type Props = {
 };
 
 export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props) {
+  const { activePlayers } = useCustomRankings();
   const [bestAvailable, setBestAvailable] = React.useState<Player[]>([]);
   const [positionFilter, setPositionFilter] = React.useState('ALL');
 
   React.useEffect(() => {
     // 1. Filter out drafted and rostered players
     const takenIds = new Set(picks.map(p => p.player_id));
-    const available = RANKINGS.filter(p => {
+    const available = activePlayers.filter(p => {
       if (takenIds.has(p.player_id)) return false;
       if (rosteredPlayerIds?.has(p.player_id)) return false;
       return true;
@@ -49,7 +49,7 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
     const calculated = VBDService.calculate(available, settings);
     setBestAvailable(calculated);
 
-  }, [draft, picks, rosteredPlayerIds]);
+  }, [draft, picks, rosteredPlayerIds, activePlayers]);
 
   const filteredPlayers = React.useMemo(() => {
     if (positionFilter === 'ALL') return bestAvailable;
@@ -65,8 +65,9 @@ export default function BestAvailable({ draft, picks, rosteredPlayerIds }: Props
 
   return (
     <Paper sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1 }}>
         <Typography variant="h6">Best Available</Typography>
+        <RankingsSelector />
       </Box>
       
       <ToggleButtonGroup
