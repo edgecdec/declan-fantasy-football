@@ -1,6 +1,12 @@
 """
-Script to fetch the full player database AND 2025 stats from Sleeper API and save it to a JSON file.
-This is designed to be run by GitHub Actions daily.
+Script to fetch the full player database AND last season's stats from Sleeper
+API and save it to a JSON file. This is designed to be run by GitHub Actions
+daily.
+
+Season was previously hardcoded to 2025, which meant generate_rankings.py
+(which reads the `season` field from this file to know which year's
+projections to fetch) kept pulling 2025 projections indefinitely, even once
+the 2026 season's real projections were published on Sleeper's API.
 """
 
 import requests
@@ -12,7 +18,20 @@ from datetime import datetime
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 OUTPUT_FILE = os.path.join(DATA_DIR, 'sleeper_players.json')
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
-SLEEPER_STATS_URL = "https://api.sleeper.app/v1/stats/nfl/regular/2025"
+
+
+def compute_seasons():
+    """Returns (stats_season, upcoming_season). An NFL season N is played
+    Sep(N)-Feb(N+1); treat it as complete once we're past that Feb (month>=3
+    of year N+1). `upcoming_season` is the one rankings/projections target."""
+    now = datetime.now()
+    stats_season = now.year - 1 if now.month >= 3 else now.year - 2
+    upcoming_season = now.year
+    return stats_season, upcoming_season
+
+
+STATS_SEASON, UPCOMING_SEASON = compute_seasons()
+SLEEPER_STATS_URL = f"https://api.sleeper.app/v1/stats/nfl/regular/{STATS_SEASON}"
 
 def fetch_json(url, description):
     print(f"Fetching {description} from {url}...")
@@ -67,16 +86,19 @@ def process_data(players, stats):
 
     return {
         "updated_at": datetime.now().isoformat(),
-        "season": "2025",
+        # The season generate_rankings.py fetches projections for -- the
+        # upcoming/current season, not the one `stats` above reflects.
+        "season": str(UPCOMING_SEASON),
+        "stats_season": str(STATS_SEASON),
         "players": players
     }
 
 if __name__ == "__main__":
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
-        
+
     raw_players = fetch_json(SLEEPER_PLAYERS_URL, "Players")
-    raw_stats = fetch_json(SLEEPER_STATS_URL, "2025 Stats")
+    raw_stats = fetch_json(SLEEPER_STATS_URL, f"{STATS_SEASON} Stats")
     
     if raw_players and raw_stats:
         final_data = process_data(raw_players, raw_stats)
