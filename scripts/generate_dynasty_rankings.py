@@ -20,7 +20,7 @@ import os
 import requests
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-REDRAFT_RANKINGS_FILE = os.path.join(DATA_DIR, 'redraft', 'redraft_ppr1_te_none.json')
+REDRAFT_RANKINGS_FILE = os.path.join(DATA_DIR, 'redraft', 'redraft_1qb_ppr1_te_none.json')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'dynasty')
 FANTASYCALC_BASE_URL = "https://api.fantasycalc.com/values/current"
 

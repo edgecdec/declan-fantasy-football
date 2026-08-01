@@ -98,8 +98,16 @@ export class VBDService {
       if (['RB', 'WR', 'TE'].includes(pos)) {
         flexAdd += (settings.roster['FLEX'] || 0) * settings.teams * 0.3; // 30% share
       }
-      if (['QB', 'RB', 'WR', 'TE'].includes(pos) && settings.format === 'superflex') {
-        flexAdd += (settings.roster['SUPER_FLEX'] || 0) * settings.teams * 0.2;
+      if (settings.format === 'superflex') {
+        // Unlike a normal FLEX (roughly even RB/WR/TE competition), a superflex
+        // slot is overwhelmingly used to start a 2nd real QB in practice -- a
+        // low-end starter still outscores a bench-tier RB/WR/TE most weeks. A
+        // small share for RB/WR/TE covers leagues where a QB2 isn't available.
+        if (pos === 'QB') {
+          flexAdd += (settings.roster['SUPER_FLEX'] || 0) * settings.teams * 0.8;
+        } else if (['RB', 'WR', 'TE'].includes(pos)) {
+          flexAdd += (settings.roster['SUPER_FLEX'] || 0) * settings.teams * 0.1;
+        }
       }
 
       // Bench multiplier

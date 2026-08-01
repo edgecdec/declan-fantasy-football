@@ -2,16 +2,18 @@
 Script to generate redraft rankings from Sleeper player data AND projections.
 
 Sleeper's own season-projections endpoint already breaks points out by format
-(pts_std / pts_half_ppr / pts_ppr) and gives format-specific ADP (adp_std /
-adp_half_ppr / adp_ppr), so -- unlike dynasty trade value -- we don't need a
-third-party API for this. Tight End Premium isn't broken out by Sleeper, but
-it's just an extra points-per-catch bonus for TEs, and the projection already
-gives each TE's raw catch count (`rec`), so it's computed directly here.
+(pts_std / pts_half_ppr / pts_ppr), gives format-specific ADP (adp_std /
+adp_half_ppr / adp_ppr), AND gives real community-sourced 2QB/Superflex ADP
+(adp_2qb) -- so unlike dynasty trade value, no third-party API is needed for
+any of numQbs/ppr. adp_2qb is dramatically different from 1QB ADP for top
+QBs (e.g. Lamar Jackson: pick 3 overall in adp_2qb vs pick 22 in adp_ppr) --
+using it directly is far more accurate than trying to approximate superflex
+QB scarcity with a formula. Tight End Premium isn't broken out by Sleeper,
+but it's just an extra points-per-catch bonus for TEs, and the projection
+already gives each TE's raw catch count (`rec`), so it's computed directly.
 
-Outputs one file per (ppr, tep) combination into data/redraft/ -- numQbs/
-Superflex isn't a separate axis here (unlike dynasty) because redraft "value"
-comes from our own VBD math at runtime, which already raises QB replacement
-demand for a superflex draft's actual roster settings.
+Outputs one file per (numQbs, ppr, tep) combination into data/redraft/,
+mirroring the dynasty rankings matrix.
 """
 
 import json
@@ -38,6 +40,7 @@ TIER_POINTS = {
     'DEF': {1: 160, 2: 150, 3: 140, 4: 130, 5: 120, 6: 110, 7: 105, 8: 100}
 }
 
+NUM_QBS_OPTIONS = [1, 2]
 PPR_OPTIONS = [
     ('ppr0', 'pts_std', 'adp_std'),
     ('ppr0_5', 'pts_half_ppr', 'adp_half_ppr'),
@@ -85,7 +88,7 @@ def load_players_and_projections():
     return players, projections
 
 
-def build_variant(players, projections, pts_field, adp_field, tep_bonus):
+def build_variant(players, projections, pts_field, adp_field, tep_bonus, num_qbs):
     ranked_list = []
     for pid, p in players.items():
         if not p.get('active'):
@@ -99,7 +102,10 @@ def build_variant(players, projections, pts_field, adp_field, tep_bonus):
         if pts is not None and pos == 'TE':
             pts += proj.get('rec', 0) * tep_bonus
 
-        adp = proj.get(adp_field)
+        # adp_2qb is real community-sourced 2QB/Superflex ADP -- not split by
+        # ppr (community doesn't track that granularly), so it's used as-is
+        # for every ppr bucket in the 2qb variant.
+        adp = proj.get('adp_2qb') if num_qbs == 2 else proj.get(adp_field)
         if adp is None or adp == 999:
             adp = p.get('search_rank', 9999)
 
@@ -113,11 +119,11 @@ def build_variant(players, projections, pts_field, adp_field, tep_bonus):
             'is_estimated': pts is None,
         })
 
-    # Rank/tier follow real-world ADP, same as before -- ADP already reflects
-    # actual draft-day positional value (e.g. QBs going later despite comparable
-    # raw points), which raw projected_points alone doesn't capture. The TEP
-    # bonus still shows up in projected_points (and therefore in VBD "Value"
-    # once the app computes it), it just doesn't reorder the whole board.
+    # Rank/tier follow real ADP for the scenario (1QB or 2QB) -- ADP already
+    # reflects actual draft-day positional value (e.g. QBs going much earlier
+    # in a 2QB league), which raw projected_points alone doesn't capture. The
+    # TEP bonus still shows up in projected_points (and therefore in VBD
+    # "Value" once the app computes it), it just doesn't reorder the board.
     ranked_list.sort(key=lambda x: x['adp'] or 9999)
     pos_counts = {p: 0 for p in VALID_POSITIONS}
     for p in ranked_list:
@@ -153,17 +159,18 @@ def generate_rankings():
     players, projections = load_players_and_projections()
 
     manifest = []
-    for ppr_slug, pts_field, adp_field in PPR_OPTIONS:
-        for tep_slug, tep_bonus in TEP_OPTIONS:
-            key = f"{ppr_slug}_{tep_slug}"
-            print(f"Building {key} ({pts_field}, TE bonus +{tep_bonus}/catch)...")
-            rankings = build_variant(players, projections, pts_field, adp_field, tep_bonus)
+    for num_qbs in NUM_QBS_OPTIONS:
+        for ppr_slug, pts_field, adp_field in PPR_OPTIONS:
+            for tep_slug, tep_bonus in TEP_OPTIONS:
+                key = f"{num_qbs}qb_{ppr_slug}_{tep_slug}"
+                print(f"Building {key} ({pts_field}, adp={'adp_2qb' if num_qbs == 2 else adp_field}, TE bonus +{tep_bonus}/catch)...")
+                rankings = build_variant(players, projections, pts_field, adp_field, tep_bonus, num_qbs)
 
-            out_file = os.path.join(OUTPUT_DIR, f"redraft_{key}.json")
-            with open(out_file, 'w') as f:
-                json.dump(rankings, f, indent=2)
-            print(f"  -> {len(rankings)} players saved to {out_file}")
-            manifest.append(key)
+                out_file = os.path.join(OUTPUT_DIR, f"redraft_{key}.json")
+                with open(out_file, 'w') as f:
+                    json.dump(rankings, f, indent=2)
+                print(f"  -> {len(rankings)} players saved to {out_file}")
+                manifest.append(key)
 
     manifest_file = os.path.join(OUTPUT_DIR, 'manifest.json')
     with open(manifest_file, 'w') as f:

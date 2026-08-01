@@ -7,7 +7,7 @@ import { parseAndMatchRankingsCsv } from '@/services/draft/rankingsCsv';
 const STORAGE_KEY = 'declanalytics_custom_ranking_sets';
 const ACTIVE_KEY = 'declanalytics_active_ranking_set';
 export const DEFAULT_DYNASTY_VARIANT = '1qb|ppr1|te_none';
-export const DEFAULT_REDRAFT_VARIANT = 'ppr1|te_none';
+export const DEFAULT_REDRAFT_VARIANT = '1qb|ppr1|te_none';
 
 type PlayerLoader = () => Promise<{ default: Player[] }>;
 
@@ -38,15 +38,24 @@ const DYNASTY_LOADERS: Record<string, PlayerLoader> = {
 };
 
 const REDRAFT_LOADERS: Record<string, PlayerLoader> = {
-  'ppr0|te_none': () => import('../../data/redraft/redraft_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr0|te_plus': () => import('../../data/redraft/redraft_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr0|te_plus_plus': () => import('../../data/redraft/redraft_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr0_5|te_none': () => import('../../data/redraft/redraft_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr0_5|te_plus': () => import('../../data/redraft/redraft_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr0_5|te_plus_plus': () => import('../../data/redraft/redraft_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr1|te_none': () => import('../../data/redraft/redraft_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr1|te_plus': () => import('../../data/redraft/redraft_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
-  'ppr1|te_plus_plus': () => import('../../data/redraft/redraft_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0|te_none': () => import('../../data/redraft/redraft_1qb_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0|te_plus': () => import('../../data/redraft/redraft_1qb_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0|te_plus_plus': () => import('../../data/redraft/redraft_1qb_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_none': () => import('../../data/redraft/redraft_1qb_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_plus': () => import('../../data/redraft/redraft_1qb_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr0_5|te_plus_plus': () => import('../../data/redraft/redraft_1qb_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_none': () => import('../../data/redraft/redraft_1qb_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_plus': () => import('../../data/redraft/redraft_1qb_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '1qb|ppr1|te_plus_plus': () => import('../../data/redraft/redraft_1qb_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_none': () => import('../../data/redraft/redraft_2qb_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_plus': () => import('../../data/redraft/redraft_2qb_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0|te_plus_plus': () => import('../../data/redraft/redraft_2qb_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_none': () => import('../../data/redraft/redraft_2qb_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_plus': () => import('../../data/redraft/redraft_2qb_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr0_5|te_plus_plus': () => import('../../data/redraft/redraft_2qb_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_none': () => import('../../data/redraft/redraft_2qb_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_plus': () => import('../../data/redraft/redraft_2qb_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  '2qb|ppr1|te_plus_plus': () => import('../../data/redraft/redraft_2qb_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
 };
 
 export type RankingSet = {
