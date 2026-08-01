@@ -12,7 +12,7 @@ import DraftBoard from '@/components/draft/DraftBoard';
 import DraftSidePanel from '@/components/draft/DraftSidePanel';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
-import { recommendedDynastyVariant } from '@/services/draft/dynastyVariant';
+import { recommendedDynastyVariant, recommendedRedraftVariant } from '@/services/draft/rankingsVariant';
 import Link from 'next/link';
 
 const DYNASTY_LEAGUE_TYPE = 2;
@@ -42,7 +42,8 @@ export default function LeagueDraftPage() {
   const [selectedDraft, setSelectedDraft] = React.useState<SleeperDraft | null>(null);
   const [picks, setPicks] = React.useState<SleeperDraftPick[]>([]);
   const [isDynasty, setIsDynasty] = React.useState(false);
-  const [recommendedRankingVariant, setRecommendedRankingVariant] = React.useState<string | null>(null);
+  const [recommendedDynastyVariantKey, setRecommendedDynastyVariantKey] = React.useState<string | null>(null);
+  const [recommendedRedraftVariantKey, setRecommendedRedraftVariantKey] = React.useState<string | null>(null);
   const [rosteredPlayerIds, setRosteredPlayerIds] = React.useState<Set<string>>(new Set());
   const [tradedPicks, setTradedPicks] = React.useState<SleeperTradedPick[]>([]);
   const [rosterOwnerMap, setRosterOwnerMap] = React.useState<Map<number, string>>(new Map());
@@ -105,7 +106,8 @@ export default function LeagueDraftPage() {
 
         const dynasty = league?.settings?.type === DYNASTY_LEAGUE_TYPE;
         setIsDynasty(dynasty);
-        setRecommendedRankingVariant(league ? recommendedDynastyVariant(league) : null);
+        setRecommendedDynastyVariantKey(league ? recommendedDynastyVariant(league) : null);
+        setRecommendedRedraftVariantKey(league ? recommendedRedraftVariant(league) : null);
 
         if (dynasty) {
           const ids = new Set<string>();
@@ -228,7 +230,8 @@ export default function LeagueDraftPage() {
                 rosterOwnerMap={rosterOwnerMap}
                 rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
                 currentUserId={user?.user_id}
-                recommendedDynastyVariant={recommendedRankingVariant}
+                recommendedDynastyVariant={recommendedDynastyVariantKey}
+                recommendedRedraftVariant={recommendedRedraftVariantKey}
               />
             </Box>
           </Grid>

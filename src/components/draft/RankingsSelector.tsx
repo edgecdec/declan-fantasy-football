@@ -7,10 +7,15 @@ import CheckIcon from '@mui/icons-material/Check';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useCustomRankings } from '@/context/CustomRankingsContext';
-import { describeDynastyVariant } from '@/services/draft/dynastyVariant';
+import { describeDynastyVariant, describeRedraftVariant } from '@/services/draft/rankingsVariant';
 
 export default function RankingsSelector() {
-  const { rankingSets, activeId, activeName, dynastyVariant, dynastyLoading, uploadCsv, selectRankingSet, deleteRankingSet } = useCustomRankings();
+  const {
+    rankingSets, activeId, activeName,
+    dynastyVariant, dynastyLoading,
+    redraftVariant, redraftLoading,
+    uploadCsv, selectRankingSet, deleteRankingSet,
+  } = useCustomRankings();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [uploading, setUploading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState<{ severity: 'success' | 'error'; message: string } | null>(null);
@@ -51,7 +56,12 @@ export default function RankingsSelector() {
           onClick={() => { selectRankingSet('default'); setAnchorEl(null); }}
         >
           <ListItemIcon>{activeId === 'default' && <CheckIcon fontSize="small" />}</ListItemIcon>
-          <ListItemText>Default Rankings</ListItemText>
+          <ListItemText>
+            Default Rankings
+            <Typography variant="caption" color="text.secondary" display="block">
+              {redraftLoading ? 'Loading…' : describeRedraftVariant(redraftVariant)}
+            </Typography>
+          </ListItemText>
         </MenuItem>
 
         <MenuItem

@@ -10,7 +10,7 @@ raw API responses. tep's accepted values are the literal strings "none", "te+",
 It already includes each player's Sleeper player_id, so no name-matching is needed.
 
 FantasyCalc doesn't value K/DEF (no dynasty trade value) in any scenario, so those
-are carried over from the redraft rankings.json (generate_rankings.py) with
+are carried over from the redraft rankings (generate_rankings.py) with
 custom_value: 0 -- see rationale in that block below.
 """
 
@@ -20,7 +20,7 @@ import os
 import requests
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-REDRAFT_RANKINGS_FILE = os.path.join(DATA_DIR, 'rankings.json')
+REDRAFT_RANKINGS_FILE = os.path.join(DATA_DIR, 'redraft', 'redraft_ppr1_te_none.json')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'dynasty')
 FANTASYCALC_BASE_URL = "https://api.fantasycalc.com/values/current"
 

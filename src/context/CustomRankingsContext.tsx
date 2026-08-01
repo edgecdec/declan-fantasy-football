@@ -3,18 +3,20 @@
 import * as React from 'react';
 import { Player } from '@/services/draft/vbdService';
 import { parseAndMatchRankingsCsv } from '@/services/draft/rankingsCsv';
-import rankingsData from '../../data/rankings.json';
 
-const DEFAULT_RANKINGS = rankingsData as Player[];
 const STORAGE_KEY = 'declanalytics_custom_ranking_sets';
 const ACTIVE_KEY = 'declanalytics_active_ranking_set';
 export const DEFAULT_DYNASTY_VARIANT = '1qb|ppr1|te_none';
+export const DEFAULT_REDRAFT_VARIANT = 'ppr1|te_none';
 
-// Lazily code-split each dynasty scenario so a page only ever downloads the one
-// variant it actually needs, instead of bundling all 18 into every page's JS.
-// Keys mirror dynastyVariantKey()'s "numQbs|ppr|tep" format; the import paths
-// underneath are the underscore-joined filenames generate_dynasty_rankings.py writes.
-const DYNASTY_LOADERS: Record<string, () => Promise<{ default: Player[] }>> = {
+type PlayerLoader = () => Promise<{ default: Player[] }>;
+
+// Lazily code-split each scenario so a page only ever downloads the one variant
+// it actually needs, instead of bundling all of them into every page's JS.
+// Keys mirror dynastyVariantKey()/redraftVariantKey()'s "|"-joined format; the
+// import paths underneath are the underscore-joined filenames the generator
+// scripts write.
+const DYNASTY_LOADERS: Record<string, PlayerLoader> = {
   '1qb|ppr0|te_none': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
   '1qb|ppr0|te_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
   '1qb|ppr0|te_plus_plus': () => import('../../data/dynasty/dynasty_1qb_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
@@ -33,6 +35,18 @@ const DYNASTY_LOADERS: Record<string, () => Promise<{ default: Player[] }>> = {
   '2qb|ppr1|te_none': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
   '2qb|ppr1|te_plus': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
   '2qb|ppr1|te_plus_plus': () => import('../../data/dynasty/dynasty_2qb_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+};
+
+const REDRAFT_LOADERS: Record<string, PlayerLoader> = {
+  'ppr0|te_none': () => import('../../data/redraft/redraft_ppr0_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr0|te_plus': () => import('../../data/redraft/redraft_ppr0_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr0|te_plus_plus': () => import('../../data/redraft/redraft_ppr0_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr0_5|te_none': () => import('../../data/redraft/redraft_ppr0_5_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr0_5|te_plus': () => import('../../data/redraft/redraft_ppr0_5_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr0_5|te_plus_plus': () => import('../../data/redraft/redraft_ppr0_5_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr1|te_none': () => import('../../data/redraft/redraft_ppr1_te_none.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr1|te_plus': () => import('../../data/redraft/redraft_ppr1_te_plus.json') as unknown as Promise<{ default: Player[] }>,
+  'ppr1|te_plus_plus': () => import('../../data/redraft/redraft_ppr1_te_plus_plus.json') as unknown as Promise<{ default: Player[] }>,
 };
 
 export type RankingSet = {
@@ -58,6 +72,9 @@ interface CustomRankingsContextType {
   dynastyVariant: string;
   dynastyLoading: boolean;
   setDynastyVariant: (key: string) => void;
+  redraftVariant: string;
+  redraftLoading: boolean;
+  setRedraftVariant: (key: string) => void;
   uploadCsv: (file: File) => Promise<UploadResult>;
   selectRankingSet: (id: string) => void;
   deleteRankingSet: (id: string) => void;
@@ -65,12 +82,37 @@ interface CustomRankingsContextType {
 
 const CustomRankingsContext = React.createContext<CustomRankingsContextType | undefined>(undefined);
 
+function useLazyVariant(loaders: Record<string, PlayerLoader>, variant: string) {
+  const [players, setPlayers] = React.useState<Player[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    const loader = loaders[variant];
+    if (!loader) return;
+
+    let cancelled = false;
+    setLoading(true);
+    loader()
+      .then(mod => { if (!cancelled) setPlayers(mod.default); })
+      .catch(e => console.error(`Failed to load rankings variant ${variant}`, e))
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+    // loaders is a static module-level map, safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
+
+  return { players, loading };
+}
+
 export function CustomRankingsProvider({ children }: { children: React.ReactNode }) {
   const [rankingSets, setRankingSets] = React.useState<RankingSet[]>([]);
   const [activeId, setActiveId] = React.useState('default');
   const [dynastyVariant, setDynastyVariant] = React.useState(DEFAULT_DYNASTY_VARIANT);
-  const [dynastyPlayers, setDynastyPlayers] = React.useState<Player[]>([]);
-  const [dynastyLoading, setDynastyLoading] = React.useState(false);
+  const [redraftVariant, setRedraftVariant] = React.useState(DEFAULT_REDRAFT_VARIANT);
+
+  const { players: dynastyPlayers, loading: dynastyLoading } = useLazyVariant(DYNASTY_LOADERS, dynastyVariant);
+  const { players: redraftPlayers, loading: redraftLoading } = useLazyVariant(REDRAFT_LOADERS, redraftVariant);
 
   React.useEffect(() => {
     try {
@@ -83,20 +125,6 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
     }
   }, []);
 
-  React.useEffect(() => {
-    const loader = DYNASTY_LOADERS[dynastyVariant];
-    if (!loader) return;
-
-    let cancelled = false;
-    setDynastyLoading(true);
-    loader()
-      .then(mod => { if (!cancelled) setDynastyPlayers(mod.default); })
-      .catch(e => console.error(`Failed to load dynasty variant ${dynastyVariant}`, e))
-      .finally(() => { if (!cancelled) setDynastyLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [dynastyVariant]);
-
   const persist = (sets: RankingSet[]) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sets));
@@ -107,7 +135,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
 
   const uploadCsv = async (file: File): Promise<UploadResult> => {
     const text = await file.text();
-    const { players, matchedCount, totalRows, unmatchedNames } = parseAndMatchRankingsCsv(text, DEFAULT_RANKINGS);
+    const { players, matchedCount, totalRows, unmatchedNames } = parseAndMatchRankingsCsv(text, redraftPlayers);
 
     if (matchedCount === 0) {
       throw new Error('No players could be matched. Check that your CSV has "name" and "position" columns.');
@@ -153,7 +181,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
 
   const activeSet = rankingSets.find(s => s.id === activeId);
   const resolvedActiveId = activeSet ? activeId : (activeId === 'dynasty' ? 'dynasty' : 'default');
-  const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? dynastyPlayers : DEFAULT_RANKINGS);
+  const activePlayers = activeSet ? activeSet.players : (resolvedActiveId === 'dynasty' ? dynastyPlayers : redraftPlayers);
   const activeName = activeSet ? activeSet.name : (resolvedActiveId === 'dynasty' ? 'Dynasty Rankings' : 'Default Rankings');
 
   return (
@@ -166,6 +194,9 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
         dynastyVariant,
         dynastyLoading,
         setDynastyVariant,
+        redraftVariant,
+        redraftLoading,
+        setRedraftVariant,
         uploadCsv,
         selectRankingSet,
         deleteRankingSet,

@@ -36,6 +36,6 @@ jobs:
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
-        git add data/sleeper_players.json data/rankings.json data/dynasty/
+        git add data/sleeper_players.json data/redraft/ data/dynasty/
         git commit -m "Auto-update Sleeper player database" || exit 0
         git push

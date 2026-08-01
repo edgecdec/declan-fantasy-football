@@ -18,18 +18,25 @@ type Props = {
   currentUserId?: string;
   /** Dynasty scenario (numQbs/ppr/tep) detected from this draft's real league settings. */
   recommendedDynastyVariant?: string | null;
+  /** Redraft scenario (ppr/tep) detected from this draft's real league settings. */
+  recommendedRedraftVariant?: string | null;
 };
 
-export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId, recommendedDynastyVariant }: Props) {
-  const { activePlayers, setDynastyVariant } = useCustomRankings();
+export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId, recommendedDynastyVariant, recommendedRedraftVariant }: Props) {
+  const { activePlayers, setDynastyVariant, setRedraftVariant } = useCustomRankings();
   const valuedPlayers = useValuedPlayers(activePlayers, draft);
   const [tab, setTab] = React.useState(0);
 
-  // Keep "Dynasty Rankings" resolved to whatever scenario actually matches this
-  // league's settings (superflex, PPR, TE premium) rather than a fixed default.
+  // Keep "Dynasty Rankings"/"Default Rankings" resolved to whatever scenario
+  // actually matches this league's settings (superflex, PPR, TE premium)
+  // rather than a fixed default.
   React.useEffect(() => {
     if (recommendedDynastyVariant) setDynastyVariant(recommendedDynastyVariant);
   }, [recommendedDynastyVariant, setDynastyVariant]);
+
+  React.useEffect(() => {
+    if (recommendedRedraftVariant) setRedraftVariant(recommendedRedraftVariant);
+  }, [recommendedRedraftVariant, setRedraftVariant]);
 
   return (
     <Paper sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

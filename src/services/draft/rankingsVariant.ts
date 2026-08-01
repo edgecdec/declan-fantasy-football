@@ -63,3 +63,23 @@ export function describeDynastyVariant(key: string): string {
   if (tep !== 'te_none') parts.push(TEP_LABELS[tep]);
   return parts.join(' · ');
 }
+
+// Redraft doesn't need a numQbs axis -- unlike dynasty trade value (a holistic
+// number FantasyCalc hands us), redraft "value" is computed by our own VBD math
+// at runtime from the draft's real roster settings, which already raises QB
+// replacement demand for a superflex draft. See useValuedPlayers.
+export function redraftVariantKey(ppr: PprSlug, tep: TepSlug): string {
+  return `${ppr}|${tep}`;
+}
+
+/** Picks the redraft rankings variant that matches a league's real settings. */
+export function recommendedRedraftVariant(league: SleeperLeague): string {
+  return redraftVariantKey(detectPpr(league), detectTep(league));
+}
+
+export function describeRedraftVariant(key: string): string {
+  const [ppr, tep] = key.split('|') as [PprSlug, TepSlug];
+  const parts = [`${PPR_VALUES[ppr]} PPR`];
+  if (tep !== 'te_none') parts.push(TEP_LABELS[tep]);
+  return parts.join(' · ');
+}

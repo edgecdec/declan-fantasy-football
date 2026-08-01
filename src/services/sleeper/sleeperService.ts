@@ -83,7 +83,11 @@ export type SleeperDraft = {
   settings: {
     rounds: number;
     slots_bn: number;
-    slots_flex: number;
+    // Sleeper renames the generic flex slot to slots_rec_flex once a league also
+    // has a slots_super_flex slot -- both need to be checked.
+    slots_flex?: number;
+    slots_rec_flex?: number;
+    slots_super_flex?: number;
     slots_rb: number;
     slots_wr: number;
     slots_te: number;
