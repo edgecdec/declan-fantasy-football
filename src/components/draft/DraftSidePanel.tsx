@@ -25,11 +25,17 @@ export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, roster
 
   return (
     <Paper sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0, fontSize: '0.8rem' } }}>
-          <Tab label="Best Available" />
-          <Tab label="Team Value" />
-        </Tabs>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="fullWidth"
+        sx={{ minHeight: 36, mb: 1, '& .MuiTab-root': { minHeight: 36, py: 0, px: 1, fontSize: '0.75rem' } }}
+      >
+        <Tab label="Best Available" />
+        <Tab label="Team Value" />
+      </Tabs>
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
         <RankingsSelector />
       </Box>
 

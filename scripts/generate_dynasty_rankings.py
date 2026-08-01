@@ -62,6 +62,10 @@ def generate_dynasty_rankings():
             'team': p['team'],
             'rank': rank,
             'tier': math.ceil(rank / 12),
+            # Real FantasyCalc trade value, not just a tier bucket -- without this
+            # the app falls back to estimating points from tier alone, which gives
+            # every player in the same tier an identical (wrong) displayed value.
+            'custom_value': p['dynasty_value'],
         })
 
     try:
