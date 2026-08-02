@@ -341,10 +341,12 @@ export const SleeperService = {
     }
   },
 
-  async getDraft(draftId: string): Promise<SleeperDraft | null> {
+  async getDraft(draftId: string, options: { skipCache?: boolean } = {}): Promise<SleeperDraft | null> {
     const cacheKey = `draft_${draftId}`;
-    const cached = CacheService.get<SleeperDraft>(cacheKey, 'session');
-    if (cached) return cached;
+    if (!options.skipCache) {
+      const cached = CacheService.get<SleeperDraft>(cacheKey, 'session');
+      if (cached) return cached;
+    }
 
     try {
       const res = await fetch(`${BASE_URL}/draft/${draftId}`);

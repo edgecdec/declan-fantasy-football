@@ -130,23 +130,46 @@ export default function LeagueDraftPage() {
     return () => { cancelled = true; };
   }, [leagueId]);
 
-  // Poll for picks during active drafts
+  // Auto-refresh every 15s. Re-fetches the draft object too, not just picks,
+  // so a pre_draft/paused league that goes live gets picked up automatically
+  // instead of only ever refreshing picks for a draft already in progress.
+  // Depending on `status` (not just draft_id) re-evaluates the exit guard on
+  // every transition, so this naturally stops once the draft is complete.
   React.useEffect(() => {
-    if (!selectedDraft || selectedDraft.status !== 'drafting') return;
+    if (!selectedDraft || selectedDraft.status === 'complete') return;
+    let cancelled = false;
+
     const interval = setInterval(async () => {
       try {
-        const fetchedPicks = await SleeperService.getDraftPicks(selectedDraft.draft_id);
+        const [fetchedDraft, fetchedPicks] = await Promise.all([
+          SleeperService.getDraft(selectedDraft.draft_id, { skipCache: true }),
+          SleeperService.getDraftPicks(selectedDraft.draft_id),
+        ]);
+        if (cancelled) return;
+        if (fetchedDraft) setSelectedDraft(fetchedDraft);
         setPicks(fetchedPicks);
       } catch (e) { console.error(e); }
     }, 15000);
-    return () => clearInterval(interval);
-  }, [selectedDraft]);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // Intentionally depend on draft_id/status rather than the whole object --
+    // setSelectedDraft gives it a new reference every poll, so depending on
+    // the object itself would tear down and rebuild the interval every tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDraft?.draft_id, selectedDraft?.status]);
 
   const handleRefresh = async () => {
     if (!selectedDraft) return;
     setRefreshing(true);
     try {
-      const fetchedPicks = await SleeperService.getDraftPicks(selectedDraft.draft_id);
+      const [fetchedDraft, fetchedPicks] = await Promise.all([
+        SleeperService.getDraft(selectedDraft.draft_id, { skipCache: true }),
+        SleeperService.getDraftPicks(selectedDraft.draft_id),
+      ]);
+      if (fetchedDraft) setSelectedDraft(fetchedDraft);
       setPicks(fetchedPicks);
     } catch (e) { console.error(e); }
     setRefreshing(false);
