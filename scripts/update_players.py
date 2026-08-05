@@ -104,8 +104,12 @@ if __name__ == "__main__":
         final_data = process_data(raw_players, raw_stats)
         
         print(f"Saving to {OUTPUT_FILE}...")
+        # sort_keys is load-bearing, not cosmetic: Sleeper's /players/nfl doesn't
+        # serialize object keys in a stable order, so without it every player's
+        # ~70 fields reshuffle between runs and the daily auto-commit rewrites
+        # ~68% of this 825k-line file even when no player data actually changed.
         with open(OUTPUT_FILE, 'w') as f:
-            json.dump(final_data, f, indent=2)
+            json.dump(final_data, f, indent=2, sort_keys=True)
         
         print("Done!")
     else:
