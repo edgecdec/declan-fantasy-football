@@ -42,8 +42,9 @@ import { useUser } from '@/context/UserContext';
 
 const drawerWidth = 240;
 
-const BASE_MENU_ITEMS = [
+const MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
+  { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
   { text: 'Manager Skill', href: '/skill', icon: <BarChartIcon /> },
   { text: 'Season Review', href: '/performance', icon: <EmojiEventsIcon /> },
@@ -53,8 +54,6 @@ const BASE_MENU_ITEMS = [
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
 ];
 
-const DRAFT_ASSISTANT_ITEM = { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> };
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useUser();
   const theme = useTheme();
@@ -62,10 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
   
-  const menuItems = React.useMemo(() => 
-    user?.username === 'edgecdec' ? [...BASE_MENU_ITEMS, DRAFT_ASSISTANT_ITEM] : BASE_MENU_ITEMS,
-    [user?.username]
-  );
+  const menuItems = MENU_ITEMS;
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
