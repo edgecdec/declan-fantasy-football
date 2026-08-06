@@ -146,6 +146,25 @@ export type SleeperProjection = Record<string, number>;
 /** Map of player_id -> projection stats for a single week */
 export type SleeperWeeklyProjections = Record<string, SleeperProjection>;
 
+/**
+ * Sleeper's authoritative view of where the NFL calendar currently sits.
+ * Preferred over deriving the season from the client clock: `season_type` and
+ * `week` tell us whether real games have been played, which is what decides
+ * when the analytics pages may flip to a new season.
+ */
+export type SleeperNflState = {
+  season: string;
+  previous_season: string;
+  league_season: string;
+  league_create_season: string;
+  season_type: 'pre' | 'regular' | 'post' | 'off';
+  week: number;
+  display_week: number;
+  leg: number;
+  season_has_scores: boolean;
+  season_start_date: string;
+};
+
 export type SleeperTransaction = {
   transaction_id: string;
   type: string; // 'trade', 'free_agent', 'waiver'
@@ -161,6 +180,25 @@ export type SleeperTransaction = {
 };
 
 export const SleeperService = {
+  async getNflState(): Promise<SleeperNflState | null> {
+    const cacheKey = 'nfl_state';
+    const cached = CacheService.get<SleeperNflState>(cacheKey, 'local');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/state/nfl`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      // 1h TTL: week/season_type advance on Sleeper's schedule, not ours, and a
+      // stale value here would pin every page's default season.
+      CacheService.set(cacheKey, data, { storage: 'local', ttl: 1000 * 60 * 60 });
+      return data;
+    } catch (e) {
+      console.error('Error fetching NFL state', e);
+      return null;
+    }
+  },
+
   async getUser(username: string): Promise<SleeperUser | null> {
     const cacheKey = `user_${username.toLowerCase()}`;
     const cached = CacheService.get<SleeperUser>(cacheKey, 'local');
