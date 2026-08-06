@@ -127,10 +127,6 @@ export default function DraftAssistantPage() {
         subtitle="Real-time draft companion with dynamic rankings and VBD analysis."
       />
 
-      <Alert severity="warning" sx={{ mb: 4 }}>
-        <strong>Development Mode Only:</strong> This feature is currently under active construction. Rankings are simulated.
-      </Alert>
-
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="h6" gutterBottom>Connect to Draft</Typography>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
