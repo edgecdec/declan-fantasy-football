@@ -36,6 +36,7 @@ import playerData from '../../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import YearSelector from '@/components/common/YearSelector';
 import { getPositionColor, getPositionBgColor } from '@/constants/colors';
+import useSeason from '@/hooks/useSeason';
 
 // --- Types ---
 type WeeklyStats = {
@@ -95,7 +96,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function TrendsPage() {
   const { user } = useUser();
-  const [year, setYear] = React.useState('2025');
+  // Trends chart weekly ownership across a completed season, so it seeds to the
+  // last scored season rather than an upcoming one with no weeks yet.
+  const { season: year, setSeason: setYear } = useSeason('results');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   

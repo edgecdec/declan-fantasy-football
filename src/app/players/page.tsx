@@ -7,6 +7,15 @@ import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 import PageHeader from '@/components/common/PageHeader';
 import playerData from '../../../data/sleeper_players.json';
 
+/**
+ * The season the stat columns actually cover. Taken from the data file's own
+ * `stats_season` rather than the current season: during the preseason the file's
+ * `season` has already advanced (e.g. 2026) while the stats it carries are still
+ * the last completed season's (2025), so labelling this with the current season
+ * would misdescribe the numbers on screen.
+ */
+const STATS_SEASON = playerData.stats_season;
+
 // --- Data Preparation ---
 const ALL_PLAYERS: Player[] = Object.values(playerData.players)
   .filter((p: any) => p.position && ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(p.position))
@@ -97,7 +106,7 @@ export default function PlayersPage() {
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <PageHeader 
         title="Player Database" 
-        subtitle="Search and filter all active NFL players and view 2025 stats." 
+        subtitle={`Search and filter all active NFL players and view ${STATS_SEASON} stats.`}
       />
       
       <SmartTable

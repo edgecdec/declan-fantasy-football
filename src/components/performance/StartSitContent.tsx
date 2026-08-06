@@ -19,6 +19,7 @@ import { SeasonDecisionSummary, LineupMistake, PositionAccuracy, WeeklyDecision 
 import UserSearchInput from '@/components/common/UserSearchInput';
 import YearSelector from '@/components/common/YearSelector';
 import { getPositionColor } from '@/constants/colors';
+import useSeason from '@/hooks/useSeason';
 
 const TOP_N = 5;
 const HIGH_ACC = 90;
@@ -339,7 +340,9 @@ function MistakesList({ title, mistakes }: { title: string; mistakes: LineupMist
 export default function StartSitContent() {
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
+  // Start/sit accuracy needs played weeks to score decisions against, so seed to
+  // the last season that produced games.
+  const { season: year, setSeason: setYear } = useSeason('results');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState({ done: 0, total: 0 });
   const [summaries, setSummaries] = React.useState<SeasonDecisionSummary[]>([]);

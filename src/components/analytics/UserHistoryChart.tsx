@@ -22,9 +22,7 @@ import {
 } from 'recharts';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { analyzeLeague } from '@/services/stats/expectedWins';
-
-// Years to analyze for User History
-const YEARS_TO_ANALYZE = ['2020', '2021', '2022', '2023', '2024', '2025'];
+import { buildSeasonRange, getNflStateOrFallback, resolveDefaultSeason } from '@/services/common/seasonService';
 
 type UserYearlyStats = {
   year: string;
@@ -54,11 +52,17 @@ export default function UserHistoryChart({ userId }: Props) {
       setLoading(true);
       setProgress(0);
       const results: UserYearlyStats[] = [];
-      const totalSteps = YEARS_TO_ANALYZE.length;
+
+      // Scan every season Sleeper could have data for, oldest first so the chart
+      // reads left-to-right. Stops at the last scored season: an upcoming season
+      // has no games to compute expected wins from.
+      const state = await getNflStateOrFallback();
+      const yearsToAnalyze = buildSeasonRange(resolveDefaultSeason(state, 'results')).slice().reverse();
+      const totalSteps = yearsToAnalyze.length;
 
       try {
         for (let i = 0; i < totalSteps; i++) {
-          const year = YEARS_TO_ANALYZE[i];
+          const year = yearsToAnalyze[i];
           setStatus(`Scanning ${year}...`);
           
           try {

@@ -46,6 +46,7 @@ import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import LuckSummaryCard from '@/components/analytics/LuckSummaryCard';
 import useTableSort from '@/hooks/useTableSort';
+import useSeason from '@/hooks/useSeason';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -231,7 +232,9 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
 
 export default function ExpectedWinsPage() {
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
+  // Expected wins divides by games played, so this page waits for the new
+  // season to actually kick off before defaulting to it.
+  const { season: year, setSeason: setYear, seasons: YEARS, loading: seasonLoading } = useSeason('results');
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   
   const [loadingUser, setLoadingUser] = React.useState(false);
@@ -240,8 +243,6 @@ export default function ExpectedWinsPage() {
   const [user, setUser] = React.useState<SleeperUser | null>(null);
   
   const [leagueData, setLeagueData] = React.useState<LeagueData[]>([]);
-  
-  const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
@@ -257,12 +258,15 @@ export default function ExpectedWinsPage() {
 
   // Auto-Run when Username is set
   React.useEffect(() => {
+    // Wait for the season to resolve, or we'd fetch leagues for an empty year
+    // and immediately refetch once the real season lands.
+    if (seasonLoading || !year) return;
     if (username && !loadingUser && !analyzing && leagueData.length === 0) {
       // Debounce slightly to prevent flicker if typing
       const t = setTimeout(() => handleStart(), 500);
       return () => clearTimeout(t);
     }
-  }, [username]); // Triggers when username loads from storage or is typed
+  }, [username, seasonLoading, year]); // Triggers when username loads from storage or is typed
 
   const toggleAdvanced = () => {
     const newVal = !showAdvanced;

@@ -34,6 +34,7 @@ import { SleeperService, SleeperLeague } from '@/services/sleeper/sleeperService
 import playerData from '../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import useSeason from '@/hooks/useSeason';
 
 // --- Types ---
 type IssueType = 'critical' | 'warning' | 'info';
@@ -55,7 +56,10 @@ type LeagueHealth = {
 
 export default function RosterMedicPage() {
   const [username, setUsername] = React.useState('');
-  
+  // Medic is a "check my current rosters" tool with no year picker by design, so
+  // it just tracks whichever season the user's rosters live in.
+  const { season, loading: seasonLoading } = useSeason('roster');
+
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [results, setResults] = React.useState<LeagueHealth[]>([]);
@@ -77,11 +81,13 @@ export default function RosterMedicPage() {
 
   // Auto-run scan when username is available
   React.useEffect(() => {
+    // Wait for the season, or the scan would request leagues for an empty year.
+    if (seasonLoading || !season) return;
     if (username && !loading && !scanned) {
       const t = setTimeout(() => startScan(), 500);
       return () => clearTimeout(t);
     }
-  }, [username]);
+  }, [username, seasonLoading, season]);
 
   const saveUsername = (name: string) => {
     if (!name) return;
@@ -103,7 +109,7 @@ export default function RosterMedicPage() {
       if (!user) throw new Error("User not found");
       saveUsername(username);
 
-      const leagues = await SleeperService.getLeagues(user.user_id, '2025');
+      const leagues = await SleeperService.getLeagues(user.user_id, season);
       if (leagues.length === 0) {
         setLoading(false);
         return;

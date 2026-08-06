@@ -25,6 +25,7 @@ import SkillProfileChart, { AggregatePositionStats } from '@/components/performa
 import PlayerImpactList from '@/components/performance/PlayerImpactList';
 import LeagueBreakdown from '@/components/performance/LeagueBreakdown';
 import ImpactsModal from '@/components/performance/ImpactsModal';
+import useSeason from '@/hooks/useSeason';
 
 const VALID_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
@@ -37,7 +38,9 @@ type LeagueResultItem = {
 export default function PositionalBenchmarksContent() {
   const { user, fetchUser } = useUser();
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
+  // Benchmarks compare against completed-season output, so seed to the last
+  // season with games rather than an upcoming one.
+  const { season: year, setSeason: setYear } = useSeason('results');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [status, setStatus] = React.useState('');

@@ -42,6 +42,7 @@ import { SleeperService, SleeperUser, SleeperLeague, SleeperRoster, SleeperBrack
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import useTableSort from '@/hooks/useTableSort';
+import useSeason from '@/hooks/useSeason';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -340,16 +341,16 @@ function LeagueRow({ item, onToggle, userId }: { item: LeaguePerformanceData, on
 
 export default function PerformancePage() {
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
-  
+  // Season review reads final standings and playoff brackets, so it stays on the
+  // last season that produced games until the new one kicks off.
+  const { season: year, setSeason: setYear, seasons: YEARS, loading: seasonLoading } = useSeason('results');
+
   const [loadingUser, setLoadingUser] = React.useState(false);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   
   const [leagueData, setLeagueData] = React.useState<LeaguePerformanceData[]>([]);
   const [user, setUser] = React.useState<SleeperUser | null>(null);
-
-  const YEARS = ['2025', '2024', '2023', '2022', '2021'];
 
   React.useEffect(() => {
     const saved = localStorage.getItem('sleeper_usernames');
@@ -363,11 +364,14 @@ export default function PerformancePage() {
 
   // Auto-Run when Username is set
   React.useEffect(() => {
+    // Hold off until the season resolves, otherwise the first fetch uses an
+    // empty year.
+    if (seasonLoading || !year) return;
     if (username && !loadingUser && !analyzing && leagueData.length === 0) {
       const t = setTimeout(() => handleStart(), 500);
       return () => clearTimeout(t);
     }
-  }, [username]);
+  }, [username, seasonLoading, year]);
 
   const saveUsername = (name: string) => {
     const saved = localStorage.getItem('sleeper_usernames');

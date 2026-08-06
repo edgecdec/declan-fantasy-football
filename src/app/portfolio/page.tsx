@@ -27,6 +27,7 @@ import playerData from '../../../data/sleeper_players.json';
 import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import useSeason from '@/hooks/useSeason';
 
 // Types
 type LeagueInfo = {
@@ -45,13 +46,14 @@ type PortfolioItem = {
   leagues: LeagueInfo[];
 };
 
-const YEARS = ['2025', '2024', '2023', '2022', '2021', '2020'];
 const WEEKS = Array.from({length: 18}, (_, i) => i + 1);
 
 export default function PortfolioPage() {
   const [username, setUsername] = React.useState('');
-  const [year, setYear] = React.useState('2025');
-  const [week, setWeek] = React.useState<string>('live'); 
+  // Ownership is a roster view, so it follows the new league year as soon as
+  // Sleeper opens it rather than waiting for kickoff.
+  const { season: year, setSeason: setYear, seasons: YEARS, loading: seasonLoading } = useSeason('roster');
+  const [week, setWeek] = React.useState<string>('live');
   
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -75,14 +77,17 @@ export default function PortfolioPage() {
 
   // Auto-run if username exists and not loaded
   React.useEffect(() => {
+    // Wait for the season, or the first fetch would use an empty year.
+    if (seasonLoading || !year) return;
     if (username && !loading && !user) {
       const t = setTimeout(() => handleAnalyze(), 500);
       return () => clearTimeout(t);
     }
-  }, [username]);
+  }, [username, seasonLoading, year]);
 
   // Re-run on filter change if user is loaded
   React.useEffect(() => {
+    if (!year) return;
     if (user && !loading) {
       handleAnalyze();
     }

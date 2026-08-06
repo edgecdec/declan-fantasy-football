@@ -34,6 +34,7 @@ import { SleeperService, SleeperLeague } from '@/services/sleeper/sleeperService
 import { analyzeLeagueHistory, LeagueHistoryResult, MemberHistoryStats } from '@/services/stats/leagueHistory';
 import PageHeader from '@/components/common/PageHeader';
 import YearSelector from '@/components/common/YearSelector';
+import useSeason from '@/hooks/useSeason';
 
 // --- Sub-Components ---
 
@@ -229,7 +230,9 @@ export default function LeagueHistoryPage() {
   const [username, setUsername] = React.useState('');
   const [userId, setUserId] = React.useState<string | undefined>(undefined);
   const [savedUsernames, setSavedUsernames] = React.useState<string[]>([]);
-  const [year, setYear] = React.useState('2025');
+  // Seeded to the last scored season so the first fetch matches what
+  // YearSelector (which filters to seasons with played games) would pick anyway.
+  const { season: year, setSeason: setYear } = useSeason('results');
   
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
