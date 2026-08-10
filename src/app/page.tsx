@@ -108,6 +108,7 @@ export default function HomePage() {
       {/* Feature Cards */}
       <Grid container spacing={4} sx={{ mt: 2 }}>
         {[
+          { title: 'Draft Assistant', desc: 'Live draft companion with dynamic rankings and VBD analysis.', href: '/draft-assistant', cta: 'Start Drafting' },
           { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
           { title: 'Manager Skill', desc: 'Analyze your positional efficiency, lineup decisions, and historical trends.', href: '/skill', cta: 'View Skills' },
           { title: 'Season Review', desc: 'Analyze your final placements and playoff performance.', href: '/performance', cta: 'View Results' },
