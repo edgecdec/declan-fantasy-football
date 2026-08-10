@@ -267,8 +267,19 @@ export const SleeperService = {
     }
   },
 
-  /** Returns true if the roster has 0 total points (test league or season never played) */
+  /**
+   * Returns true for a roster that was never really used — an abandoned team or a
+   * dead test league — so callers can leave it out of analytics.
+   *
+   * Zero points alone is NOT sufficient evidence. Before Week 1 every roster in
+   * every league has fpts === 0, including fully drafted dynasty teams, so a
+   * points-only check hides the user's entire portfolio during the preseason.
+   * A roster that holds players is a real roster whether or not it has scored,
+   * so only treat it as empty when it has no players at all.
+   */
   isZeroPointRoster(roster: SleeperRoster): boolean {
+    const rosteredPlayers = roster.players?.length ?? 0;
+    if (rosteredPlayers > 0) return false;
     const totalPoints = roster.settings.fpts + (roster.settings.fpts_decimal || 0) / 100;
     return totalPoints === 0;
   },
