@@ -13,7 +13,7 @@
  *    same numbers instead of reshuffling.
  */
 import * as React from "react";
-import { Alert, Paper, Skeleton, Typography } from "@mui/material";
+import { Alert, Button, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Artifact } from "@/services/sim/engine";
 import { useDraftOdds } from "@/hooks/useDraftOdds";
@@ -33,6 +33,13 @@ export default function PickOddsPanel({ draft, picks, currentUserId,
                                        season = "2026" }: PickOddsPanelProps) {
   const [artifact, setArtifact] = React.useState<Artifact | null>(null);
   const [loadErr, setLoadErr] = React.useState<string | null>(null);
+  // Only simulate automatically while a draft is actually live. This is a public site and
+  // a full pass is ~3000 sims x ~10 candidates of the visitor's CPU; firing that on every
+  // page view of a finished or not-yet-started draft would be rude and pointless.
+  const [started, setStarted] = React.useState(false);
+  React.useEffect(() => {
+    if (draft?.status === "drafting") setStarted(true);
+  }, [draft?.status]);
   const odds = useDraftOdds(artifact);
 
   React.useEffect(() => {
@@ -101,13 +108,13 @@ export default function PickOddsPanel({ draft, picks, currentUserId,
   }, [artifact, idx, draft, picks, currentUserId]);
 
   React.useEffect(() => {
-    if (!plan || "skip" in plan) return;
+    if (!started || !plan || "skip" in plan) return;
     void odds.run({
       myTeam: plan.myTeam, taken: plan.taken, candidates: plan.candidates,
       seedBase: plan.seedBase, reversalRound: plan.reversalRound,
     });
     // re-run only when the draft state actually changes
-  }, [plan?.seedBase]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [plan?.seedBase, started]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadErr) {
     return (
@@ -126,6 +133,22 @@ export default function PickOddsPanel({ draft, picks, currentUserId,
       <Alert severity="info" sx={{ mt: 2 }}>
         Pick odds unavailable: {plan.skip}.
       </Alert>
+    );
+  }
+  if (!started) {
+    return (
+      <Paper sx={{ p: 2, mt: 2 }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+          <Button variant="contained" onClick={() => setStarted(true)}>
+            Estimate pick odds
+          </Button>
+          <Typography variant="body2" color="text.secondary">
+            Simulates the rest of the draft, the season and the playoffs for each candidate,
+            in your browser. Takes a few seconds and uses your CPU, so it does not run by
+            itself unless a draft is live.
+          </Typography>
+        </Stack>
+      </Paper>
     );
   }
   return (
