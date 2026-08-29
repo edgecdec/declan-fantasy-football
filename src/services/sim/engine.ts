@@ -216,7 +216,13 @@ export function runDraft(
   const M = D.art.meta, T = bots.length;
   const avail = new Uint8Array(D.n).fill(0);
   for (let i = 0; i < D.draftable; i++) avail[i] = 1;
-  for (const pid of taken.values()) if (pid >= 0 && pid < D.n) avail[pid] = 1;
+  // RESERVE every forced pick. Without this, a forced pick whose player an earlier
+  // SIMULATED pick had already taken silently became a no-op, so the seat drafted one
+  // fewer player. That produced odds almost perfectly anti-correlated with ADP -- asking
+  // "what if I take the #1 overall at pick 5" meant an opponent took him at pick 1 in
+  // nearly every sim and the seat got nobody. Reserving makes the counterfactual
+  // coherent: "conditional on this player being on the board at my pick".
+  for (const pid of taken.values()) if (pid >= 0 && pid < D.n) avail[pid] = 0;
   const rosters: number[][] = Array.from({ length: T }, () => []);
   const cnt: Record<string, number>[] = Array.from({ length: T }, () => ({}));
   const remaining = new Int32Array(T);
@@ -226,13 +232,12 @@ export function runDraft(
     const left = remaining[t]--;
     const forced = taken.get(ov);
     if (forced !== undefined) {
-      // a pick that really happened: replay it verbatim, and do not let caps veto it
-      if (avail[forced]) {
-        avail[forced] = 0;
-        rosters[t].push(forced);
-        const p = D.posOf(forced);
-        cnt[t][p] = (cnt[t][p] ?? 0) + 1;
-      }
+      // Replay verbatim. The player was reserved above so he is guaranteed to be here,
+      // and positional caps deliberately do not veto him -- a real manager may well have
+      // drafted a third TE.
+      rosters[t].push(forced);
+      const p = D.posOf(forced);
+      cnt[t][p] = (cnt[t][p] ?? 0) + 1;
       continue;
     }
     let missing = 0;
