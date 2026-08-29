@@ -80,8 +80,15 @@ export type SleeperDraft = {
   status: string; // "pre_draft", "drafting", "complete"
   type: string; // "snake", "linear"
   slot_to_roster_id?: Record<string, number> | null;
+  /** user_id -> draft slot (1-indexed). UNRELIABLE as a source of truth for "which seat
+   *  am I": in a live 16-team draft this reported slot 1 for a user whose actual picks
+   *  were #6/#27/#43, i.e. slot 6. Derive the seat from picks that have happened, and only
+   *  fall back to this before any pick exists. */
+  draft_order?: Record<string, number> | null;
   settings: {
     rounds: number;
+    /** Round at which a snake reverses again (3rd-round reversal). 0/absent = plain snake. */
+    reversal_round?: number;
     slots_bn: number;
     // Sleeper renames the generic flex slot to slots_rec_flex once a league also
     // has a slots_super_flex slot -- both need to be checked.
