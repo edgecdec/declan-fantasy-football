@@ -226,6 +226,12 @@ export function runDraft(
   D: SimData, bots: BotWeights[], sheets: Float64Array,
   order: { ov: number; rnd: number; t: number }[],
   taken: Map<number, number>,
+  /** If set, capture who was still on the board immediately BEFORE this overall pick.
+   *  Used to estimate "what is the chance this player even reaches my pick", which has to
+   *  be measured on an UNFORCED draft -- forcing a player in guarantees his availability
+   *  and would make the answer trivially 100%. */
+  snapshotAt?: number,
+  snapshotOut?: Uint8Array,
 ): Int32Array[] {
   const M = D.art.meta, T = bots.length;
   const avail = new Uint8Array(D.n).fill(0);
@@ -243,6 +249,9 @@ export function runDraft(
   for (const o of order) remaining[o.t]++;
 
   for (const { ov, rnd, t } of order) {
+    if (snapshotAt !== undefined && snapshotOut && ov === snapshotAt) {
+      snapshotOut.set(avail);
+    }
     const left = remaining[t]--;
     const forced = taken.get(ov);
     if (forced !== undefined) {

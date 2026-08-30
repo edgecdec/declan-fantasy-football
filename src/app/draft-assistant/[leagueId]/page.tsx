@@ -10,6 +10,9 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
 import DraftSidePanel from '@/components/draft/DraftSidePanel';
+import PlayerOdds from '@/components/draft/PlayerOdds';
+import useValuedPlayers from '@/hooks/useValuedPlayers';
+import { useCustomRankings } from '@/context/CustomRankingsContext';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
 import { recommendedDynastyVariant, recommendedRedraftVariant } from '@/services/draft/rankingsVariant';
@@ -50,6 +53,14 @@ export default function LeagueDraftPage() {
   const [rosterIdToOwnerIdMap, setRosterIdToOwnerIdMap] = React.useState<Map<number, string>>(new Map());
   const [refreshing, setRefreshing] = React.useState(false);
   const [panelCollapsed, setPanelCollapsed] = React.useState(false);
+  // The board the per-player panel ranks candidates from -- the same ranking set the
+  // side panel is showing, so both views agree on what "best available" means.
+  const { activePlayers } = useCustomRankings();
+  const pageValuedPlayers = useValuedPlayers(activePlayers, selectedDraft ?? ({
+    settings: { slots_qb: 1, slots_rb: 2, slots_wr: 2, slots_te: 1, slots_k: 1,
+                slots_def: 1, slots_bn: 6, slots_flex: 2, rounds: 16, teams: 10,
+                pick_time: 0 },
+  } as unknown as SleeperDraft));
 
   React.useEffect(() => {
     if (!leagueId) return;
@@ -259,6 +270,15 @@ export default function LeagueDraftPage() {
             </Box>
           </Grid>
         </Grid>
+
+        {/* Per-player odds. Conditional on getting the player, with the chance he
+            actually reaches your pick alongside. Client-side in Web Workers. */}
+        <PlayerOdds
+          draft={selectedDraft}
+          picks={picks}
+          valuedPlayers={pageValuedPlayers}
+          currentUserId={user?.user_id}
+        />
 
         <Tooltip title={panelCollapsed ? 'Show Best Available' : 'Hide Best Available'}>
           <IconButton

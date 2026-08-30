@@ -63,6 +63,10 @@ export type OddsRequest = {
 
 export type CandidateResult = {
   pid: number; playoff: number; title: number; pf: number; n: number;
+  /** Chance this player is still on the board when your pick arrives, measured on the
+   *  UNFORCED draft. The odds columns are all conditional on getting him, so this is the
+   *  other half of the decision: a big edge you only see 10% of the time is not a plan. */
+  availability: number;
   /** paired difference vs the leader, and its paired SE. |vsBest| < 2*se means the gap
    *  is not distinguishable from zero -- render it muted rather than as a real ordering. */
   vsBest: number; vsBestSe: number;
@@ -79,7 +83,7 @@ export type CandidateResult = {
  *  So each worker runs all candidates over `[simOffset, simOffset+sims)` and the main
  *  thread concatenates. Every candidate therefore always has an identical sim count. */
 export type Slice = { po: Uint8Array[]; ti: Uint8Array[]; pf: Float32Array[];
-                      nextPick: number };
+                      avail: Uint8Array[]; nextPick: number };
 
 export function simulateSlice(art: Artifact, req: OddsRequest,
                               simOffset = 0): Slice {
@@ -99,6 +103,8 @@ export function simulateSlice(art: Artifact, req: OddsRequest,
   const po = cands.map(() => new Uint8Array(req.sims));
   const ti = cands.map(() => new Uint8Array(req.sims));
   const pf = cands.map(() => new Float32Array(req.sims));
+  const avail = cands.map(() => new Uint8Array(req.sims));
+  const snap = new Uint8Array(D.n);
 
   for (let i = 0; i < req.sims; i++) {
     // Seeded from the ABSOLUTE sim index, so a slice computed in any worker reproduces
@@ -107,6 +113,9 @@ export function simulateSlice(art: Artifact, req: OddsRequest,
     const outcomes = sampleOutcomes(D, rng(seed ^ 0x9e3779b9));
     const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b);
     const sched = schedule(teams, M.regWeeks, rng(seed ^ 0xc2b2ae35));
+    // One UNFORCED draft first, purely to see who actually survives to my pick.
+    runDraft(D, bots, sheets, order, takenMap, nextPick, snap);
+    for (let c = 0; c < cands.length; c++) avail[c][i] = snap[cands[c]];
     for (let c = 0; c < cands.length; c++) {
       const t2 = new Map(takenMap);
       t2.set(nextPick, cands[c]);
@@ -118,7 +127,39 @@ export function simulateSlice(art: Artifact, req: OddsRequest,
       pf[c][i] = teamPf[req.myTeam];
     }
   }
-  return { po, ti, pf, nextPick };
+  return { po, ti, pf, avail, nextPick };
+}
+
+/** Cheap availability probe: run UNFORCED drafts only, no season, and report how often
+ *  each candidate is still on the board at my pick.
+ *
+ *  Worth its own pass because simulating a player who is never there is pure waste --
+ *  asking "what if you take the #1 overall at pick 5" burns the same compute as a real
+ *  candidate to answer a question that cannot arise. A draft is ~1/6th of a full
+ *  simulation and this skips the season entirely, so a few hundred probes cost almost
+ *  nothing and can cut the candidate list substantially. */
+export function probeAvailability(art: Artifact, req: Omit<OddsRequest, "sims">,
+                                  probes = 250): { pid: number; availability: number }[] {
+  const D = new SimData(art);
+  const M = art.meta, teams = M.teams;
+  const bots: BotWeights[] = [];
+  const me: BotWeights = { posMult: req.myPosMult ?? { QB: 1.30, K: 1.30 }, ...TUNED };
+  for (let t = 0; t < teams; t++) {
+    bots.push(t === req.myTeam ? me : FIELD[(t < req.myTeam ? t : t - 1) % FIELD.length]);
+  }
+  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0);
+  const takenMap = new Map<number, number>(req.taken);
+  const nextPick = order.find((o) => o.t === req.myTeam && !takenMap.has(o.ov))?.ov ?? -1;
+  if (nextPick < 0) throw new Error("no picks remaining for this seat");
+  const hits = new Int32Array(req.candidates.length);
+  const snap = new Uint8Array(D.n);
+  for (let i = 0; i < probes; i++) {
+    const seed = hashSeed(`${req.seedBase}|${i}`);
+    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b);
+    runDraft(D, bots, sheets, order, takenMap, nextPick, snap);
+    for (let c = 0; c < req.candidates.length; c++) if (snap[req.candidates[c]]) hits[c]++;
+  }
+  return req.candidates.map((pid, c) => ({ pid, availability: 100 * hits[c] / probes }));
 }
 
 /** Aggregate one or more slices into the ranked, uncertainty-annotated result. */
@@ -132,12 +173,14 @@ export function aggregate(candidates: number[], slices: Slice[]): {
   };
   const rec = candidates.map((_p, c) => ({
     po: cat((s) => s.po, c), ti: cat((s) => s.ti, c), pf: cat((s) => s.pf, c),
+    av: cat((s) => s.avail, c),
   }));
   const n = rec[0].po.length;
   const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
   const results: CandidateResult[] = candidates.map((pid, c) => ({
     pid, playoff: 100 * mean(rec[c].po), title: 100 * mean(rec[c].ti),
-    pf: mean(rec[c].pf), n, vsBest: 0, vsBestSe: 0, distinguishable: false,
+    pf: mean(rec[c].pf), n, availability: 100 * mean(rec[c].av),
+    vsBest: 0, vsBestSe: 0, distinguishable: false,
   }));
   const bi = results.reduce((a, b, i) => (b.playoff > results[a].playoff ? i : a), 0);
   let maxSe = 0;

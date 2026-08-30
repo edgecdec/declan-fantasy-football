@@ -18,11 +18,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Artifact } from "@/services/sim/engine";
 import {
-  CandidateResult, DEFAULT_SIMS, QUICK_SIMS, OddsRequest, Slice, aggregate,
+  CandidateResult, OddsRequest, Slice, aggregate, probeAvailability,
 } from "@/services/sim/candidateOdds";
+
+/** Per-candidate is ~N times the work of the league view, so the sim counts are lower
+ *  than the 3000 the ranking-stability test wanted. The consequence is honest: rows within
+ *  a couple of points of each other are not separable, which the UI shows via the paired
+ *  SE rather than implying an order. */
+export const PLAYER_QUICK_SIMS = 400;
+export const PLAYER_FULL_SIMS = 2000;
+/** Candidates below this chance of reaching your pick are not simulated at all. */
+export const MIN_AVAILABILITY = 2;
 
 export type OddsState = {
   results: CandidateResult[];
+  /** candidates that were skipped because they will not reach your pick */
+  unreachable: { pid: number; availability: number }[];
   nextPick: number;
   noiseFloor: number;
   sims: number;
@@ -32,7 +43,7 @@ export type OddsState = {
 };
 
 const EMPTY: OddsState = {
-  results: [], nextPick: -1, noiseFloor: 0, sims: 0,
+  results: [], unreachable: [], nextPick: -1, noiseFloor: 0, sims: 0,
   provisional: false, running: false, error: null,
 };
 
@@ -60,6 +71,19 @@ export function useDraftOdds(artifact: Artifact | null) {
     const myJob = ++jobRef.current;
     setState((s) => ({ ...s, running: true, error: null }));
 
+    // Cheap draft-only probe first: drop anyone who will not reach the pick, so no
+    // compute is spent answering a question that cannot arise.
+    let cands = req.candidates;
+    let unreachable: { pid: number; availability: number }[] = [];
+    try {
+      const av = probeAvailability(artifact, req, 300);
+      unreachable = av.filter((a) => a.availability < MIN_AVAILABILITY);
+      const drop = new Set(unreachable.map((a) => a.pid));
+      const kept = cands.filter((p) => !drop.has(p));
+      if (kept.length) cands = kept;
+    } catch { /* probe is an optimisation; fall through with the full list */ }
+    if (jobRef.current !== myJob) return;
+
     const pass = async (sims: number, provisional: boolean) => {
       const workers = pool.current;
       const per = Math.ceil(sims / workers.length);
@@ -77,7 +101,8 @@ export function useDraftOdds(artifact: Artifact | null) {
           };
           w.addEventListener("message", onMsg);
           w.postMessage({ kind: "job", jobId: myJob,
-                          req: { ...req, sims: count }, simOffset: offset });
+                          req: { ...req, candidates: cands, sims: count },
+                          simOffset: offset });
         });
       });
       const slices = (await Promise.all(jobs)).filter((s): s is Slice => s !== null);
@@ -86,13 +111,13 @@ export function useDraftOdds(artifact: Artifact | null) {
         setState((s) => ({ ...s, running: false, error: "all workers failed" }));
         return;
       }
-      const agg = aggregate(req.candidates, slices);
-      setState({ ...agg, sims: agg.results[0]?.n ?? 0, provisional,
+      const agg = aggregate(cands, slices);
+      setState({ ...agg, unreachable, sims: agg.results[0]?.n ?? 0, provisional,
                  running: provisional, error: null });
     };
 
-    await pass(QUICK_SIMS, true);
-    if (jobRef.current === myJob) await pass(DEFAULT_SIMS, false);
+    await pass(PLAYER_QUICK_SIMS, true);
+    if (jobRef.current === myJob) await pass(PLAYER_FULL_SIMS, false);
   }, [artifact]);
 
   return { ...state, run };
