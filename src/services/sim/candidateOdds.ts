@@ -64,6 +64,10 @@ export type OddsRequest = {
    *  Applies to YOUR seat only -- the other managers draft consensus, so availability
    *  keeps tracking market ADP even when your board disagrees with it. */
   rankOverride?: Int32Array | null;
+  /** [overallPick, seat] for every traded pick; absent picks follow the snake. Sent as pairs
+   *  rather than a Map because structured-clone of a Map through postMessage is avoidable
+   *  complexity here. */
+  swaps?: [number, number][] | null;
 };
 
 export type CandidateResult = {
@@ -105,7 +109,8 @@ export function simulateSlice(art: Artifact, req: OddsRequest,
   for (let t = 0; t < teams; t++) {
     bots.push(t === req.myTeam ? me : FIELD[(t < req.myTeam ? t : t - 1) % FIELD.length]);
   }
-  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0);
+  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0,
+                          req.swaps ? new Map(req.swaps) : null);
   const takenMap = new Map<number, number>(req.taken);
   const nextPick = order.find((o) => o.t === req.myTeam && !takenMap.has(o.ov))?.ov ?? -1;
   if (nextPick < 0) throw new Error("no picks remaining for this seat");
@@ -158,7 +163,8 @@ export function probeAvailability(art: Artifact, req: Omit<OddsRequest, "sims">,
   for (let t = 0; t < teams; t++) {
     bots.push(t === req.myTeam ? me : FIELD[(t < req.myTeam ? t : t - 1) % FIELD.length]);
   }
-  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0);
+  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0,
+                          req.swaps ? new Map(req.swaps) : null);
   const takenMap = new Map<number, number>(req.taken);
   const nextPick = order.find((o) => o.t === req.myTeam && !takenMap.has(o.ov))?.ov ?? -1;
   if (nextPick < 0) throw new Error("no picks remaining for this seat");

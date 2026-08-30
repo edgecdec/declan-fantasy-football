@@ -28,7 +28,7 @@ import useValuedPlayers from '@/hooks/useValuedPlayers';
 import { useCustomRankings } from '@/context/CustomRankingsContext';
 import { useUser } from '@/context/UserContext';
 import {
-  SleeperService, SleeperDraft, SleeperDraftPick,
+  SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick,
 } from '@/services/sleeper/sleeperService';
 
 const DRAFT_STATUS_PRIORITY: Record<string, number> = {
@@ -56,6 +56,7 @@ export default function PredictionsPage() {
   const [rosterOwnerMap, setRosterOwnerMap] = React.useState<Map<number, string>>(new Map());
   const [rosterIdToOwnerIdMap, setRosterIdToOwnerIdMap] =
     React.useState<Map<number, string>>(new Map());
+  const [tradedPicks, setTradedPicks] = React.useState<SleeperTradedPick[]>([]);
   const [boardSource, setBoardSource] = React.useState<'rankings' | 'adp'>('rankings');
 
   const valuedPlayers = useValuedPlayers(activePlayers, draft ?? PLACEHOLDER);
@@ -80,13 +81,15 @@ export default function PredictionsPage() {
           (DRAFT_STATUS_PRIORITY[a.status] ?? 99) - (DRAFT_STATUS_PRIORITY[b.status] ?? 99))[0];
         if (!best) { setError('No drafts found for this league.'); setLoading(false); return; }
 
-        const [full, fetchedPicks] = await Promise.all([
+        const [full, fetchedPicks, traded] = await Promise.all([
           SleeperService.getDraft(best.draft_id),
           SleeperService.getDraftPicks(best.draft_id),
+          SleeperService.getDraftTradedPicks(best.draft_id),
         ]);
         if (cancelled) return;
         setDraft(full || best);
         setPicks(fetchedPicks);
+        setTradedPicks(traded);
 
         const names = new Map<string, string>();
         for (const u of leagueUsers) names.set(u.user_id, u.display_name || u.username);
@@ -115,13 +118,15 @@ export default function PredictionsPage() {
     let cancelled = false;
     const t = setInterval(async () => {
       try {
-        const [d, p] = await Promise.all([
+        const [d, p, tp] = await Promise.all([
           SleeperService.getDraft(draft.draft_id, { skipCache: true }),
           SleeperService.getDraftPicks(draft.draft_id),
+          SleeperService.getDraftTradedPicks(draft.draft_id),
         ]);
         if (cancelled) return;
         if (d) setDraft(d);
         setPicks(p);
+        setTradedPicks(tp);
       } catch (e) { console.error(e); }
     }, 15000);
     return () => { cancelled = true; clearInterval(t); };
@@ -203,10 +208,12 @@ export default function PredictionsPage() {
         <WinningOdds draft={draft} picks={picks} valuedPlayers={valuedPlayers}
                      rosterOwnerMap={rosterOwnerMap}
                      rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
-                     currentUserId={user?.user_id} boardSource={boardSource} />
+                     currentUserId={user?.user_id} boardSource={boardSource}
+                     tradedPicks={tradedPicks} />
       </Box>
       <PlayerOdds draft={draft} picks={picks} valuedPlayers={valuedPlayers}
-                  currentUserId={user?.user_id} boardSource={boardSource} />
+                  currentUserId={user?.user_id} boardSource={boardSource}
+                  tradedPicks={tradedPicks} />
     </Container>
   );
 }

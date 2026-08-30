@@ -57,11 +57,17 @@ export function inferSeat(
   currentUserId?: string,
   draftOrder?: Record<string, number> | null,
   reversalRound = 0,
+  /** overallPick -> seat, for traded picks. Without this a user whose first pick was an
+   *  ACQUIRED pick is placed in the wrong seat, because snake math attributes that pick to
+   *  the seat it physically sits in rather than to whoever now owns it. */
+  swaps?: Map<number, number> | null,
 ): number {
   if (!currentUserId) return -1;
   const mine = picks.filter((p) => p.picked_by === currentUserId);
   if (mine.length) {
-    const p = mine[0];
+    const p = mine.reduce((a, b) => (b.pick_no < a.pick_no ? b : a));
+    const owner = swaps?.get(p.pick_no);
+    if (owner !== undefined) return owner;
     let seat = (p.pick_no - 1) % teams;
     let fwd = p.round % 2 === 1;
     if (reversalRound && p.round >= reversalRound) fwd = !fwd;

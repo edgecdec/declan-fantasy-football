@@ -268,6 +268,7 @@ export default function LeagueDraftPage() {
                 rosterOwnerMap={rosterOwnerMap}
                 rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
                 currentUserId={user?.user_id}
+                tradedPicks={tradedPicks}
                 recommendedDynastyVariant={recommendedDynastyVariantKey}
                 recommendedRedraftVariant={recommendedRedraftVariantKey}
               />
@@ -282,6 +283,7 @@ export default function LeagueDraftPage() {
           picks={picks}
           valuedPlayers={pageValuedPlayers}
           currentUserId={user?.user_id}
+          tradedPicks={tradedPicks}
         />
 
         <Tooltip title={panelCollapsed ? 'Show Best Available' : 'Hide Best Available'}>

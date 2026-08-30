@@ -30,6 +30,8 @@ export type LeagueOddsRequest = {
   reversalRound?: number;
   /** denseIndex -> draft-order rank from your selected rankings; YOUR seat only. */
   rankOverride?: Int32Array | null;
+  /** [overallPick, seat] for every traded pick; absent picks follow the snake. */
+  swaps?: [number, number][] | null;
 };
 
 export type LeagueSlice = { po: Uint8Array[]; ti: Uint8Array[]; pf: Float32Array[] };
@@ -74,7 +76,8 @@ export function simulateLeagueSlice(art: Artifact, req: LeagueOddsRequest,
                                     simOffset = 0): LeagueSlice {
   const D = new SimData(art);
   const M = art.meta, teams = M.teams;
-  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0);
+  const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0,
+                          req.swaps ? new Map(req.swaps) : null);
   const takenMap = new Map<number, number>(req.taken);
   const po = Array.from({ length: teams }, () => new Uint8Array(req.sims));
   const ti = Array.from({ length: teams }, () => new Uint8Array(req.sims));

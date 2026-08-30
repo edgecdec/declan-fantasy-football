@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Box, Paper, Tabs, Tab } from '@mui/material';
-import { SleeperDraft, SleeperDraftPick } from '@/services/sleeper/sleeperService';
+import { SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
 import { useCustomRankings } from '@/context/CustomRankingsContext';
 import useValuedPlayers from '@/hooks/useValuedPlayers';
 import RankingsSelector from '@/components/draft/RankingsSelector';
@@ -17,13 +17,16 @@ type Props = {
   rosterOwnerMap: Map<number, string>;
   rosterIdToOwnerIdMap: Map<number, string>;
   currentUserId?: string;
+  /** Draft-pick trades, forwarded to WinningOdds so pick ownership is correct. */
+  tradedPicks?: SleeperTradedPick[];
   /** Dynasty scenario (numQbs/ppr/tep) detected from this draft's real league settings. */
   recommendedDynastyVariant?: string | null;
   /** Redraft scenario (ppr/tep) detected from this draft's real league settings. */
   recommendedRedraftVariant?: string | null;
 };
 
-export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId, recommendedDynastyVariant, recommendedRedraftVariant }: Props) {
+export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId, recommendedDynastyVariant, recommendedRedraftVariant, tradedPicks,
+}: Props) {
   const { activePlayers, setDynastyVariant, setRedraftVariant } = useCustomRankings();
   const valuedPlayers = useValuedPlayers(activePlayers, draft);
   const [tab, setTab] = React.useState(0);
@@ -76,6 +79,7 @@ export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, roster
           rosterOwnerMap={rosterOwnerMap}
           rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
           currentUserId={currentUserId}
+          tradedPicks={tradedPicks}
         />
       )}
     </Paper>

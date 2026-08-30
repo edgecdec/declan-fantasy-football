@@ -15,10 +15,13 @@ import {
 } from "@mui/material";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
+import {
+  SleeperDraft, SleeperDraftPick, SleeperTradedPick,
+} from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
 import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
 import { useMyBoard } from "@/hooks/useMyBoard";
+import { buildSwaps, swapsFingerprint } from "@/services/sim/pickOwnership";
 import { useLeagueOdds, LEAGUE_REFINE_SIMS } from "@/hooks/useLeagueOdds";
 
 type Props = {
@@ -31,11 +34,14 @@ type Props = {
   /** "adp" ignores the selected ranking set and drafts consensus ADP from your
    *  seat too, so the two boards can be compared side by side. */
   boardSource?: "rankings" | "adp";
+  /** Draft-pick trades. Without these the sim credits already-made picks to the wrong seats
+   *  and hands out future picks that were traded away. */
+  tradedPicks?: SleeperTradedPick[];
 };
 
 export default function WinningOdds({
   draft, picks, valuedPlayers, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId,
-  boardSource,
+  boardSource, tradedPicks,
 }: Props) {
   const season = draft.season ?? "2026";
   const { artifact, idx, error: artErr, loading } = useSimArtifact(season);
@@ -55,6 +61,17 @@ export default function WinningOdds({
   const { rankOverride, fingerprint } =
     useMyBoard(valuedPlayers, artifact, idx, boardSource !== "adp");
 
+  /** Real pick ownership after trades. Recomputed when a trade lands, and folded into the
+   *  seed so the odds re-simulate rather than reusing a pre-trade result. */
+  const swaps = React.useMemo(
+    () => buildSwaps(tradedPicks, draft?.slot_to_roster_id,
+                     artifact?.meta.teams ?? draft?.settings?.teams ?? 0,
+                     artifact?.meta.rounds ?? draft?.settings?.rounds ?? 0,
+                     draft?.settings?.reversal_round ?? 0),
+    [tradedPicks, draft?.slot_to_roster_id, draft?.settings?.reversal_round,
+     draft?.settings?.teams, draft?.settings?.rounds, artifact]);
+  const swapSig = swapsFingerprint(swaps);
+
   const plan = React.useMemo(() => {
     if (!artifact || !idx || mismatch) return null;
     const taken: [number, number][] = [];
@@ -63,14 +80,15 @@ export default function WinningOdds({
       if (i !== undefined) taken.push([p.pick_no, i]);
     }
     const seat = inferSeat(teams, picks, currentUserId, draft.draft_order,
-                           draft.settings?.reversal_round ?? 0);
+                           draft.settings?.reversal_round ?? 0, swaps);
     return {
       taken, myTeam: seat >= 0 ? seat : undefined,
       reversalRound: draft.settings?.reversal_round ?? 0,
-      seedBase: `${draft.draft_id}|${picks.length}|${fingerprint}`,
+      swaps: swaps.size ? [...swaps.entries()] : null,
+      seedBase: `${draft.draft_id}|${picks.length}|${fingerprint}|${swapSig}`,
     };
   }, [artifact, idx, picks, teams, currentUserId, draft, mismatch, rankOverride,
-      fingerprint]);
+      fingerprint, swaps, swapSig]);
 
   React.useEffect(() => {
     if (!started || !plan) return;

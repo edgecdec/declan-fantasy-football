@@ -210,7 +210,14 @@ export function buildSheets(D: SimData, bots: BotWeights[], seed: number,
 // ---------------------------------------------------------------------------
 // draft
 // ---------------------------------------------------------------------------
-export function pickOrder(teams: number, rounds: number, reversalRound = 0) {
+/**
+ * The pick order. `swaps` maps an overall pick number to the seat that actually owns it after
+ * draft-pick trades; anything absent follows the plain snake. Applied to both the replay of
+ * completed picks and the simulation of the rest, since a traded pick changes who a past pick
+ * is credited to as well as who makes a future one.
+ */
+export function pickOrder(teams: number, rounds: number, reversalRound = 0,
+                          swaps?: Map<number, number> | null) {
   const out: { ov: number; rnd: number; t: number }[] = [];
   let ov = 0;
   for (let rnd = 1; rnd <= rounds; rnd++) {
@@ -218,7 +225,9 @@ export function pickOrder(teams: number, rounds: number, reversalRound = 0) {
     if (reversalRound && rnd >= reversalRound) fwd = !fwd;
     for (let k = 0; k < teams; k++) {
       const t = fwd ? k : teams - 1 - k;
-      out.push({ ov: ++ov, rnd, t });
+      ov++;
+      const owner = swaps?.get(ov);
+      out.push({ ov, rnd, t: owner === undefined ? t : owner });
     }
   }
   return out;
