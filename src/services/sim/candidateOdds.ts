@@ -59,6 +59,11 @@ export type OddsRequest = {
   seedBase: string;                     // derive from draft state so results are stable
   myPosMult?: Record<string, number>;
   reversalRound?: number;
+  /** denseIndex -> draft-order rank from the user's selected ranking set. Changes what YOU
+   *  take, not what the other managers take. Must be applied in the
+   *  Applies to YOUR seat only -- the other managers draft consensus, so availability
+   *  keeps tracking market ADP even when your board disagrees with it. */
+  rankOverride?: Int32Array | null;
 };
 
 export type CandidateResult = {
@@ -111,7 +116,8 @@ export function simulateSlice(art: Artifact, req: OddsRequest,
     // exactly the world that index would have had in a single-threaded run.
     const seed = hashSeed(`${req.seedBase}|${simOffset + i}`);
     const outcomes = sampleOutcomes(D, rng(seed ^ 0x9e3779b9));
-    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b);
+    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b, req.myTeam,
+                               req.rankOverride);
     const sched = schedule(teams, M.regWeeks, rng(seed ^ 0xc2b2ae35));
     // One UNFORCED draft first, purely to see who actually survives to my pick.
     runDraft(D, bots, sheets, order, takenMap, nextPick, snap);
@@ -155,7 +161,8 @@ export function probeAvailability(art: Artifact, req: Omit<OddsRequest, "sims">,
   const snap = new Uint8Array(D.n);
   for (let i = 0; i < probes; i++) {
     const seed = hashSeed(`${req.seedBase}|${i}`);
-    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b);
+    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b, req.myTeam,
+                               req.rankOverride);
     runDraft(D, bots, sheets, order, takenMap, nextPick, snap);
     for (let c = 0; c < req.candidates.length; c++) if (snap[req.candidates[c]]) hits[c]++;
   }

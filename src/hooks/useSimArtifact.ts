@@ -74,3 +74,28 @@ export function inferSeat(
   }
   return -1;
 }
+
+/**
+ * denseIndex -> rank, from the user's selected ranking set.
+ *
+ * Both the per-manager and per-player views need this and must agree, otherwise one would
+ * simulate opponents drafting the user's board while the other had them following market
+ * ADP -- and the availability numbers would then describe a different draft from the odds.
+ * Returns null when too few rows match to be a usable board.
+ */
+export function buildRankOverride(
+  players: { player_id: string }[],
+  idx: Map<string, number> | null,
+  size: number,
+  minMatched = 50,
+): Int32Array | null {
+  if (!idx || !players.length) return null;
+  const a = new Int32Array(size);
+  let r = 0;
+  for (const p of players) {
+    const i = idx.get(p.player_id);
+    if (i === undefined) continue;
+    a[i] = ++r;
+  }
+  return r >= minMatched ? a : null;
+}

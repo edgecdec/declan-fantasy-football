@@ -6,11 +6,10 @@
  * this roughly N times cheaper than asking the per-candidate question for N candidates, so
  * it can refresh on every pick.
  *
- * THE SELECTED RANKINGS DRIVE THE REMAINING DRAFT. `rankOverride` replaces the artifact's
- * market ADP order with whatever ranking set the user has chosen in the side panel, so the
- * opponents draft down that board. The artifact's own points estimate is still used for
- * value, because a ranking set does not carry points in this league's scoring currency --
- * so switching rankings changes WHO gets picked when, not how much a player is worth.
+ * YOUR RANKINGS APPLY TO YOUR SEAT ONLY. `rankOverride` changes the board `myTeam` drafts
+ * from; the other nine managers keep drafting consensus ADP, because your private rankings
+ * do not change what they do. That asymmetry is what makes "chance he lasts to my pick"
+ * meaningful -- it stays a property of the market, not of your board.
  */
 import {
   Artifact, BotWeights, SimData, buildSheets, hashSeed, pickOrder, playSeason,
@@ -29,7 +28,7 @@ export type LeagueOddsRequest = {
   assumeIPlayWell?: boolean;
   myPosMult?: Record<string, number>;
   reversalRound?: number;
-  /** denseIndex -> draft-order rank from the user's selected rankings. */
+  /** denseIndex -> draft-order rank from your selected rankings; YOUR seat only. */
   rankOverride?: Int32Array | null;
 };
 
@@ -74,7 +73,6 @@ function assignBots(teams: number, req: LeagueOddsRequest, u: () => number): Bot
 export function simulateLeagueSlice(art: Artifact, req: LeagueOddsRequest,
                                     simOffset = 0): LeagueSlice {
   const D = new SimData(art);
-  if (req.rankOverride) D.applyRankOverride(req.rankOverride);
   const M = art.meta, teams = M.teams;
   const order = pickOrder(teams, M.rounds, req.reversalRound ?? 0);
   const takenMap = new Map<number, number>(req.taken);
@@ -86,7 +84,8 @@ export function simulateLeagueSlice(art: Artifact, req: LeagueOddsRequest,
     const seed = hashSeed(`${req.seedBase}|${simOffset + i}`);
     const bots = assignBots(teams, req, rng(seed ^ 0x1b873593));
     const outcomes = sampleOutcomes(D, rng(seed ^ 0x9e3779b9));
-    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b);
+    const sheets = buildSheets(D, bots, seed ^ 0x85ebca6b, req.myTeam,
+                              req.rankOverride);
     const sched = schedule(teams, M.regWeeks, rng(seed ^ 0xc2b2ae35));
     const rosters = runDraft(D, bots, sheets, order, takenMap);
     const weekly = playSeason(D, bots, rosters, outcomes, seed ^ 0x27d4eb2f);

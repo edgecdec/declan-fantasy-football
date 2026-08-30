@@ -21,7 +21,7 @@ import {
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
 import { getPositionColor } from "@/constants/colors";
-import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
+import { useSimArtifact, inferSeat, buildRankOverride } from "@/hooks/useSimArtifact";
 import { useDraftOdds } from "@/hooks/useDraftOdds";
 
 const TOP_OVERALL = 20;
@@ -48,6 +48,11 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
     draft.settings.teams !== artifact.meta.teams
     ? `simulation data is for a ${artifact.meta.teams}-team league but this draft has ${draft.settings.teams}`
     : null;
+
+  /** Opponents draft the selected board, not market ADP, when one is loaded. */
+  const rankOverride = React.useMemo(
+    () => buildRankOverride(valuedPlayers, idx, artifact?.players.sleeperId.length ?? 0),
+    [valuedPlayers, idx, artifact]);
 
   const plan = React.useMemo(() => {
     if (!artifact || !idx || !draft || mismatch) return null;
@@ -85,11 +90,12 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
       }
     }
     return {
-      myTeam: seat, taken, candidates: cands,
+      myTeam: seat, taken, candidates: cands, rankOverride,
       reversalRound: draft.settings?.reversal_round ?? 0,
-      seedBase: `${draft.draft_id}|${picks.length}|p`,
+      seedBase: `${draft.draft_id}|${picks.length}|${rankOverride ? "ranked" : "adp"}`,
     };
-  }, [artifact, idx, draft, picks, teams, currentUserId, mismatch, valuedPlayers]);
+  }, [artifact, idx, draft, picks, teams, currentUserId, mismatch, valuedPlayers,
+      rankOverride]);
 
   React.useEffect(() => {
     if (!started || !plan) return;
@@ -143,6 +149,9 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
         Odds assume you get the player. <b>Available</b> is how often he actually lasts to
         your pick — a big edge you rarely get to use is not a plan.
+        {rankOverride
+          ? " Your seat drafts the board selected above; the other managers draft consensus ADP, which is what availability reflects."
+          : " Select or upload a ranking set to have your seat draft it instead of market ADP."}
       </Typography>
       {odds.running && <LinearProgress sx={{ mb: 1.5 }} />}
       {odds.error && <Alert severity="warning" sx={{ mb: 1 }}>{odds.error}</Alert>}
@@ -152,7 +161,13 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
           <TableHead>
             <TableRow>
               <TableCell>Player</TableCell>
-              <TableCell align="right">ADP</TableCell>
+              <TableCell align="right">
+                <Tooltip title={rankOverride
+                  ? "Rank on your board -- the order YOU draft. The other managers still draft consensus ADP."
+                  : "Market ADP rank"}>
+                  <span>{rankOverride ? "Your rank" : "ADP"}</span>
+                </Tooltip>
+              </TableCell>
               <TableCell align="right">Title&nbsp;%</TableCell>
               <TableCell align="right">Playoff&nbsp;%</TableCell>
               <TableCell align="right">
@@ -183,7 +198,10 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
                     </Stack>
                   </TableCell>
                   <TableCell align="right" sx={{ opacity: muted ? 0.6 : 1 }}>
-                    {P.adpRank[r.pid] >= 9999 ? "—" : P.adpRank[r.pid]}
+                    {(() => {
+                      const rk = rankOverride?.[r.pid] || P.adpRank[r.pid];
+                      return !rk || rk >= 9999 ? "—" : rk;
+                    })()}
                   </TableCell>
                   <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums",
                                                  opacity: muted ? 0.6 : 1 }}>

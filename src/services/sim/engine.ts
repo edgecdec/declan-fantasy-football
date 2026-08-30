@@ -129,19 +129,8 @@ export class SimData {
   }
   posOf(i: number) { return this.pos[i] >= 0 ? this.posNames[this.pos[i]] : ""; }
 
-  /** Replace the market draft order with the user's selected ranking set.
-   *
-   *  Only the ORDER changes -- `board` (the points estimate that drives VORP) is left
-   *  alone, because a ranking set does not carry points in this league's scoring currency.
-   *  So choosing different rankings changes who gets picked when, not what a player is
-   *  worth. `mkt` is rederived because it is a pure function of the rank. */
-  applyRankOverride(rank: Int32Array) {
-    for (let i = 0; i < this.n && i < rank.length; i++) {
-      if (rank[i] <= 0) continue;
-      this.adpRank[i] = rank[i];
-      this.mkt[i] = 100 * Math.exp(-(rank[i] - 1) / 50);
-    }
-  }
+  /** Market value implied by an arbitrary rank, for a manager drafting a private board. */
+  mktFor(rank: number) { return 100 * Math.exp(-(rank - 1) / 50); }
 }
 
 // ---------------------------------------------------------------------------
@@ -187,15 +176,28 @@ export function sampleOutcomes(D: SimData, u: () => number): Outcomes {
 // ---------------------------------------------------------------------------
 // private boards
 // ---------------------------------------------------------------------------
-export function buildSheets(D: SimData, bots: BotWeights[], seed: number): Float64Array {
+/**
+ * One private valuation board per manager.
+ *
+ * `myRank` applies to `myTeam` ONLY, and that asymmetry is the point: your own ranking set
+ * changes what YOU draft, not what the other nine managers draft. They work off consensus,
+ * which is why the chance a player survives to your pick keeps following market ADP even
+ * when your board disagrees with it. An earlier version applied the override to the whole
+ * league, which effectively assumed everyone had read your rankings.
+ */
+export function buildSheets(D: SimData, bots: BotWeights[], seed: number,
+                            myTeam?: number, myRank?: Int32Array | null): Float64Array {
   const T = bots.length;
   const out = new Float64Array(T * D.n);
   const u = rng(seed), g = gaussFactory(u);
   for (let t = 0; t < T; t++) {
     const b = bots[t];
+    const mine = myRank && t === myTeam ? myRank : null;
     for (let i = 0; i < D.draftable; i++) {
-      const r = D.adpRank[i];
-      const base = D.mkt[i] * (1 + VORP_TILT * D.vorp[i] / 120);
+      // my seat prices off my own board; everyone else off the market
+      const r = mine && mine[i] > 0 ? mine[i] : D.adpRank[i];
+      const base = (mine && mine[i] > 0 ? D.mktFor(mine[i]) : D.mkt[i])
+        * (1 + VORP_TILT * D.vorp[i] / 120);
       const sd = b.sheetSd * sdByRank(r);
       const pm = b.posMult[D.posOf(i)] ?? 1;
       const lean = 1 + (pm - 1) * leanW(r);

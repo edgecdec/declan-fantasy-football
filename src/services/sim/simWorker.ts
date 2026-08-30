@@ -55,7 +55,10 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
     return;
   }
   try {
-    const slice: Slice = simulateSlice(art, msg.req, msg.simOffset);
+    const req = { ...msg.req,
+      rankOverride: msg.req.rankOverride
+        ? Int32Array.from(msg.req.rankOverride as unknown as number[]) : null };
+    const slice: Slice = simulateSlice(art, req, msg.simOffset);
     // Transfer the typed arrays rather than copying them.
     const transfer: Transferable[] = [
       ...slice.po.map((a) => a.buffer), ...slice.ti.map((a) => a.buffer),

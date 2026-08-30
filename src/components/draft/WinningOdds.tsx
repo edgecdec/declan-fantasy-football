@@ -17,7 +17,7 @@ import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
-import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
+import { useSimArtifact, inferSeat, buildRankOverride } from "@/hooks/useSimArtifact";
 import { useLeagueOdds, LEAGUE_REFINE_SIMS } from "@/hooks/useLeagueOdds";
 
 type Props = {
@@ -45,18 +45,11 @@ export default function WinningOdds({
     ? `simulation data is for a ${artifact.meta.teams}-team league but this draft has ${draft.settings.teams}`
     : null;
 
-  /** Draft order taken from the selected ranking set, so the bots draft that board. */
-  const rankOverride = React.useMemo(() => {
-    if (!artifact || !idx) return null;
-    const a = new Int32Array(artifact.players.sleeperId.length);
-    let r = 0;
-    for (const p of valuedPlayers) {
-      const i = idx.get(p.player_id);
-      if (i === undefined) continue;
-      a[i] = ++r;
-    }
-    return r > 50 ? a : null;      // too few matched to be a usable board
-  }, [artifact, idx, valuedPlayers]);
+  /** Draft order taken from the selected ranking set, so the bots draft that board.
+   *  Shared with PlayerOdds so the two views cannot disagree about the board. */
+  const rankOverride = React.useMemo(
+    () => buildRankOverride(valuedPlayers, idx, artifact?.players.sleeperId.length ?? 0),
+    [valuedPlayers, idx, artifact]);
 
   const plan = React.useMemo(() => {
     if (!artifact || !idx || mismatch) return null;

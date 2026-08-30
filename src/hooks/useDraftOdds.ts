@@ -100,9 +100,11 @@ export function useDraftOdds(artifact: Artifact | null) {
             else { resolve(null); }
           };
           w.addEventListener("message", onMsg);
-          w.postMessage({ kind: "job", jobId: myJob,
-                          req: { ...req, candidates: cands, sims: count },
-                          simOffset: offset });
+          w.postMessage({ kind: "job", jobId: myJob, simOffset: offset,
+            req: { ...req, candidates: cands, sims: count,
+                   // typed arrays do not survive as a plain field here
+                   rankOverride: req.rankOverride
+                     ? Array.from(req.rankOverride) : null } });
         });
       });
       const slices = (await Promise.all(jobs)).filter((s): s is Slice => s !== null);
