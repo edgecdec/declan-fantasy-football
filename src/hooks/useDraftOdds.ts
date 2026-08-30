@@ -21,12 +21,24 @@ import {
   CandidateResult, OddsRequest, Slice, aggregate, probeAvailability,
 } from "@/services/sim/candidateOdds";
 
-/** Per-candidate is ~N times the work of the league view, so the sim counts are lower
- *  than the 3000 the ranking-stability test wanted. The consequence is honest: rows within
- *  a couple of points of each other are not separable, which the UI shows via the paired
- *  SE rather than implying an order. */
-export const PLAYER_QUICK_SIMS = 400;
-export const PLAYER_FULL_SIMS = 2000;
+/**
+ * Sims ACCUMULATE in chunks rather than being re-run at a bigger count, so every candidate
+ * always shares the same set of sim indices and the paired differences stay valid. Each chunk
+ * uses a fresh range of sim offsets, so 10 chunks of 1000 really is 10,000 distinct sims.
+ *
+ * Nothing is shown before FIRST_SHOW: below ~2000 sims the ordering is not reproducible
+ * between seeds (measured Spearman between two seeds: -0.12 at 200 sims, +0.25 at 600,
+ * +0.95 at 3000), so an early table would show a confident ranking that a re-run contradicts.
+ *
+ * What more sims buy, and what they do not: at 2000 sims a ~63% playoff rate has SE ~1.1pp and
+ * a ~11% title rate ~0.70pp; at 10,000 those fall to ~0.48pp and ~0.31pp. But the fold SE
+ * (season-to-season heterogeneity) is 1.6-2.9x the binomial SE and does NOT shrink with sims --
+ * only with more seasons, of which six are usable. So 10,000 is where extra sims stop being
+ * the binding constraint, not where the answer becomes exact.
+ */
+export const PLAYER_CHUNK_SIMS = 1000;
+export const PLAYER_FIRST_SHOW = 2000;
+export const PLAYER_MAX_SIMS = 10000;
 /** Candidates below this chance of reaching your pick are not simulated at all. */
 export const MIN_AVAILABILITY = 2;
 
@@ -84,12 +96,13 @@ export function useDraftOdds(artifact: Artifact | null) {
     } catch { /* probe is an optimisation; fall through with the full list */ }
     if (jobRef.current !== myJob) return;
 
-    const pass = async (sims: number, provisional: boolean) => {
+    /** Run `sims` more simulations starting at sim index `base`, split across the pool. */
+    const chunk = async (base: number, sims: number) => {
       const workers = pool.current;
       const per = Math.ceil(sims / workers.length);
       const jobs = workers.map((w, i) => {
-        const offset = i * per;
-        const count = Math.min(per, sims - offset);
+        const offset = base + i * per;
+        const count = Math.min(per, base + sims - offset);
         if (count <= 0) return Promise.resolve(null);
         return new Promise<Slice | null>((resolve) => {
           const onMsg = (e: MessageEvent) => {
@@ -107,19 +120,30 @@ export function useDraftOdds(artifact: Artifact | null) {
                      ? Array.from(req.rankOverride) : null } });
         });
       });
-      const slices = (await Promise.all(jobs)).filter((s): s is Slice => s !== null);
-      if (jobRef.current !== myJob) return;               // a newer request superseded us
-      if (!slices.length) {
-        setState((s) => ({ ...s, running: false, error: "all workers failed" }));
-        return;
-      }
-      const agg = aggregate(cands, slices);
-      setState({ ...agg, unreachable, sims: agg.results[0]?.n ?? 0, provisional,
-                 running: provisional, error: null });
+      return (await Promise.all(jobs)).filter((s): s is Slice => s !== null);
     };
 
-    await pass(PLAYER_QUICK_SIMS, true);
-    if (jobRef.current === myJob) await pass(PLAYER_FULL_SIMS, false);
+    // Accumulated slices across every chunk so far. aggregate() concatenates them, so the
+    // reported n grows with each round and the paired SE shrinks accordingly.
+    const acc: Slice[] = [];
+    for (let done = 0; done < PLAYER_MAX_SIMS; done += PLAYER_CHUNK_SIMS) {
+      const want = Math.min(PLAYER_CHUNK_SIMS, PLAYER_MAX_SIMS - done);
+      const slices = await chunk(done, want);
+      if (jobRef.current !== myJob) return;             // a newer request superseded us
+      if (!slices.length) {
+        setState((s) => ({ ...s, running: false,
+          error: acc.length ? "workers stopped early; showing partial results"
+                            : "all workers failed" }));
+        return;
+      }
+      acc.push(...slices);
+      const total = done + want;
+      if (total < PLAYER_FIRST_SHOW) continue;          // too noisy to put on screen yet
+      const agg = aggregate(cands, acc);
+      const more = total < PLAYER_MAX_SIMS;
+      setState({ ...agg, unreachable, sims: agg.results[0]?.n ?? 0,
+                 provisional: more, running: more, error: null });
+    }
   }, [artifact]);
 
   return { ...state, run };

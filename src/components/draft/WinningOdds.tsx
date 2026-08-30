@@ -17,7 +17,8 @@ import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
-import { useSimArtifact, inferSeat, buildRankOverride } from "@/hooks/useSimArtifact";
+import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
+import { useMyBoard } from "@/hooks/useMyBoard";
 import { useLeagueOdds, LEAGUE_REFINE_SIMS } from "@/hooks/useLeagueOdds";
 
 type Props = {
@@ -27,10 +28,14 @@ type Props = {
   rosterOwnerMap: Map<number, string>;
   rosterIdToOwnerIdMap: Map<number, string>;
   currentUserId?: string;
+  /** "adp" ignores the selected ranking set and drafts consensus ADP from your
+   *  seat too, so the two boards can be compared side by side. */
+  boardSource?: "rankings" | "adp";
 };
 
 export default function WinningOdds({
   draft, picks, valuedPlayers, rosterOwnerMap, rosterIdToOwnerIdMap, currentUserId,
+  boardSource,
 }: Props) {
   const season = draft.season ?? "2026";
   const { artifact, idx, error: artErr, loading } = useSimArtifact(season);
@@ -45,11 +50,10 @@ export default function WinningOdds({
     ? `simulation data is for a ${artifact.meta.teams}-team league but this draft has ${draft.settings.teams}`
     : null;
 
-  /** Draft order taken from the selected ranking set, so the bots draft that board.
-   *  Shared with PlayerOdds so the two views cannot disagree about the board. */
-  const rankOverride = React.useMemo(
-    () => buildRankOverride(valuedPlayers, idx, artifact?.players.sleeperId.length ?? 0),
-    [valuedPlayers, idx, artifact]);
+  /** MY seat's board: the selected set re-ranked by value over positional replacement.
+   *  The other managers keep drafting consensus ADP. */
+  const { rankOverride, fingerprint } =
+    useMyBoard(valuedPlayers, artifact, idx, boardSource !== "adp");
 
   const plan = React.useMemo(() => {
     if (!artifact || !idx || mismatch) return null;
@@ -63,9 +67,10 @@ export default function WinningOdds({
     return {
       taken, myTeam: seat >= 0 ? seat : undefined,
       reversalRound: draft.settings?.reversal_round ?? 0,
-      seedBase: `${draft.draft_id}|${picks.length}|${rankOverride ? "ranked" : "adp"}`,
+      seedBase: `${draft.draft_id}|${picks.length}|${fingerprint}`,
     };
-  }, [artifact, idx, picks, teams, currentUserId, draft, mismatch, rankOverride]);
+  }, [artifact, idx, picks, teams, currentUserId, draft, mismatch, rankOverride,
+      fingerprint]);
 
   React.useEffect(() => {
     if (!started || !plan) return;

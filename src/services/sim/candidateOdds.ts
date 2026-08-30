@@ -68,6 +68,11 @@ export type OddsRequest = {
 
 export type CandidateResult = {
   pid: number; playoff: number; title: number; pf: number; n: number;
+  /** SE of this candidate's own title%. Reported because title is a far rarer event than
+   *  making the playoffs, so it is much noisier in relative terms and invites over-reading:
+   *  at 2000 sims a ~11% title rate carries SE ~0.70pp, meaning a 1.2pp gap between two
+   *  candidates is well inside noise even though it looks like a ranking. */
+  titleSe: number;
   /** Chance this player is still on the board when your pick arrives, measured on the
    *  UNFORCED draft. The odds columns are all conditional on getting him, so this is the
    *  other half of the decision: a big edge you only see 10% of the time is not a plan. */
@@ -187,6 +192,7 @@ export function aggregate(candidates: number[], slices: Slice[]): {
   const results: CandidateResult[] = candidates.map((pid, c) => ({
     pid, playoff: 100 * mean(rec[c].po), title: 100 * mean(rec[c].ti),
     pf: mean(rec[c].pf), n, availability: 100 * mean(rec[c].av),
+    titleSe: 100 * Math.sqrt(Math.max(mean(rec[c].ti) * (1 - mean(rec[c].ti)), 0) / n),
     vsBest: 0, vsBestSe: 0, distinguishable: false,
   }));
   const bi = results.reduce((a, b, i) => (b.playoff > results[a].playoff ? i : a), 0);

@@ -22,7 +22,8 @@ import {
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
 import { getPositionColor } from "@/constants/colors";
-import { useSimArtifact, inferSeat, buildRankOverride } from "@/hooks/useSimArtifact";
+import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
+import { useMyBoard } from "@/hooks/useMyBoard";
 import { useDraftOdds } from "@/hooks/useDraftOdds";
 import useTableSort from "@/hooks/useTableSort";
 
@@ -38,9 +39,13 @@ type Props = {
   picks: SleeperDraftPick[];
   valuedPlayers: Player[];
   currentUserId?: string;
+  /** "adp" ignores the selected ranking set and drafts consensus ADP from your
+   *  seat too, so the two boards can be compared side by side. */
+  boardSource?: "rankings" | "adp";
 };
 
-export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId }: Props) {
+export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
+                                    boardSource }: Props) {
   const [posFilter, setPosFilter] = React.useState("ALL");
   const season = draft?.season ?? "2026";
   const { artifact, idx, error: artErr } = useSimArtifact(season);
@@ -55,10 +60,10 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
     ? `simulation data is for a ${artifact.meta.teams}-team league but this draft has ${draft.settings.teams}`
     : null;
 
-  /** Opponents draft the selected board, not market ADP, when one is loaded. */
-  const rankOverride = React.useMemo(
-    () => buildRankOverride(valuedPlayers, idx, artifact?.players.sleeperId.length ?? 0),
-    [valuedPlayers, idx, artifact]);
+  /** MY seat's board: the selected set re-ranked by value over positional replacement.
+   *  The other managers keep drafting consensus ADP. */
+  const { rankOverride, fingerprint } =
+    useMyBoard(valuedPlayers, artifact, idx, boardSource !== "adp");
 
   const plan = React.useMemo(() => {
     if (!artifact || !idx || !draft || mismatch) return null;
@@ -98,10 +103,10 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
     return {
       myTeam: seat, taken, candidates: cands, rankOverride,
       reversalRound: draft.settings?.reversal_round ?? 0,
-      seedBase: `${draft.draft_id}|${picks.length}|${rankOverride ? "ranked" : "adp"}`,
+      seedBase: `${draft.draft_id}|${picks.length}|${fingerprint}`,
     };
   }, [artifact, idx, draft, picks, teams, currentUserId, mismatch, valuedPlayers,
-      rankOverride]);
+      rankOverride, fingerprint]);
 
   React.useEffect(() => {
     if (!started || !plan) return;
@@ -155,7 +160,10 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
       tip: rankOverride
         ? "Rank on your board — the order YOU draft. Other managers still draft consensus ADP."
         : "Market ADP rank" },
-    { id: "title", label: "Title %", num: true, tip: "Chance you win the championship" },
+    { id: "title", label: "Title %", num: true,
+      tip: "Chance you win the championship, with its own standard error. Winning a title is a "
+        + "much rarer event than making the playoffs, so this column is far noisier in relative "
+        + "terms — gaps smaller than roughly twice the ± are not a ranking." },
     { id: "playoff", label: "Playoff %", num: true },
     { id: "vsBest", label: "vs best", num: true,
       tip: "Difference from the top option, with its paired standard error" },
@@ -173,7 +181,9 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
         {odds.sims > 0 && (
           <Chip size="small" variant="outlined"
                 color={odds.provisional ? "warning" : "default"}
-                label={odds.provisional ? `${odds.sims} sims…` : `${odds.sims} sims`} />
+                label={odds.provisional
+                  ? `${odds.sims.toLocaleString()} sims, refining…`
+                  : `${odds.sims.toLocaleString()} sims`} />
         )}
         {odds.unreachable.length > 0 && (
           <Tooltip title={`Not simulated -- they reach pick #${odds.nextPick} less than 2% of the time: `
@@ -239,6 +249,9 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
                   <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums",
                                                  opacity: muted ? 0.6 : 1 }}>
                     {r.title.toFixed(1)}
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {" ±"}{r.titleSe.toFixed(1)}
+                    </Typography>
                   </TableCell>
                   <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums",
                                                  opacity: muted ? 0.6 : 1 }}>

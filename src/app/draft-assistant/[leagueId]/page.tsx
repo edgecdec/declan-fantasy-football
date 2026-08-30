@@ -7,6 +7,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import InsightsIcon from '@mui/icons-material/Insights';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
 import DraftSidePanel from '@/components/draft/DraftSidePanel';
@@ -234,6 +235,9 @@ export default function LeagueDraftPage() {
             >
               <OpenInNewIcon />
             </IconButton>
+            <Button component={Link} href={`/draft-assistant/${leagueId}/predictions`} variant="outlined" color="inherit" startIcon={<InsightsIcon />}>
+              Predictions
+            </Button>
             <Button component={Link} href={`/draft-assistant/${leagueId}/efficiency`} variant="outlined" color="inherit" startIcon={<BarChartIcon />}>
               Efficiency
             </Button>
