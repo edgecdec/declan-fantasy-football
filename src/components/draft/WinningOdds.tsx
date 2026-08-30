@@ -18,7 +18,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
 import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
-import { useLeagueOdds } from "@/hooks/useLeagueOdds";
+import { useLeagueOdds, LEAGUE_REFINE_SIMS } from "@/hooks/useLeagueOdds";
 
 type Props = {
   draft: SleeperDraft;
@@ -80,6 +80,11 @@ export default function WinningOdds({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.seedBase, started]);
 
+  const refine = React.useCallback(() => {
+    if (plan) void run({ ...plan, rankOverride }, picks.length, LEAGUE_REFINE_SIMS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, rankOverride, picks.length]);
+
   const nameFor = (t: number) => {
     // seat -> roster_id -> owner. slot_to_roster_id is keyed by 1-indexed slot.
     const rosterId = draft.slot_to_roster_id?.[String(t + 1)];
@@ -133,6 +138,14 @@ export default function WinningOdds({
           <Chip size="small" variant="outlined"
                 color={provisional ? "warning" : "default"}
                 label={provisional ? `${sims} sims…` : `${sims} sims`} />
+        )}
+        {sims > 0 && !running && sims < LEAGUE_REFINE_SIMS && (
+          <Tooltip title={`Re-run with ${LEAGUE_REFINE_SIMS.toLocaleString()} simulations. Roughly halves the error bars; takes several seconds.`}>
+            <Button size="small" onClick={refine} sx={{ minWidth: 0, px: 1,
+                    fontSize: "0.7rem" }}>
+              more sims
+            </Button>
+          </Tooltip>
         )}
       </Stack>
       {running && <LinearProgress sx={{ mb: 0.5 }} />}
@@ -197,7 +210,9 @@ export default function WinningOdds({
 
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
         Simulated in your browser down the ranking set selected above. Faint Δ values are
-        smaller than the simulation&apos;s own error, so treat them as unchanged.
+        smaller than the simulation&apos;s own error, so treat them as unchanged. Before any
+        picks every manager sits near {(100 / Math.max(teams, 1)).toFixed(0)}% by
+        construction — differences appear as the rosters actually diverge.
       </Typography>
     </Box>
   );

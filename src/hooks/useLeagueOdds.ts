@@ -14,8 +14,10 @@ import {
   LeagueOddsRequest, LeagueSlice, TeamOdds, aggregateLeague,
 } from "@/services/sim/leagueOdds";
 
-export const LEAGUE_QUICK_SIMS = 300;
-export const LEAGUE_FULL_SIMS = 2000;
+export const LEAGUE_QUICK_SIMS = 400;
+export const LEAGUE_FULL_SIMS = 6000;
+/** Explicit "refine" pass. ~12s across a worker pool; halves the standard error again. */
+export const LEAGUE_REFINE_SIMS = 25000;
 
 export type LeagueOddsState = {
   odds: TeamOdds[];
@@ -53,7 +55,7 @@ export function useLeagueOdds(artifact: Artifact | null) {
   }, [artifact]);
 
   const run = React.useCallback(async (
-    req: Omit<LeagueOddsRequest, "sims">, pickCount: number,
+    req: Omit<LeagueOddsRequest, "sims">, pickCount: number, sims?: number,
   ) => {
     if (!artifact || !pool.current.length) return;
     const myJob = ++jobRef.current;
@@ -99,6 +101,7 @@ export function useLeagueOdds(artifact: Artifact | null) {
       if (!provisional) settled.current = { picks: pickCount, odds };
     };
 
+    if (sims) { await pass(sims, false); return; }
     await pass(LEAGUE_QUICK_SIMS, true);
     if (jobRef.current === myJob) await pass(LEAGUE_FULL_SIMS, false);
   }, [artifact]);
