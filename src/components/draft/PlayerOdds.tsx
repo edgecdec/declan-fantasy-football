@@ -16,17 +16,22 @@
 import * as React from "react";
 import {
   Alert, Box, Button, Chip, LinearProgress, Paper, Stack, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Tooltip, Typography,
+  TableContainer, TableHead, TableRow, TableSortLabel, ToggleButton, ToggleButtonGroup,
+  Tooltip, Typography,
 } from "@mui/material";
 import { SleeperDraft, SleeperDraftPick } from "@/services/sleeper/sleeperService";
 import { Player } from "@/services/draft/vbdService";
 import { getPositionColor } from "@/constants/colors";
 import { useSimArtifact, inferSeat, buildRankOverride } from "@/hooks/useSimArtifact";
 import { useDraftOdds } from "@/hooks/useDraftOdds";
+import useTableSort from "@/hooks/useTableSort";
 
 const TOP_OVERALL = 20;
 const TOP_PER_POS = 3;
-const POSITIONS = ["QB", "RB", "WR", "TE"];
+// K and DEF included deliberately. Taking one early is a bad idea and the simulation says
+// so numerically, which is more useful than hiding the option -- and late in a draft they
+// are exactly the decision left.
+const POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 type Props = {
   draft: SleeperDraft | null;
@@ -36,6 +41,7 @@ type Props = {
 };
 
 export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId }: Props) {
+  const [posFilter, setPosFilter] = React.useState("ALL");
   const season = draft?.season ?? "2026";
   const { artifact, idx, error: artErr } = useSimArtifact(season);
   const odds = useDraftOdds(artifact);
@@ -103,6 +109,23 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.seedBase, started]);
 
+  // The sort hook compares plain properties, so flatten name/pos/rank onto each row rather
+  // than looking them up during render.
+  // MUST run before any early return: hooks have to be called unconditionally and in the
+  // same order every render, and this component returns early while loading / before the
+  // user starts. Calling useTableSort below those returns changed the hook count between
+  // renders, which React aborts with "rendered fewer hooks than expected".
+  const rows = artifact ? odds.results.map((r) => ({
+    ...r,
+    name: artifact.players.name[r.pid],
+    pos: artifact.players.pos[r.pid],
+    rank: (rankOverride?.[r.pid] || artifact.players.adpRank[r.pid]) || 9999,
+  })) : [];
+  const filtered = posFilter === "ALL" ? rows : rows.filter((r) => r.pos === posFilter);
+  // Default: strongest playoff odds first, which is the question the panel answers.
+  const { sorted, order, orderBy, handleSort } = useTableSort(filtered, "playoff", "desc");
+
+
   if (!draft || artErr || mismatch) return null;   // the tab already explains why
   if (!artifact) return null;
   const P = artifact.players;
@@ -115,7 +138,8 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
             Estimate odds per player
           </Button>
           <Typography variant="body2" color="text.secondary">
-            For the top {TOP_OVERALL} available plus the top {TOP_PER_POS} at each position:
+            For the top {TOP_OVERALL} available plus the top {TOP_PER_POS} at each of
+            {POSITIONS.join(", ")}:
             your championship odds if you take that player, and how often he actually
             reaches your pick. Runs in your browser.
           </Typography>
@@ -125,6 +149,19 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
   }
 
   const leader = odds.results[0];
+  const COLS: { id: string; label: string; num: boolean; tip?: string }[] = [
+    { id: "name", label: "Player", num: false },
+    { id: "rank", label: rankOverride ? "Your rank" : "ADP", num: true,
+      tip: rankOverride
+        ? "Rank on your board — the order YOU draft. Other managers still draft consensus ADP."
+        : "Market ADP rank" },
+    { id: "title", label: "Title %", num: true, tip: "Chance you win the championship" },
+    { id: "playoff", label: "Playoff %", num: true },
+    { id: "vsBest", label: "vs best", num: true,
+      tip: "Difference from the top option, with its paired standard error" },
+    { id: "availability", label: "Available", num: true,
+      tip: "Chance he is still on the board at your pick" },
+  ];
   return (
     <Paper sx={{ p: 2, mt: 2 }}>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
@@ -153,6 +190,13 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
           ? " Your seat drafts the board selected above; the other managers draft consensus ADP, which is what availability reflects."
           : " Select or upload a ranking set to have your seat draft it instead of market ADP."}
       </Typography>
+      <ToggleButtonGroup value={posFilter} exclusive size="small" sx={{ mb: 1.5 }}
+        onChange={(_e, v: string | null) => v && setPosFilter(v)}>
+        {["ALL", ...POSITIONS].map((pp) => (
+          <ToggleButton key={pp} value={pp} sx={{ py: 0.25, px: 1, fontSize: "0.72rem",
+            color: pp === "ALL" ? undefined : getPositionColor(pp) }}>{pp}</ToggleButton>
+        ))}
+      </ToggleButtonGroup>
       {odds.running && <LinearProgress sx={{ mb: 1.5 }} />}
       {odds.error && <Alert severity="warning" sx={{ mb: 1 }}>{odds.error}</Alert>}
 
@@ -160,30 +204,22 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell>Player</TableCell>
-              <TableCell align="right">
-                <Tooltip title={rankOverride
-                  ? "Rank on your board -- the order YOU draft. The other managers still draft consensus ADP."
-                  : "Market ADP rank"}>
-                  <span>{rankOverride ? "Your rank" : "ADP"}</span>
-                </Tooltip>
-              </TableCell>
-              <TableCell align="right">Title&nbsp;%</TableCell>
-              <TableCell align="right">Playoff&nbsp;%</TableCell>
-              <TableCell align="right">
-                <Tooltip title="Difference from the best option, with its paired standard error">
-                  <span>vs best</span>
-                </Tooltip>
-              </TableCell>
-              <TableCell align="right">
-                <Tooltip title="Chance he is still on the board at your pick">
-                  <span>Available</span>
-                </Tooltip>
-              </TableCell>
+              {COLS.map((c) => (
+                <TableCell key={c.id} align={c.num ? "right" : "left"}
+                           sortDirection={orderBy === c.id ? order : false}>
+                  <Tooltip title={c.tip ?? ""} disableHoverListener={!c.tip}>
+                    <TableSortLabel active={orderBy === c.id}
+                                    direction={orderBy === c.id ? order : "desc"}
+                                    onClick={() => handleSort(c.id)}>
+                      {c.label}
+                    </TableSortLabel>
+                  </Tooltip>
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {odds.results.map((r) => {
+            {sorted.map((r) => {
               const isLeader = leader && r.pid === leader.pid;
               const muted = !isLeader && !r.distinguishable;
               return (
@@ -191,17 +227,14 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId 
                   <TableCell sx={{ opacity: muted ? 0.6 : 1 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Box sx={{ width: 5, height: 18, borderRadius: 0.5,
-                                 bgcolor: getPositionColor(P.pos[r.pid]) }} />
-                      <span>{P.name[r.pid]}</span>
+                                 bgcolor: getPositionColor(r.pos) }} />
+                      <span>{r.name}</span>
                       <Typography component="span" variant="caption"
-                                  color="text.secondary">{P.pos[r.pid]}</Typography>
+                                  color="text.secondary">{r.pos}</Typography>
                     </Stack>
                   </TableCell>
                   <TableCell align="right" sx={{ opacity: muted ? 0.6 : 1 }}>
-                    {(() => {
-                      const rk = rankOverride?.[r.pid] || P.adpRank[r.pid];
-                      return !rk || rk >= 9999 ? "—" : rk;
-                    })()}
+                    {r.rank >= 9999 ? "—" : r.rank}
                   </TableCell>
                   <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums",
                                                  opacity: muted ? 0.6 : 1 }}>
