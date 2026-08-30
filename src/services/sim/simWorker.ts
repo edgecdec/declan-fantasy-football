@@ -13,10 +13,12 @@
  */
 import { Artifact } from "./engine";
 import { OddsRequest, Slice, simulateSlice } from "./candidateOdds";
+import { LeagueOddsRequest, LeagueSlice, simulateLeagueSlice } from "./leagueOdds";
 
 type InMsg =
   | { kind: "artifact"; artifact: Artifact }
-  | { kind: "job"; jobId: number; req: OddsRequest; simOffset: number };
+  | { kind: "job"; jobId: number; req: OddsRequest; simOffset: number }
+  | { kind: "leagueJob"; jobId: number; req: LeagueOddsRequest; simOffset: number };
 
 let art: Artifact | null = null;
 const post = (m: unknown, transfer?: Transferable[]) =>
@@ -29,9 +31,27 @@ self.onmessage = (e: MessageEvent<InMsg>) => {
     post({ kind: "ready" });
     return;
   }
-  if (msg.kind !== "job") return;
+  if (msg.kind !== "job" && msg.kind !== "leagueJob") return;
   if (!art) {
     post({ kind: "error", jobId: msg.jobId, message: "worker has no artifact" });
+    return;
+  }
+  if (msg.kind === "leagueJob") {
+    try {
+      // rankOverride arrives as a plain array over postMessage; restore the typed array
+      const req = { ...msg.req,
+        rankOverride: msg.req.rankOverride
+          ? Int32Array.from(msg.req.rankOverride as unknown as number[]) : null };
+      const slice: LeagueSlice = simulateLeagueSlice(art, req, msg.simOffset);
+      const transfer: Transferable[] = [
+        ...slice.po.map((a) => a.buffer), ...slice.ti.map((a) => a.buffer),
+        ...slice.pf.map((a) => a.buffer),
+      ];
+      post({ kind: "leagueSlice", jobId: msg.jobId, slice }, transfer);
+    } catch (err) {
+      post({ kind: "error", jobId: msg.jobId,
+             message: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
   try {

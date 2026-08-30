@@ -8,6 +8,7 @@ import useValuedPlayers from '@/hooks/useValuedPlayers';
 import RankingsSelector from '@/components/draft/RankingsSelector';
 import BestAvailable from '@/components/draft/BestAvailable';
 import TeamValueRankings from '@/components/draft/TeamValueRankings';
+import WinningOdds from '@/components/draft/WinningOdds';
 
 type Props = {
   draft: SleeperDraft;
@@ -48,6 +49,7 @@ export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, roster
       >
         <Tab label="Best Available" />
         <Tab label="Team Value" />
+        <Tab label="Winning Odds" />
       </Tabs>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
@@ -61,6 +63,16 @@ export default function DraftSidePanel({ draft, picks, rosteredPlayerIds, roster
         <TeamValueRankings
           valuedPlayers={valuedPlayers}
           picks={picks}
+          rosterOwnerMap={rosterOwnerMap}
+          rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
+          currentUserId={currentUserId}
+        />
+      )}
+      {tab === 2 && (
+        <WinningOdds
+          draft={draft}
+          picks={picks}
+          valuedPlayers={valuedPlayers}
           rosterOwnerMap={rosterOwnerMap}
           rosterIdToOwnerIdMap={rosterIdToOwnerIdMap}
           currentUserId={currentUserId}

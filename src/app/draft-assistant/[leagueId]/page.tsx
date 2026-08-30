@@ -10,7 +10,6 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PageHeader from '@/components/common/PageHeader';
 import DraftBoard from '@/components/draft/DraftBoard';
 import DraftSidePanel from '@/components/draft/DraftSidePanel';
-import PickOddsPanel from '@/components/draft/PickOddsPanel';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
 import { recommendedDynastyVariant, recommendedRedraftVariant } from '@/services/draft/rankingsVariant';
@@ -260,15 +259,6 @@ export default function LeagueDraftPage() {
             </Box>
           </Grid>
         </Grid>
-
-        {/* Simulated win odds per candidate pick. Runs entirely client-side in Web
-            Workers, so traffic costs the visitor's CPU rather than the server's. */}
-        <PickOddsPanel
-          draft={selectedDraft}
-          picks={picks}
-          currentUserId={user?.user_id}
-          season={selectedDraft?.season ?? '2026'}
-        />
 
         <Tooltip title={panelCollapsed ? 'Show Best Available' : 'Hide Best Available'}>
           <IconButton

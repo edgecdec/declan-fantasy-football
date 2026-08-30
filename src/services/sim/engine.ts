@@ -128,6 +128,20 @@ export class SimData {
       })));
   }
   posOf(i: number) { return this.pos[i] >= 0 ? this.posNames[this.pos[i]] : ""; }
+
+  /** Replace the market draft order with the user's selected ranking set.
+   *
+   *  Only the ORDER changes -- `board` (the points estimate that drives VORP) is left
+   *  alone, because a ranking set does not carry points in this league's scoring currency.
+   *  So choosing different rankings changes who gets picked when, not what a player is
+   *  worth. `mkt` is rederived because it is a pure function of the rank. */
+  applyRankOverride(rank: Int32Array) {
+    for (let i = 0; i < this.n && i < rank.length; i++) {
+      if (rank[i] <= 0) continue;
+      this.adpRank[i] = rank[i];
+      this.mkt[i] = 100 * Math.exp(-(rank[i] - 1) / 50);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
