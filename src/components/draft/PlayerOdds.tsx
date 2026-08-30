@@ -24,7 +24,7 @@ import { Player } from "@/services/draft/vbdService";
 import { getPositionColor } from "@/constants/colors";
 import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
 import { useMyBoard } from "@/hooks/useMyBoard";
-import { useDraftOdds } from "@/hooks/useDraftOdds";
+import { useDraftOdds, PLAYER_MAX_SIMS } from "@/hooks/useDraftOdds";
 import useTableSort from "@/hooks/useTableSort";
 
 const TOP_OVERALL = 20;
@@ -180,10 +180,12 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
           <Chip size="small" variant="outlined" label={`your pick #${odds.nextPick}`} />}
         {odds.sims > 0 && (
           <Chip size="small" variant="outlined"
-                color={odds.provisional ? "warning" : "default"}
-                label={odds.provisional
-                  ? `${odds.sims.toLocaleString()} sims, refining…`
-                  : `${odds.sims.toLocaleString()} sims`} />
+                color={!odds.settled ? "error" : odds.provisional ? "warning" : "default"}
+                label={!odds.settled
+                  ? `${odds.sims.toLocaleString()} sims — too few to rank`
+                  : odds.provisional
+                    ? `${odds.sims.toLocaleString()} sims, refining…`
+                    : `${odds.sims.toLocaleString()} sims`} />
         )}
         {odds.unreachable.length > 0 && (
           <Tooltip title={`Not simulated -- they reach pick #${odds.nextPick} less than 2% of the time: `
@@ -208,6 +210,12 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
         ))}
       </ToggleButtonGroup>
       {odds.running && <LinearProgress sx={{ mb: 1.5 }} />}
+      {odds.sims > 0 && !odds.settled && (
+        <Alert severity="warning" sx={{ mb: 1 }}>
+          First pass at {odds.sims.toLocaleString()} sims — the <b>order is not reliable yet</b>
+          {" "}and will change. Still simulating up to {PLAYER_MAX_SIMS.toLocaleString()}.
+        </Alert>
+      )}
       {odds.error && <Alert severity="warning" sx={{ mb: 1 }}>{odds.error}</Alert>}
 
       <TableContainer sx={{ maxHeight: 460 }}>

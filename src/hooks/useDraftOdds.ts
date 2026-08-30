@@ -3,11 +3,8 @@
  * Runs draft-odds simulations in a pool of Web Workers and streams results back.
  *
  * PROGRESSIVE, IN TWO SENSES
- *  1. A quick pass (QUICK_SIMS) lands fast so something is on screen, then the full pass
- *     (DEFAULT_SIMS) replaces it. The quick pass is flagged `provisional` -- at 400 sims
- *     the ordering is genuinely not reproducible (measured Spearman between two seeds:
- *     -0.12 at 200 sims, +0.25 at 600, +0.95 at 3000), so the UI must not present it as
- *     settled.
+ *  1. Results accumulate through the schedule below and repaint at every step, so the panel
+ *     is useful immediately and keeps sharpening while the user reads it.
  *  2. Sims are split across workers by RANGE, so every candidate always has the same sim
  *     count. Splitting by candidate instead would let a 3000-sim candidate be compared
  *     against a 400-sim one, which is invalid.
@@ -26,9 +23,17 @@ import {
  * always shares the same set of sim indices and the paired differences stay valid. Each chunk
  * uses a fresh range of sim offsets, so 10 chunks of 1000 really is 10,000 distinct sims.
  *
- * Nothing is shown before FIRST_SHOW: below ~2000 sims the ordering is not reproducible
- * between seeds (measured Spearman between two seeds: -0.12 at 200 sims, +0.25 at 600,
- * +0.95 at 3000), so an early table would show a confident ranking that a re-run contradicts.
+ * MEASURED COST, which drives the schedule: 3.14 ms per candidate-sim warm (38 candidates =
+ * top 20 overall + top 3 at each of 6 positions). On 8 workers that is ~6s for 400 sims, ~30s
+ * for 2000, and ~149s to reach 10,000 -- so during a live draft, where a pick lands every
+ * 30-90s and every pick restarts the accumulation, the higher counts are reached between picks
+ * or not at all. Sitting on a blank panel for 30s after every pick is worse than seeing a
+ * flagged number, so there is a fast PROVISIONAL paint at 400 sims which is explicitly marked
+ * unreliable, and FIRST_SHOW is the point at which the table stops being flagged.
+ *
+ * Why 2000 is that point: below it the ordering is not reproducible between seeds (measured
+ * Spearman between two seeds: -0.12 at 200 sims, +0.25 at 600, +0.95 at 3000), so an early
+ * table shows a confident-looking ranking that a re-run contradicts.
  *
  * What more sims buy, and what they do not: at 2000 sims a ~63% playoff rate has SE ~1.1pp and
  * a ~11% title rate ~0.70pp; at 10,000 those fall to ~0.48pp and ~0.31pp. But the fold SE
@@ -36,9 +41,19 @@ import {
  * only with more seasons, of which six are usable. So 10,000 is where extra sims stop being
  * the binding constraint, not where the answer becomes exact.
  */
+export const PLAYER_PROVISIONAL_SIMS = 400;
 export const PLAYER_CHUNK_SIMS = 1000;
 export const PLAYER_FIRST_SHOW = 2000;
 export const PLAYER_MAX_SIMS = 10000;
+
+/** Chunk sizes in order: a fast flagged paint, up to FIRST_SHOW, then steady increments. */
+function simSchedule(): number[] {
+  const out = [PLAYER_PROVISIONAL_SIMS, PLAYER_FIRST_SHOW - PLAYER_PROVISIONAL_SIMS];
+  for (let t = PLAYER_FIRST_SHOW; t < PLAYER_MAX_SIMS; t += PLAYER_CHUNK_SIMS) {
+    out.push(Math.min(PLAYER_CHUNK_SIMS, PLAYER_MAX_SIMS - t));
+  }
+  return out;
+}
 /** Candidates below this chance of reaching your pick are not simulated at all. */
 export const MIN_AVAILABILITY = 2;
 
@@ -49,14 +64,17 @@ export type OddsState = {
   nextPick: number;
   noiseFloor: number;
   sims: number;
+  /** more sims are still coming */
   provisional: boolean;
+  /** enough sims that the ORDER is reproducible; below this the table is flagged */
+  settled: boolean;
   running: boolean;
   error: string | null;
 };
 
 const EMPTY: OddsState = {
   results: [], unreachable: [], nextPick: -1, noiseFloor: 0, sims: 0,
-  provisional: false, running: false, error: null,
+  provisional: false, settled: false, running: false, error: null,
 };
 
 export function useDraftOdds(artifact: Artifact | null) {
@@ -126,8 +144,8 @@ export function useDraftOdds(artifact: Artifact | null) {
     // Accumulated slices across every chunk so far. aggregate() concatenates them, so the
     // reported n grows with each round and the paired SE shrinks accordingly.
     const acc: Slice[] = [];
-    for (let done = 0; done < PLAYER_MAX_SIMS; done += PLAYER_CHUNK_SIMS) {
-      const want = Math.min(PLAYER_CHUNK_SIMS, PLAYER_MAX_SIMS - done);
+    let done = 0;
+    for (const want of simSchedule()) {
       const slices = await chunk(done, want);
       if (jobRef.current !== myJob) return;             // a newer request superseded us
       if (!slices.length) {
@@ -137,12 +155,12 @@ export function useDraftOdds(artifact: Artifact | null) {
         return;
       }
       acc.push(...slices);
-      const total = done + want;
-      if (total < PLAYER_FIRST_SHOW) continue;          // too noisy to put on screen yet
+      done += want;
       const agg = aggregate(cands, acc);
-      const more = total < PLAYER_MAX_SIMS;
+      const more = done < PLAYER_MAX_SIMS;
       setState({ ...agg, unreachable, sims: agg.results[0]?.n ?? 0,
-                 provisional: more, running: more, error: null });
+                 provisional: more, settled: done >= PLAYER_FIRST_SHOW,
+                 running: more, error: null });
     }
   }, [artifact]);
 
