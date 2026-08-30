@@ -153,13 +153,17 @@ export default function LeagueDraftPage() {
 
     const interval = setInterval(async () => {
       try {
-        const [fetchedDraft, fetchedPicks] = await Promise.all([
+        const [fetchedDraft, fetchedPicks, fetchedTraded] = await Promise.all([
           SleeperService.getDraft(selectedDraft.draft_id, { skipCache: true }),
           SleeperService.getDraftPicks(selectedDraft.draft_id),
+          // A trade executed mid-draft changes pick ownership on the board and in the odds,
+          // so this has to be polled too -- it was previously fetched only on first load.
+          SleeperService.getDraftTradedPicks(selectedDraft.draft_id, { skipCache: true }),
         ]);
         if (cancelled) return;
         if (fetchedDraft) setSelectedDraft(fetchedDraft);
         setPicks(fetchedPicks);
+        setTradedPicks(fetchedTraded);
       } catch (e) { console.error(e); }
     }, 15000);
 
@@ -177,12 +181,14 @@ export default function LeagueDraftPage() {
     if (!selectedDraft) return;
     setRefreshing(true);
     try {
-      const [fetchedDraft, fetchedPicks] = await Promise.all([
+      const [fetchedDraft, fetchedPicks, fetchedTraded] = await Promise.all([
         SleeperService.getDraft(selectedDraft.draft_id, { skipCache: true }),
         SleeperService.getDraftPicks(selectedDraft.draft_id),
+        SleeperService.getDraftTradedPicks(selectedDraft.draft_id, { skipCache: true }),
       ]);
       if (fetchedDraft) setSelectedDraft(fetchedDraft);
       setPicks(fetchedPicks);
+      setTradedPicks(fetchedTraded);
     } catch (e) { console.error(e); }
     setRefreshing(false);
   };

@@ -121,7 +121,7 @@ export default function PredictionsPage() {
         const [d, p, tp] = await Promise.all([
           SleeperService.getDraft(draft.draft_id, { skipCache: true }),
           SleeperService.getDraftPicks(draft.draft_id),
-          SleeperService.getDraftTradedPicks(draft.draft_id),
+          SleeperService.getDraftTradedPicks(draft.draft_id, { skipCache: true }),
         ]);
         if (cancelled) return;
         if (d) setDraft(d);

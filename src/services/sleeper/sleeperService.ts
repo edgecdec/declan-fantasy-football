@@ -3,6 +3,9 @@ import { CacheService } from '@/services/common/cacheService';
 
 const BASE_URL = 'https://api.sleeper.app/v1';
 
+/** Draft-pick trades change during a live draft, so they cannot use the 1-hour default TTL. */
+const TRADED_PICKS_TTL = 15 * 1000;
+
 export type SleeperUser = {
   username: string;
   user_id: string;
@@ -429,16 +432,26 @@ export const SleeperService = {
     }
   },
 
-  async getDraftTradedPicks(draftId: string): Promise<SleeperTradedPick[]> {
+  /**
+   * Draft-pick trades. Cached for TRADED_PICKS_TTL rather than the 1-hour default, because
+   * this is live draft state: a trade executed during a draft was previously invisible for up
+   * to an hour, since the pre-trade result (often an empty list) stayed cached in
+   * sessionStorage. That made pick ownership wrong on the board AND in the odds simulation,
+   * and a 15s poll could not fix it because the poll hit the same cache.
+   */
+  async getDraftTradedPicks(draftId: string,
+                            options: { skipCache?: boolean } = {}): Promise<SleeperTradedPick[]> {
     const cacheKey = `draft_traded_picks_${draftId}`;
-    const cached = CacheService.get<SleeperTradedPick[]>(cacheKey, 'session');
-    if (cached) return cached;
+    if (!options.skipCache) {
+      const cached = CacheService.get<SleeperTradedPick[]>(cacheKey, 'session');
+      if (cached) return cached;
+    }
 
     try {
       const res = await fetch(`${BASE_URL}/draft/${draftId}/traded_picks`);
       if (!res.ok) return [];
       const data = await res.json();
-      CacheService.set(cacheKey, data, { storage: 'session' });
+      CacheService.set(cacheKey, data, { storage: 'session', ttl: TRADED_PICKS_TTL });
       return data;
     } catch (e) {
       console.error(`Error fetching traded picks for draft ${draftId}`, e);

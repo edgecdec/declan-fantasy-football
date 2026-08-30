@@ -27,6 +27,7 @@ import { getPositionColor } from "@/constants/colors";
 import { useSimArtifact, inferSeat } from "@/hooks/useSimArtifact";
 import { useMyBoard } from "@/hooks/useMyBoard";
 import { buildSwaps, swapsFingerprint } from "@/services/sim/pickOwnership";
+import { rosterNeed, isBenchOnly } from "@/services/sim/rosterNeed";
 import { useDraftOdds, PLAYER_MAX_SIMS } from "@/hooks/useDraftOdds";
 import useTableSort from "@/hooks/useTableSort";
 
@@ -81,6 +82,21 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
     [tradedPicks, draft?.slot_to_roster_id, draft?.settings?.reversal_round,
      draft?.settings?.teams, draft?.settings?.rounds, artifact]);
   const swapSig = swapsFingerprint(swaps);
+
+  /** What I already own, and therefore which positions can still reach my starting lineup.
+   *  A position with no open starting slot is bench depth: still simulatable, but it should
+   *  not sit in the default list next to players who will start every week. */
+  const need = React.useMemo(() => {
+    if (!artifact) return null;
+    const mine: string[] = [];
+    for (const p of picks) {
+      if (currentUserId && p.picked_by !== currentUserId) continue;
+      if (!currentUserId) continue;
+      const i = idx?.get(p.player_id);
+      if (i !== undefined) mine.push(artifact.players.pos[i]);
+    }
+    return rosterNeed(artifact.meta.slots, mine);
+  }, [artifact, idx, picks, currentUserId]);
 
   const plan = React.useMemo(() => {
     if (!artifact || !idx || !draft || mismatch) return null;
@@ -144,7 +160,15 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
     pos: artifact.players.pos[r.pid],
     rank: (rankOverride?.[r.pid] || artifact.players.adpRank[r.pid]) || 9999,
   })) : [];
-  const filtered = posFilter === "ALL" ? rows : rows.filter((r) => r.pos === posFilter);
+  const benchOnly = (pos: string) => !!need && isBenchOnly(need, pos);
+  const benchPositions = need ? POSITIONS.filter((p) => isBenchOnly(need, p)
+    && rows.some((r) => r.pos === p)) : [];
+  const withBench = rows.map((r) => ({ ...r, bench: benchOnly(r.pos) }));
+  // Default view hides bench-only positions -- they are reachable via their own tab, where
+  // the question "who is the best backup QB" is the one actually being asked.
+  const filtered = posFilter === "ALL"
+    ? withBench.filter((r) => !r.bench)
+    : withBench.filter((r) => r.pos === posFilter);
   // Default: strongest playoff odds first, which is the question the panel answers.
   const { sorted, order, orderBy, handleSort } = useTableSort(filtered, "playoff", "desc");
 
@@ -220,6 +244,21 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
           ? " Your seat drafts the board selected above; the other managers draft consensus ADP, which is what availability reflects."
           : " Select or upload a ranking set to have your seat draft it instead of market ADP."}
       </Typography>
+      {need && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          <b>Starting slots still open:</b>{" "}
+          {need.openSlots.length ? need.openSlots.join(", ") : "none — everything else is depth"}.
+          {benchPositions.length > 0 && (
+            <> {benchPositions.join(" and ")} {benchPositions.length === 1 ? "is" : "are"}{" "}
+              bench-only for you now, so {benchPositions.length === 1 ? "it is" : "they are"}{" "}
+              hidden from this list — open the {benchPositions[0]} tab to see{" "}
+              {benchPositions.length === 1 ? "them" : "those"} anyway. A backup only scores when
+              your starter has a bye or a bad week, which is worth far less than a player who
+              starts every week.
+            </>
+          )}
+        </Typography>
+      )}
       <ToggleButtonGroup value={posFilter} exclusive size="small" sx={{ mb: 1.5 }}
         onChange={(_e, v: string | null) => v && setPosFilter(v)}>
         {["ALL", ...POSITIONS].map((pp) => (
@@ -267,6 +306,12 @@ export default function PlayerOdds({ draft, picks, valuedPlayers, currentUserId,
                       <span>{r.name}</span>
                       <Typography component="span" variant="caption"
                                   color="text.secondary">{r.pos}</Typography>
+                      {r.bench && (
+                        <Tooltip title="You have no open starting slot for this position — he would be bench depth, scoring only when your starter is on bye or underperforms.">
+                          <Chip size="small" variant="outlined" label="bench"
+                                sx={{ height: 18, fontSize: "0.65rem" }} />
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                   <TableCell align="right" sx={{ opacity: muted ? 0.6 : 1 }}>

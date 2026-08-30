@@ -131,10 +131,21 @@ export default function DraftGrid({ draft, grid, ownershipMap, rosterOwnerMap, s
                         <Typography variant="caption" noWrap sx={{ color: getPositionColor(position), fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {position} <Typography component="span" variant="caption" color="text.secondary">- {pick.metadata.team}</Typography>
                         </Typography>
+                        {/* A completed traded pick still sits in the ORIGINAL owner's column,
+                            because Sleeper's draft_slot is the pick's physical position in the
+                            snake. Without a clear marker the player reads as belonging to the
+                            column header -- e.g. pullmanguy's Brock Bowers appearing under
+                            edgecdec. So name the real drafter, and use the same chip treatment
+                            as an un-taken traded pick rather than 0.6rem grey text. */}
                         {isTraded && (
-                          <Typography variant="caption" sx={{ fontSize: '0.6rem', color: isTradedToCurrentUser ? 'warning.main' : 'text.secondary' }}>
-                            ↔️ {ownerName || `Team ${actualOwnerId}`}
-                          </Typography>
+                          <Chip
+                            label={`↔ ${ownerName || `Team ${actualOwnerId}`}`}
+                            size="small"
+                            color={isTradedToCurrentUser ? 'warning' : 'default'}
+                            variant={isTradedToCurrentUser ? 'filled' : 'outlined'}
+                            sx={{ height: 16, fontSize: '0.6rem', mt: 0.25, maxWidth: '100%',
+                                  '& .MuiChip-label': { px: 0.5 } }}
+                          />
                         )}
                       </>
                     ) : (
