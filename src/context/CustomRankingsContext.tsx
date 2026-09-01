@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Player } from '@/services/draft/vbdService';
 import { parseAndMatchRankingsCsv } from '@/services/draft/rankingsCsv';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 const STORAGE_KEY = 'declanalytics_custom_ranking_sets';
 const ACTIVE_KEY = 'declanalytics_active_ranking_set';
@@ -136,7 +137,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
 
   const persist = (sets: RankingSet[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sets));
+      safeLocalSet(STORAGE_KEY, JSON.stringify(sets));
     } catch (e) {
       console.error('Failed to save custom rankings (storage full?)', e);
     }
@@ -165,14 +166,14 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
       return next;
     });
     setActiveId(set.id);
-    localStorage.setItem(ACTIVE_KEY, set.id);
+    safeLocalSet(ACTIVE_KEY, set.id);
 
     return { matchedCount, totalRows, unmatchedNames };
   };
 
   const selectRankingSet = (id: string) => {
     setActiveId(id);
-    localStorage.setItem(ACTIVE_KEY, id);
+    safeLocalSet(ACTIVE_KEY, id);
   };
 
   const deleteRankingSet = (id: string) => {
@@ -183,7 +184,7 @@ export function CustomRankingsProvider({ children }: { children: React.ReactNode
     });
     setActiveId(prev => {
       if (prev !== id) return prev;
-      localStorage.setItem(ACTIVE_KEY, 'default');
+      safeLocalSet(ACTIVE_KEY, 'default');
       return 'default';
     });
   };

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { sendGAEvent } from '@next/third-parties/google';
 import { SleeperUser, SleeperService } from '@/services/sleeper/sleeperService';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 interface UserContextType {
   user: SleeperUser | null;
@@ -33,11 +34,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const setUser = (newUser: SleeperUser | null) => {
     setUserState(newUser);
     if (newUser) {
-      localStorage.setItem('sleeper_active_user', JSON.stringify(newUser));
+      safeLocalSet('sleeper_active_user', JSON.stringify(newUser));
       // Also save to history
       const history = JSON.parse(localStorage.getItem('sleeper_usernames') || '[]');
       if (!history.includes(newUser.username)) {
-        localStorage.setItem('sleeper_usernames', JSON.stringify([newUser.username, ...history].slice(0, 5)));
+        safeLocalSet('sleeper_usernames', JSON.stringify([newUser.username, ...history].slice(0, 5)));
       }
       
       // Track in GA

@@ -32,6 +32,35 @@ function evictOldest(store: Storage, bytesNeeded: number) {
   }
 }
 
+/**
+ * Writes a plain (non-cache) key to localStorage without ever throwing.
+ *
+ * The analysis pages cache well over a megabyte of results per season under the
+ * PREFIX namespace, so localStorage can legitimately be at quota by the time a
+ * small preference or the active user gets written. A bare setItem throws
+ * QuotaExceededError there, and because these writes sit inside async click
+ * handlers the rejection surfaces as a blank error page telling the user to
+ * reload — losing the analysis they just waited for. Preferences are not worth
+ * a crash: evict cache entries to make room, and if that still fails, drop the
+ * write and carry on.
+ */
+export function safeLocalSet(key: string, value: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    try {
+      evictOldest(localStorage, value.length * 2);
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      console.warn(`Storage full, skipped write for "${key}"`);
+      return false;
+    }
+  }
+}
+
 export const CacheService = {
   set<T>(key: string, data: T, options: CacheOptions = {}) {
     if (typeof window === 'undefined') return;

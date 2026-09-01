@@ -35,6 +35,7 @@ import playerData from '../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import useSeason from '@/hooks/useSeason';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 // --- Types ---
 type IssueType = 'critical' | 'warning' | 'info';
@@ -94,7 +95,7 @@ export default function RosterMedicPage() {
     const saved = localStorage.getItem('sleeper_usernames');
     let list = saved ? JSON.parse(saved) : [];
     list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
+    safeLocalSet('sleeper_usernames', JSON.stringify(list));
   };
 
   const startScan = async () => {

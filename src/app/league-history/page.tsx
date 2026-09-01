@@ -35,6 +35,7 @@ import { analyzeLeagueHistory, LeagueHistoryResult, MemberHistoryStats } from '@
 import PageHeader from '@/components/common/PageHeader';
 import YearSelector from '@/components/common/YearSelector';
 import useSeason from '@/hooks/useSeason';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 // --- Sub-Components ---
 
@@ -266,7 +267,7 @@ export default function LeagueHistoryPage() {
       setUserId(userRes.user_id);
       const newSaved = [username, ...savedUsernames.filter(u => u !== username)].slice(0, 5);
       setSavedUsernames(newSaved);
-      localStorage.setItem('sleeper_usernames', JSON.stringify(newSaved));
+      safeLocalSet('sleeper_usernames', JSON.stringify(newSaved));
 
       const leaguesRes = await SleeperService.getLeagues(userRes.user_id, year);
       setLeagues(leaguesRes);

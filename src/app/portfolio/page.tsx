@@ -28,6 +28,7 @@ import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import useSeason from '@/hooks/useSeason';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 // Types
 type LeagueInfo = {
@@ -98,7 +99,7 @@ export default function PortfolioPage() {
     const saved = localStorage.getItem('sleeper_usernames');
     let list = saved ? JSON.parse(saved) : [];
     list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
+    safeLocalSet('sleeper_usernames', JSON.stringify(list));
   };
 
   const handleAnalyze = async () => {

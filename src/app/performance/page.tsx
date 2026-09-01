@@ -43,6 +43,7 @@ import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import useTableSort from '@/hooks/useTableSort';
 import useSeason from '@/hooks/useSeason';
+import { safeLocalSet } from '@/services/common/cacheService';
 
 // --- Types ---
 type AnalysisStatus = 'idle' | 'pending' | 'loading' | 'complete' | 'error';
@@ -377,7 +378,7 @@ export default function PerformancePage() {
     const saved = localStorage.getItem('sleeper_usernames');
     let list = saved ? JSON.parse(saved) : [];
     list = [name, ...list.filter((u: string) => u !== name)].slice(0, 5);
-    localStorage.setItem('sleeper_usernames', JSON.stringify(list));
+    safeLocalSet('sleeper_usernames', JSON.stringify(list));
   };
 
   const handleStart = async () => {
