@@ -14,6 +14,8 @@ import { analyzePositionalBenchmarks } from '@/services/stats/positionalBenchmar
 import { analyzeStartSitDecisions } from '@/services/stats/lineupOptimizer';
 import PositionalHeatmap from '@/components/performance/PositionalHeatmap';
 import SmartTable from '@/components/common/SmartTable';
+import LeagueManagerHistoryPanels from '@/components/performance/LeagueManagerHistoryPanels';
+import { analyzeLeagueManagerHistory, LeagueManagerHistory } from '@/services/stats/historicalManagers';
 
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 const POSITION_COLORS: Record<string, string> = {
@@ -34,6 +36,7 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
   const [positionalData, setPositionalData] = React.useState<YearlyPositionalStats[]>([]);
   const [decisionData, setDecisionData] = React.useState<YearlyDecisionStats[]>([]);
   const [summaryRows, setSummaryRows] = React.useState<SeasonSummaryRow[]>([]);
+  const [managerHistory, setManagerHistory] = React.useState<LeagueManagerHistory | null>(null);
   const [metric, setMetric] = React.useState<'total' | 'efficiency'>('total');
   const fetchedRef = React.useRef('');
 
@@ -49,8 +52,17 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
     setPositionalData([]);
     setDecisionData([]);
     setSummaryRows([]);
+    setManagerHistory(null);
 
     try {
+      // Run the all-manager pass first. It walks the same seasons and weeks the
+      // personal charts below need, so it warms the matchup/projection caches
+      // and the per-user loop that follows is served almost entirely from them.
+      const managers = await analyzeLeagueManagerHistory(leagueId, userId, (done, total) => {
+        setProgress({ done, total });
+      });
+      setManagerHistory(managers);
+
       const history = await SleeperService.getLeagueHistory(leagueId);
       const validLeagues = history.filter(l => l.status === 'complete' || l.status === 'in_season');
       setProgress({ done: 0, total: validLeagues.length });
@@ -115,7 +127,7 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
     } catch (e) { console.error('League history error', e); } finally { setLoading(false); }
   };
 
-  if (loading && positionalData.length === 0 && decisionData.length === 0) {
+  if (loading && !managerHistory && positionalData.length === 0 && decisionData.length === 0) {
     return (
       <Box sx={{ mb: 3 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -127,7 +139,7 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
     );
   }
 
-  if (!loading && positionalData.length === 0 && decisionData.length === 0) {
+  if (!loading && !managerHistory && positionalData.length === 0 && decisionData.length === 0) {
     return (
       <Typography color="text.secondary" sx={{ textAlign: 'center', py: 8 }}>
         No historical data available for this league.
@@ -144,6 +156,15 @@ export default function LeagueHistoricalContent({ leagueId, userId }: Props) {
           </Typography>
           <LinearProgress variant="determinate" value={(progress.done / progress.total) * 100} />
         </Box>
+      )}
+
+      {/* Every manager, every season — who is weak where */}
+      {managerHistory && (
+        <LeagueManagerHistoryPanels history={managerHistory} currentUserId={userId} />
+      )}
+
+      {managerHistory && (decisionData.length > 0 || positionalData.length > 0) && (
+        <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>Your Detail</Typography>
       )}
 
       {/* Decision Accuracy Trend */}
