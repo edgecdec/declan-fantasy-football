@@ -40,7 +40,7 @@ export default function PositionalBenchmarksContent() {
   const [username, setUsername] = React.useState('');
   // Benchmarks compare against completed-season output, so seed to the last
   // season with games rather than an upcoming one.
-  const { season: year, setSeason: setYear } = useSeason('results');
+  const { season: year, setSeason: setYear, loading: seasonLoading } = useSeason('results');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [status, setStatus] = React.useState('');
@@ -67,11 +67,14 @@ export default function PositionalBenchmarksContent() {
   }, [user]);
 
   React.useEffect(() => {
+    // Wait for the season to resolve, or the first analyse runs against an
+    // empty year and silently finds no leagues.
+    if (seasonLoading || !year) return;
     if (username && !loading && results.length === 0) {
       const t = setTimeout(() => handleAnalyze(), 500);
       return () => clearTimeout(t);
     }
-  }, [username]);
+  }, [username, seasonLoading, year]);
 
   React.useEffect(() => {
     if (results.length > 0) {

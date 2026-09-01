@@ -342,7 +342,7 @@ export default function StartSitContent() {
   const [username, setUsername] = React.useState('');
   // Start/sit accuracy needs played weeks to score decisions against, so seed to
   // the last season that produced games.
-  const { season: year, setSeason: setYear } = useSeason('results');
+  const { season: year, setSeason: setYear, loading: seasonLoading } = useSeason('results');
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState({ done: 0, total: 0 });
   const [summaries, setSummaries] = React.useState<SeasonDecisionSummary[]>([]);
@@ -351,13 +351,16 @@ export default function StartSitContent() {
   React.useEffect(() => { if (user) setUsername(user.username); }, [user]);
 
   React.useEffect(() => {
+    // Without this the first pass runs with an empty year, then immediately
+    // reruns once the real season lands — two analyses for one page load.
+    if (seasonLoading || !year) return;
     const key = `${username}|${year}`;
     if (username && key !== prevTrigger.current) {
       prevTrigger.current = key;
       const t = setTimeout(() => handleAnalyze(), 500);
       return () => clearTimeout(t);
     }
-  }, [username, year]);
+  }, [username, year, seasonLoading]);
 
   const handleAnalyze = async () => {
     if (!username) return;
