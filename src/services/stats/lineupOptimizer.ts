@@ -3,6 +3,7 @@ import {
   OptimalLineupResult, LineupSlot, LineupMistake,
   WeeklyDecision, PositionAccuracy, SeasonDecisionSummary,
 } from '@/types/lineup';
+import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
 import playerData from '../../../data/sleeper_players.json';
 
 type PlayerRecord = { first_name: string; last_name: string; position: string };
@@ -239,9 +240,18 @@ export async function analyzeStartSitDecisions(
   const scoringSettings = leagueAny.scoring_settings;
   if (!rosterPositions || !scoringSettings) return null;
 
-  const totalWeeks = league.settings.playoff_week_start
+  const settingsWeeks = league.settings.playoff_week_start
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
+
+  // Only walk weeks that have actually been scored. Sleeper serves a matchup row
+  // for future weeks with the current roster in the starter slots, which would
+  // otherwise register as real lineup decisions worth grading.
+  const nflState = await getNflStateOrFallback();
+  const totalWeeks = Math.min(
+    settingsWeeks,
+    completedWeekCount(nflState, season, league.settings.last_scored_leg),
+  );
 
   const weekly: WeeklyDecision[] = [];
   const allMistakes: LineupMistake[] = [];
@@ -325,9 +335,18 @@ export async function analyzeLeagueAllManagers(
   const scoringSettings = leagueAny.scoring_settings;
   if (!rosterPositions || !scoringSettings) return [];
 
-  const totalWeeks = league.settings.playoff_week_start
+  const settingsWeeks = league.settings.playoff_week_start
     ? league.settings.playoff_week_start - 1
     : DEFAULT_REGULAR_SEASON_WEEKS;
+
+  // Only walk weeks that have actually been scored. Sleeper serves a matchup row
+  // for future weeks with the current roster in the starter slots, which would
+  // otherwise register as real lineup decisions worth grading.
+  const nflState = await getNflStateOrFallback();
+  const totalWeeks = Math.min(
+    settingsWeeks,
+    completedWeekCount(nflState, season, league.settings.last_scored_leg),
+  );
 
   type MgrAccum = {
     ownerId: string;

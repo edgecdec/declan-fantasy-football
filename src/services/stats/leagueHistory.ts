@@ -1,4 +1,5 @@
 import { SleeperService, SleeperLeague, SleeperRoster, SleeperMatchup, SleeperBracketMatch } from '@/services/sleeper/sleeperService';
+import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
 import playerData from '../../../data/sleeper_players.json';
 
 export type MemberHistoryStats = {
@@ -122,9 +123,14 @@ export async function analyzeLeagueHistory(
     });
 
     // --- Process Matchups (For H2H, Positional, and verified PA) ---
-    // We assume regular season is up to playoff_week_start
+    // We assume regular season is up to playoff_week_start, but never past the
+    // weeks actually scored: Sleeper returns future weeks as 0-0 matchup rows,
+    // which would otherwise land in the H2H matrix as real ties.
     const playoffStart = league.settings.playoff_week_start || 15;
-    const regSeasonWeeks = Array.from({ length: playoffStart - 1 }, (_, i) => i + 1);
+    const nflState = await getNflStateOrFallback();
+    const scoredWeeks = completedWeekCount(nflState, league.season, league.settings.last_scored_leg);
+    const regSeasonCount = Math.min(playoffStart - 1, scoredWeeks);
+    const regSeasonWeeks = Array.from({ length: Math.max(0, regSeasonCount) }, (_, i) => i + 1);
 
     // Fetch all weeks in parallel batches
     const BATCH = 4;

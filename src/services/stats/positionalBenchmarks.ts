@@ -1,5 +1,6 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { CacheService } from '@/services/common/cacheService';
+import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
 import playerData from '../../../data/sleeper_players.json';
 
 // Types
@@ -49,16 +50,28 @@ export async function analyzePositionalBenchmarks(
   // 1. Determine Weeks to Analyze
   const startWeek = league.settings.start_week || 1;
   const playoffStart = league.settings.playoff_week_start || 15;
-  const lastScoredLeg = league.settings.last_scored_leg || 18; 
-  
-  const endWeek = includePlayoffs ? lastScoredLeg : (playoffStart - 1);
-  
+  const lastScoredLeg = league.settings.last_scored_leg || 18;
+
+  const settingsEndWeek = includePlayoffs ? lastScoredLeg : (playoffStart - 1);
+
+  // Clamp to weeks that have actually been scored. Sleeper returns a full
+  // matchup row for future weeks with the current roster in the starter slots,
+  // so without this every rostered player is credited with a start in every
+  // remaining week of the season — and `last_scored_leg` is absent before a
+  // season scores, making the `|| 18` above invent 18 of them.
+  const nflState = await getNflStateOrFallback();
+  const playedWeeks = completedWeekCount(nflState, league.season, league.settings.last_scored_leg);
+  const endWeek = Math.min(settingsEndWeek, playedWeeks);
+
   const weeks: number[] = [];
   if (endWeek >= startWeek) {
     for (let w = startWeek; w <= endWeek; w++) {
       weeks.push(w);
     }
   }
+
+  // Nothing scored yet: report no data rather than a grid of zeroes.
+  if (weeks.length === 0) return null;
 
   // 2. Fetch All Matchups, Rosters & Users
   const [allWeeksMatchups, rostersRes, usersRes] = await Promise.all([

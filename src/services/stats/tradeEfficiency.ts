@@ -1,5 +1,6 @@
 import { SleeperService, SleeperMatchup, SleeperDraftPick } from '@/services/sleeper/sleeperService';
 import { CacheService } from '@/services/common/cacheService';
+import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
 import { fetchLeagueTrades, TradeData } from '@/services/stats/tradeAnalyzer';
 import {
   PlayerWeekEfficiency,
@@ -330,7 +331,14 @@ export async function evaluateTradeEfficiency(
   const league = await SleeperService.getLeague(leagueId);
   const playoffWeekStart = league?.settings?.playoff_week_start || (DEFAULT_REGULAR_SEASON_WEEKS + 1);
   const lastWeek = await getLastPlayoffWeek(leagueId, playoffWeekStart);
-  const totalWeeks = lastWeek;
+  // Never evaluate a trade against weeks that have not been played. Sleeper
+  // serves future weeks as 0-point matchup rows, which would read as a traded
+  // player producing nothing rather than as "no data yet".
+  const nflState = await getNflStateOrFallback();
+  const totalWeeks = Math.min(
+    lastWeek,
+    completedWeekCount(nflState, season, league?.settings?.last_scored_leg),
+  );
 
   const [fetched, draftPicksResult] = await Promise.all([
     Promise.all(

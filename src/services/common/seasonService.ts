@@ -60,11 +60,60 @@ function fallbackState(): SleeperNflState {
   };
 }
 
-/** True once the season in `state` has produced completed games. */
+/** Longest a fantasy regular season + playoffs can run. */
+const MAX_SEASON_WEEKS = 18;
+
+/**
+ * How many weeks of `season` have actually been scored.
+ *
+ * This is the guard against phantom data. Sleeper's
+ * `/league/<id>/matchups/<week>` answers for *every* week of the season, not
+ * just played ones — ask it about week 17 in September and it echoes the
+ * current roster back with 0 points. Any loop bounded by league settings
+ * (`last_scored_leg`, `playoff_week_start`) therefore credits every rostered
+ * player with a start in weeks that haven't happened. `last_scored_leg` is
+ * absent entirely on a season that hasn't scored yet, so `|| 18` fallbacks turn
+ * into 18 invented weeks.
+ *
+ * Callers should clamp their week range to this before counting anything.
+ */
+export function completedWeekCount(
+  state: SleeperNflState,
+  season: string,
+  lastScoredLeg?: number,
+): number {
+  const target = Number(season);
+  const current = Number(state.season);
+  if (!Number.isFinite(target) || !Number.isFinite(current)) return 0;
+
+  // A finished season is authoritative via its own last_scored_leg.
+  if (target < current) return lastScoredLeg ?? MAX_SEASON_WEEKS;
+  if (target > current) return 0;
+
+  switch (state.season_type) {
+    case 'pre':
+      return 0;
+    // The week Sleeper reports is the one in progress, so it isn't banked yet.
+    case 'regular':
+      return Math.max(0, state.week - 1);
+    case 'post':
+    case 'off':
+      return lastScoredLeg ?? state.week;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * True once the season in `state` has produced completed games.
+ *
+ * Deliberately conservative: during regular-season week 1 nothing has been
+ * banked yet, so this stays false and the results-oriented pages hold on the
+ * previous season rather than showing tables that divide by zero games.
+ */
 export function seasonHasPlayedGames(state: SleeperNflState): boolean {
   if (!PLAYED_SEASON_TYPES.includes(state.season_type)) return false;
-  // Week 1 is in progress at week === 1; a result only exists once it's banked.
-  return state.week >= 1;
+  return completedWeekCount(state, state.season) >= 1;
 }
 
 /**
