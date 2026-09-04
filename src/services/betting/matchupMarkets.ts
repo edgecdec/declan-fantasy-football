@@ -48,6 +48,10 @@ export type MarketSide = {
   playersRemaining: number;
   /** Bench players the model assumes will be started before kickoff. */
   assumedPromotions: { playerId: string; name: string; projectedPoints: number }[];
+  /** Free agents the model assumes get streamed in (typically K/DEF). */
+  assumedStreams: { playerId: string; name: string; projectedPoints: number }[];
+  /** Slots nobody could fill, which genuinely score nothing. */
+  unfilledSlots: string[];
 };
 
 export type MatchupMarket = {
@@ -114,7 +118,14 @@ function buildStarters(
   projections: Record<string, Record<string, number>>,
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
-): { starters: StarterInput[]; promoted: LineupCandidate[]; demoted: LineupCandidate[] } {
+  freeAgents: LineupCandidate[],
+  claimedFreeAgents: Set<string>,
+): {
+  starters: StarterInput[];
+  promoted: LineupCandidate[];
+  streamed: LineupCandidate[];
+  unfilledSlots: string[];
+} {
   const starterIds = matchup.starters ?? [];
   const starterPoints = matchup.starters_points ?? [];
   const playersPoints = matchup.players_points ?? {};
@@ -130,7 +141,7 @@ function buildStarters(
     .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
     .map(pid => buildCandidate(pid, playersPoints[pid] ?? 0, projections, scoringSettings, games));
 
-  const best = bestAvailableLineup(rosterPositions, current, bench);
+  const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, claimedFreeAgents);
 
   return {
     starters: best.starters.map(c => ({
@@ -142,8 +153,40 @@ function buildStarters(
       remainingMinutes: c.remainingMinutes,
     })),
     promoted: best.promoted,
-    demoted: best.demoted,
+    streamed: best.streamed,
+    unfilledSlots: best.unfilledSlots,
   };
+}
+
+/**
+ * Everyone at a streamable position who is not on any roster in the league.
+ *
+ * A manager who carries no kicker or defence all week and grabs one right before
+ * kickoff would otherwise be priced as scoring zero in that slot. Restricted to
+ * K and DEF, and to active players with a real projection, so this stays a
+ * plausible waiver pool rather than the whole player database.
+ */
+function buildFreeAgentPool(
+  rosters: { players: string[] | null }[],
+  projections: Record<string, Record<string, number>>,
+  scoringSettings: Record<string, number>,
+  games: NflGamesResponse,
+): LineupCandidate[] {
+  const rostered = new Set<string>();
+  for (const r of rosters) {
+    for (const pid of r.players ?? []) rostered.add(pid);
+  }
+
+  const pool: LineupCandidate[] = [];
+  for (const [playerId, row] of Object.entries(PLAYERS)) {
+    if (rostered.has(playerId)) continue;
+    const pos = row.position;
+    if (pos !== 'K' && pos !== 'DEF') continue;
+    if (!projections[playerId]) continue;
+    const c = buildCandidate(playerId, 0, projections, scoringSettings, games);
+    if (c.projectedPoints > 0) pool.push(c);
+  }
+  return pool;
 }
 
 /**
@@ -185,10 +228,17 @@ export async function buildMatchupMarkets(
     pairs.set(m.matchup_id, list);
   }
 
+  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, gamesRes);
+  // Shared across every side in the league: two teams cannot stream the same
+  // unrostered player, so the first to need him claims him.
+  const claimedFreeAgents = new Set<string>();
+
   const buildSide = (
     m: SleeperMatchup,
     starters: StarterInput[],
     promoted: LineupCandidate[],
+    streamed: LineupCandidate[],
+    unfilledSlots: string[],
   ): MarketSide => {
     const ownerId = ownerByRoster.get(m.roster_id) ?? null;
     const user = ownerId ? userById.get(ownerId) : undefined;
@@ -205,6 +255,12 @@ export async function buildMatchupMarkets(
         name: playerName(c.playerId),
         projectedPoints: c.projectedPoints,
       })),
+      assumedStreams: streamed.map(c => ({
+        playerId: c.playerId,
+        name: playerName(c.playerId),
+        projectedPoints: c.projectedPoints,
+      })),
+      unfilledSlots,
     };
   };
 
@@ -213,13 +269,13 @@ export async function buildMatchupMarkets(
   for (const [matchupId, sides] of pairs) {
     if (sides.length !== 2) continue; // byes and odd league shapes have no market
 
-    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes);
-    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes);
+    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, claimedFreeAgents);
+    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, claimedFreeAgents);
     const startersA = lineupA.starters;
     const startersB = lineupB.starters;
 
-    const a = buildSide(sides[0], startersA, lineupA.promoted);
-    const b = buildSide(sides[1], startersB, lineupB.promoted);
+    const a = buildSide(sides[0], startersA, lineupA.promoted, lineupA.streamed, lineupA.unfilledSlots);
+    const b = buildSide(sides[1], startersB, lineupB.promoted, lineupB.streamed, lineupB.unfilledSlots);
 
     const probA = winProbability(a.distribution, b.distribution);
     const remaining = matchupRemainingMinutes(

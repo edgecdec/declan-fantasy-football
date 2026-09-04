@@ -40,6 +40,19 @@ function SideRow({ side, prob, odds, favourite }: {
           {d.banked.toFixed(1)} pts
           {d.remaining > 0 && ` · ${d.remaining.toFixed(1)} projected to come · ${side.playersRemaining} yet to finish`}
         </Typography>
+        {side.assumedStreams.length > 0 && (
+          <Tooltip title="This team has no rostered player for that slot, so we assume they pick the best unrostered option up before kickoff. Each unrostered player is only assigned to one team.">
+            <Typography variant="caption" color="info.main" component="div">
+              assumes they stream in{' '}
+              {side.assumedStreams.map(p => `${p.name} (${p.projectedPoints.toFixed(1)})`).join(', ')}
+            </Typography>
+          </Tooltip>
+        )}
+        {side.unfilledSlots.length > 0 && (
+          <Typography variant="caption" color="error.main" component="div">
+            {side.unfilledSlots.join(', ')} unfilled — scores nothing
+          </Typography>
+        )}
         {side.assumedPromotions.length > 0 && (
           <Tooltip
             title="Anyone whose game hasn't kicked off can still be swapped in, so we price the best lineup they could field rather than the one currently set."
