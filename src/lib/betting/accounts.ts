@@ -34,10 +34,16 @@ export type LedgerEntry = {
   created_at: string;
 };
 
+/**
+ * Case-insensitive on purpose. Usernames come from Sleeper display names, which are
+ * mostly lowercase, and people naturally capitalise when typing them into a login
+ * box — a plain `=` comparison in SQLite is case-sensitive, so "Cemisme" silently
+ * failed for an account stored as "cemisme" and looked like a wrong password.
+ */
 export function findAccountByUsername(username: string): Account | undefined {
   return getDb()
-    .prepare('SELECT * FROM accounts WHERE username = ?')
-    .get(username) as Account | undefined;
+    .prepare('SELECT * FROM accounts WHERE username = ? COLLATE NOCASE')
+    .get(username.trim()) as Account | undefined;
 }
 
 export function findAccountById(accountId: string): Account | undefined {

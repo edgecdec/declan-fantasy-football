@@ -18,6 +18,7 @@ function SetupContent() {
 
   const [checking, setChecking] = React.useState(true);
   const [displayName, setDisplayName] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [tokenError, setTokenError] = React.useState<string | null>(null);
   const [password, setPassword] = React.useState('');
   const [confirm, setConfirm] = React.useState('');
@@ -36,7 +37,7 @@ function SetupContent() {
         const data = await res.json().catch(() => ({}));
         if (!mounted) return;
         if (!res.ok) setTokenError(data.error ?? 'This setup link is not valid.');
-        else setDisplayName(data.displayName ?? data.username ?? '');
+        else { setDisplayName(data.displayName ?? data.username ?? ''); setUsername(data.username ?? ''); }
       })
       .catch(() => mounted && setTokenError('Could not check this setup link.'))
       .finally(() => mounted && setChecking(false));
@@ -89,11 +90,16 @@ function SetupContent() {
       <Typography variant="h6" gutterBottom>
         Welcome, {displayName}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Set a password to claim your account. You&apos;ll start with{' '}
         <strong>{formatCents(START_BALANCE_CENTS)}</strong> in Declan Dollars. This link only
         works once.
       </Typography>
+      {/* Spelled out because people were guessing it at the login box later. */}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Your username is <strong>{username}</strong> — you&apos;ll need it to sign in
+        again later. Capitalisation doesn&apos;t matter.
+      </Alert>
       <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <TextField
           label="Password"

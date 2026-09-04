@@ -34,8 +34,9 @@ function SignInPanel() {
     <Paper sx={{ p: 3, maxWidth: 460 }}>
       <Typography variant="h6" gutterBottom>Sign in to bet</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Accounts are created for league members only. If you haven&apos;t set a password yet,
-        use the setup link you were sent.
+        Your username is your Sleeper display name (capitalisation doesn&apos;t matter).
+        Accounts are created for league members only — if you haven&apos;t set a password
+        yet, use the setup link you were sent.
       </Typography>
       <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <TextField
