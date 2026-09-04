@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# betting setup links handout — contains live one-time credentials
+setup_links.html
+
 # sqlite (betting). Deliberately NOT `data/` — that directory holds the
 # committed player database and rankings JSON.
 data/*.db

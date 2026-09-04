@@ -4,37 +4,16 @@ import {
   WeeklyDecision, PositionAccuracy, SeasonDecisionSummary,
 } from '@/types/lineup';
 import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
+import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/lineupSlots';
+import { calculateProjectedPoints } from '@/services/stats/scoring';
 import playerData from '../../../data/sleeper_players.json';
 
 type PlayerRecord = { first_name: string; last_name: string; position: string };
 const players = (playerData as unknown as { players: Record<string, PlayerRecord> }).players ?? {};
 
-/** Non-bench slot types to fill */
-export const BENCH_SLOTS = new Set(['BN', 'IR', 'TAXI']);
-
-/** Position eligibility per roster slot */
-export const SLOT_ELIGIBILITY: Record<string, string[]> = {
-  QB: ['QB'],
-  RB: ['RB'],
-  WR: ['WR'],
-  TE: ['TE'],
-  K: ['K'],
-  DEF: ['DEF'],
-  FLEX: ['RB', 'WR', 'TE'],
-  REC_FLEX: ['WR', 'TE'],
-  SUPER_FLEX: ['QB', 'RB', 'WR', 'TE'],
-  IDP_FLEX: ['DL', 'LB', 'DB'],
-  DL: ['DL'],
-  LB: ['LB'],
-  DB: ['DB'],
-};
-
-/** Fill most-restrictive slots first to avoid wasting elite players on flex */
-export const SLOT_PRIORITY: string[] = [
-  'K', 'DEF', 'QB', 'TE', 'RB', 'WR',
-  'DL', 'LB', 'DB',
-  'REC_FLEX', 'FLEX', 'SUPER_FLEX', 'IDP_FLEX',
-];
+// Slot rules live in lineupSlots so server-side code can use them without
+// pulling in the 22 MB player database this module imports.
+export { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/lineupSlots';
 
 function getPlayerPosition(playerId: string): string {
   return players[playerId]?.position || 'UNKNOWN';
@@ -45,18 +24,7 @@ function getPlayerName(playerId: string): string {
   return p ? `${p.first_name} ${p.last_name}` : playerId;
 }
 
-/** Calculate projected points for a single player using league scoring */
-export function calculateProjectedPoints(
-  projection: SleeperProjection | undefined,
-  scoringSettings: Record<string, number>,
-): number {
-  if (!projection) return 0;
-  let total = 0;
-  for (const stat in scoringSettings) {
-    if (stat in projection) total += projection[stat] * scoringSettings[stat];
-  }
-  return total;
-}
+export { calculateProjectedPoints } from '@/services/stats/scoring';
 
 type PlayerCandidate = { playerId: string; position: string; projectedPoints: number };
 

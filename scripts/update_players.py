@@ -111,6 +111,30 @@ if __name__ == "__main__":
         with open(OUTPUT_FILE, 'w') as f:
             json.dump(final_data, f, indent=2, sort_keys=True)
         
+        # Slim index for server-side use. The full file is ~22MB, which is fine in
+        # a client bundle that already ships it but not something to parse in the
+        # Next server process on a 1.9GB box.
+        #
+        # Scoped to fantasy positions only: 4,265 players / ~114KB instead of
+        # 12,226 / ~326KB. Everything else (OL, DL, LB, DB, practice-squad bodies)
+        # can never occupy a starting slot in these leagues, so it is dead weight.
+        #
+        # Not scoped tighter than that on purpose. Pricing only ever touches about
+        # 365 players — the ~160 rostered across a league plus K/DEF for streaming —
+        # but which ones changes with every trade and waiver claim, and free-agent
+        # discovery needs the whole K/DEF universe rather than a snapshot. Position
+        # and team are all pricing needs.
+        FANTASY_POSITIONS = {'QB', 'RB', 'WR', 'TE', 'K', 'DEF'}
+        index = {
+            pid: {'p': p.get('position'), 't': p.get('team')}
+            for pid, p in players.items()
+            if p.get('position') in FANTASY_POSITIONS
+        }
+        index_file = os.path.join(DATA_DIR, 'player_index.json')
+        print(f"Saving slim index ({len(index)} players) to {index_file}...")
+        with open(index_file, 'w') as f:
+            json.dump(index, f, sort_keys=True, separators=(',', ':'))
+
         print("Done!")
     else:
         print("Failed to update database (missing players or stats).")

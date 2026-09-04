@@ -82,6 +82,69 @@ function issueSetupToken(db, accountId) {
   return raw;
 }
 
+/**
+ * Writes a one-page handout of the setup links, with a copy button per manager.
+ *
+ * Tokens are stored only as a sha256 hash, so a raw link cannot be recovered from
+ * the database later — this file is the single chance to capture them. It is
+ * written to setup_links.html, which is gitignored: it contains live credentials
+ * and must never be committed.
+ */
+function writeHtml(links) {
+  const rows = links.map(l => `
+    <tr>
+      <td class="name">${escapeHtml(l.name)}</td>
+      <td><a href="${escapeHtml(l.url)}">${escapeHtml(l.url)}</a></td>
+      <td><button data-url="${escapeHtml(l.url)}">Copy</button></td>
+    </tr>`).join('');
+
+  const html = `<!doctype html>
+<meta charset="utf-8">
+<title>Declan Dollars — setup links</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 60rem; padding: 0 1rem; }
+  h1 { margin-bottom: .25rem; }
+  .warn { background: #fff4e5; border-left: 4px solid #ed6c02; padding: .75rem 1rem; margin: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+  td.name { font-weight: 600; white-space: nowrap; }
+  a { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  button { cursor: pointer; padding: .3rem .7rem; }
+  button.done { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+</style>
+<h1>Declan Dollars — one-time setup links</h1>
+<p>Generated ${new Date().toLocaleString()} · expire in ${SETUP_TOKEN_TTL_DAYS} days · ${links.length} manager(s)</p>
+<div class="warn">
+  <strong>These are live credentials.</strong> Each link claims that manager's account and
+  works once. Anyone holding a link can claim that account, so DM them individually rather
+  than posting the list. They cannot be recovered after this — only a hash is stored — so
+  re-run the seed script if you need new ones.
+</div>
+<table>
+  <thead><tr><th>Manager</th><th>Link</th><th></th></tr></thead>
+  <tbody>${rows}
+  </tbody>
+</table>
+<script>
+  document.querySelectorAll('button[data-url]').forEach(b => {
+    b.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(b.dataset.url);
+      b.textContent = 'Copied'; b.classList.add('done');
+      setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1500);
+    });
+  });
+</script>
+`;
+  const out = path.join(process.cwd(), 'setup_links.html');
+  fs.writeFileSync(out, html);
+  console.log(`\nHTML handout written to ${out}`);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 async function main() {
   const db = openDb();
   const links = [];
@@ -132,6 +195,7 @@ async function main() {
   if (links.length > 0) {
     console.log(`\nSetup links (single use, expire in ${SETUP_TOKEN_TTL_DAYS} days) — DM these:\n`);
     for (const l of links) console.log(`  ${l.name.padEnd(20)} ${l.url}`);
+    writeHtml(links);
   }
   console.log('');
 }

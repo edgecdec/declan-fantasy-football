@@ -1,4 +1,4 @@
-import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/lineupOptimizer';
+import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/lineupSlots';
 
 /**
  * Assumes each manager will field their best available lineup in the slots that
