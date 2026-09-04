@@ -6,54 +6,74 @@
  */
 
 /**
- * Per-player projection error, fitted from **48,644 player-weeks across 2019-2025**
- * (Sleeper `pts_ppr` projection vs actual). Residual sd rises with projection
- * size, so a flat sd would misprice a lineup whose remaining players are all
- * kickers.
+ * Per-player projection error, fitted from **68,011 player-weeks across 2019-2025**.
  *
- * Fallback used when a player's position is unknown, refit on the full seven-season
- * set (the earlier single-season fit gave 3.386 + 0.2562, i.e. 6.46 at proj 12 —
- * so ten times the data moved it by about 1%, which is reassuring).
+ * Critically, everything here is measured in **this league's own scoring**, not
+ * Sleeper's generic `pts_ppr` field. Those are materially different numbers:
+ * Graham's league is half-PPR, charges -2 per interception rather than -1, and
+ * penalises `fum` and `fum_lost` separately. Dak Prescott's week-1 2026 line is
+ * 21.11 as `pts_ppr` and 17.83 under these settings. An earlier fit used
+ * `pts_ppr` and produced coefficients on the wrong scale — for quarterbacks it
+ * overstated the bias by more than double (-2.99 vs the true -1.26).
+ *
+ * Projections are converted with calculateProjectedPoints(raw, scoringSettings),
+ * so the model and the pricing agree on units.
  */
-const RESID_SD_INTERCEPT = 3.538;
-const RESID_SD_SLOPE = 0.2494;
+
+/** Fallback when a player's position is unknown. */
+const RESID_SD_INTERCEPT = 3.419;
+const RESID_SD_SLOPE = 0.2614;
 
 /**
- * Per-position sd = intercept + slope * projection, same 48,644-row dataset.
+ * sd never drops below this. The kicker fit has a slightly negative slope
+ * (higher-projected kickers are marginally steadier), which extrapolates to a
+ * nonsensical negative sd at extreme projections; a floor keeps the variance
+ * physical without distorting the fitted range.
+ */
+const MIN_RESID_SD = 1.5;
+
+/**
+ * Per-position sd = intercept + slope * projection, in league scoring.
  *
- * Positions differ a lot and the flat model gets kickers badly wrong: a kicker
- * projected for 12 has sd ~4.3, not ~6.5, and their variance barely responds to
- * projection at all (slope 0.008). QBs are the opposite — high floor, shallow
- * slope. Defences swing the hardest per projected point.
+ * Kickers are much steadier than the flat model implies (~4.4 at a 12-point
+ * projection, and essentially flat in projection). Tight ends swing hardest per
+ * projected point. Defences are steadier than the pts_ppr fit suggested — that
+ * earlier 7.97 was largely a scoring artifact, since this league scores DEF very
+ * differently from Sleeper's default.
  */
 const POSITION_SD: Record<string, { intercept: number; slope: number }> = {
-  QB: { intercept: 5.078, slope: 0.1239 },
-  RB: { intercept: 3.470, slope: 0.3127 },
-  WR: { intercept: 4.013, slope: 0.2602 },
-  TE: { intercept: 3.399, slope: 0.2724 },
-  K: { intercept: 4.172, slope: 0.0080 },
-  DEF: { intercept: 3.251, slope: 0.3931 },
+  QB: { intercept: 4.402, slope: 0.1875 },
+  RB: { intercept: 3.253, slope: 0.3573 },
+  WR: { intercept: 3.521, slope: 0.3109 },
+  TE: { intercept: 2.481, slope: 0.4167 },
+  K: { intercept: 5.529, slope: -0.0928 },
+  DEF: { intercept: 4.142, slope: 0.1678 },
 };
 
 /**
- * Mean projection bias by position, same dataset (actual minus projected).
+ * Mean projection bias by position, in league scoring (actual minus projected).
  *
- * Sleeper over-projects quarterbacks by roughly 3 points a week — by far the
- * largest and most consistent bias in the set. Everything else is under a point.
- * Applied as a shift to the expected score.
+ * Kickers are under-projected by about a point; defences over-projected by about
+ * one and a half. Quarterbacks run -1.26, not the -2.99 a pts_ppr fit claimed.
  *
- * This mostly cancels between two sides of a matchup, since both field the same
- * slots: only 36% of historical matchups had identical position mixes, but the
- * residual asymmetry is small. Corrected anyway because it is free and it does
- * matter for lineups that genuinely differ — superflex, an empty slot, or a bye.
+ * Means are used rather than medians on purpose: the mean is the unbiased
+ * estimator of expected points, which is what a score projection needs. Note the
+ * two diverge (RB mean +0.82 vs median -0.28), because weekly fantasy scoring is
+ * right-skewed — most players slightly underperform and a few explode. That skew
+ * is also why the normal approximation in winProbability is weakest when only one
+ * or two players remain.
+ *
+ * Mostly cancels between two sides fielding the same slots — only 36% of
+ * historical matchups had identical position mixes, and the residual asymmetry is
+ * small — but it is free and it matters for lineups that genuinely differ.
  */
 const POSITION_BIAS: Record<string, number> = {
-  QB: -2.99,
-  RB: 0.44,
-  WR: 0.59,
-  TE: 1.00,
-  K: 0.05,
-  DEF: 0.40,
+  QB: -1.26,
+  RB: 0.82,
+  WR: 0.36,
+  TE: 0.24,
+  K: 1.18,
+  DEF: -1.37,
 };
 
 /** Regulation minutes in an NFL game, used to scale remaining upside. */
@@ -98,8 +118,10 @@ export type SideDistribution = {
 export function projectionSd(projectedPoints: number, position?: string | null): number {
   const proj = Math.max(0, projectedPoints);
   const fit = position ? POSITION_SD[position] : undefined;
-  if (fit) return fit.intercept + fit.slope * proj;
-  return RESID_SD_INTERCEPT + RESID_SD_SLOPE * proj;
+  const sd = fit
+    ? fit.intercept + fit.slope * proj
+    : RESID_SD_INTERCEPT + RESID_SD_SLOPE * proj;
+  return Math.max(MIN_RESID_SD, sd);
 }
 
 /** Bias-corrected expected points for a player, by position where known. */
