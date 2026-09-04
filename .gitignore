@@ -48,6 +48,9 @@ setup_links.html
 data/*.db
 data/*.db-wal
 data/*.db-shm
+# Nightly ledger snapshots. The data/*.db* rules above only match files directly in
+# data/, not in a subdirectory, so these need their own line.
+data/backups/
 
 # ralph
 .ralph/.server-env
