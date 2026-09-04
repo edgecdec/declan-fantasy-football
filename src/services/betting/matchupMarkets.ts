@@ -97,6 +97,7 @@ function buildStarters(
 
       return {
         playerId,
+        position: PLAYERS[playerId]?.position ?? null,
         actualPoints: starterPoints[index] ?? 0,
         projectedPoints: calculateProjectedPoints(projections[playerId], scoringSettings),
         // No game found (bye, free agent, unmapped code) means no upside left.

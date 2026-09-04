@@ -6,26 +6,55 @@
  */
 
 /**
- * Per-player projection error, fitted from 4,636 player-weeks of 2025
- * (Sleeper `pts_ppr` projection vs actual, weeks 1-14):
+ * Per-player projection error, fitted from **48,644 player-weeks across 2019-2025**
+ * (Sleeper `pts_ppr` projection vs actual). Residual sd rises with projection
+ * size, so a flat sd would misprice a lineup whose remaining players are all
+ * kickers.
  *
- *   proj range   n     mean proj   resid sd
- *   0-3          902        1.32       2.95
- *   3-6          751        4.63       5.04
- *   6-9         1151        7.48       5.64
- *   9-12         633       10.23       6.00
- *   12-15        432       13.46       7.34
- *   15-18        331       16.51       7.62
- *   18-22        337       19.70       7.94
- *   22+           99       23.72       9.43
- *
- * Least squares over the bucket means gives sd = 3.386 + 0.2562 * projection,
- * within 0.78 sd points on every bucket. Variance genuinely scales with
- * projection size, so a flat sd would badly misprice a matchup whose remaining
- * players are all kickers.
+ * Fallback used when a player's position is unknown, refit on the full seven-season
+ * set (the earlier single-season fit gave 3.386 + 0.2562, i.e. 6.46 at proj 12 —
+ * so ten times the data moved it by about 1%, which is reassuring).
  */
-const RESID_SD_INTERCEPT = 3.386;
-const RESID_SD_SLOPE = 0.2562;
+const RESID_SD_INTERCEPT = 3.538;
+const RESID_SD_SLOPE = 0.2494;
+
+/**
+ * Per-position sd = intercept + slope * projection, same 48,644-row dataset.
+ *
+ * Positions differ a lot and the flat model gets kickers badly wrong: a kicker
+ * projected for 12 has sd ~4.3, not ~6.5, and their variance barely responds to
+ * projection at all (slope 0.008). QBs are the opposite — high floor, shallow
+ * slope. Defences swing the hardest per projected point.
+ */
+const POSITION_SD: Record<string, { intercept: number; slope: number }> = {
+  QB: { intercept: 5.078, slope: 0.1239 },
+  RB: { intercept: 3.470, slope: 0.3127 },
+  WR: { intercept: 4.013, slope: 0.2602 },
+  TE: { intercept: 3.399, slope: 0.2724 },
+  K: { intercept: 4.172, slope: 0.0080 },
+  DEF: { intercept: 3.251, slope: 0.3931 },
+};
+
+/**
+ * Mean projection bias by position, same dataset (actual minus projected).
+ *
+ * Sleeper over-projects quarterbacks by roughly 3 points a week — by far the
+ * largest and most consistent bias in the set. Everything else is under a point.
+ * Applied as a shift to the expected score.
+ *
+ * This mostly cancels between two sides of a matchup, since both field the same
+ * slots: only 36% of historical matchups had identical position mixes, but the
+ * residual asymmetry is small. Corrected anyway because it is free and it does
+ * matter for lineups that genuinely differ — superflex, an empty slot, or a bye.
+ */
+const POSITION_BIAS: Record<string, number> = {
+  QB: -2.99,
+  RB: 0.44,
+  WR: 0.59,
+  TE: 1.00,
+  K: 0.05,
+  DEF: 0.40,
+};
 
 /** Regulation minutes in an NFL game, used to scale remaining upside. */
 export const REGULATION_MINUTES = 60;
@@ -44,6 +73,8 @@ export type PlayerGameState = 'pre' | 'in' | 'post' | 'unknown';
 /** One starter's contribution to a side's score. */
 export type StarterInput = {
   playerId: string;
+  /** QB/RB/WR/TE/K/DEF. Selects the variance and bias model; unknown falls back. */
+  position?: string | null;
   /** Points already banked this week. */
   actualPoints: number;
   /** Full-week projected points under this league's scoring. */
@@ -63,10 +94,20 @@ export type SideDistribution = {
   remaining: number;
 };
 
-/** Per-player residual sd at a given projection, floored at zero. */
-export function projectionSd(projectedPoints: number): number {
+/** Per-player residual sd at a given projection, by position where known. */
+export function projectionSd(projectedPoints: number, position?: string | null): number {
   const proj = Math.max(0, projectedPoints);
+  const fit = position ? POSITION_SD[position] : undefined;
+  if (fit) return fit.intercept + fit.slope * proj;
   return RESID_SD_INTERCEPT + RESID_SD_SLOPE * proj;
+}
+
+/** Bias-corrected expected points for a player, by position where known. */
+export function adjustedProjection(projectedPoints: number, position?: string | null): number {
+  const bias = position ? POSITION_BIAS[position] : undefined;
+  // Never push an expectation below zero — a player cannot be a net negative in
+  // most scoring, and the bias is a population mean, not a floor.
+  return Math.max(0, projectedPoints + (bias ?? 0));
 }
 
 /**
@@ -95,8 +136,8 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
 
     if (fraction <= 0) continue;
 
-    remaining += s.projectedPoints * fraction;
-    const sd = projectionSd(s.projectedPoints) * Math.sqrt(fraction);
+    remaining += adjustedProjection(s.projectedPoints, s.position) * fraction;
+    const sd = projectionSd(s.projectedPoints, s.position) * Math.sqrt(fraction);
     variance += sd * sd;
   }
 
