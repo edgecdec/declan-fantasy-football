@@ -1,5 +1,6 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
+import { bestAvailableLineup, LineupCandidate } from '@/services/betting/bestLineup';
 import playerData from '../../../data/sleeper_players.json';
 import {
   StarterInput,
@@ -45,6 +46,8 @@ export type MarketSide = {
   distribution: SideDistribution;
   /** Starters still capable of scoring. */
   playersRemaining: number;
+  /** Bench players the model assumes will be started before kickoff. */
+  assumedPromotions: { playerId: string; name: string; projectedPoints: number }[];
 };
 
 export type MatchupMarket = {
@@ -77,35 +80,70 @@ export function playerName(playerId: string): string {
   return `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || playerId;
 }
 
-/** Turns one roster's matchup row into per-starter inputs for the odds model. */
-function buildStarters(
-  matchup: SleeperMatchup,
+/** One player's projection, points so far, and where his NFL game stands. */
+function buildCandidate(
+  playerId: string,
+  actualPoints: number,
   projections: Record<string, Record<string, number>>,
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
-): StarterInput[] {
-  const starters = matchup.starters ?? [];
+): LineupCandidate {
+  const team = playerTeam(playerId);
+  const gameId = team ? games.teamToGame[team] : undefined;
+  const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+  return {
+    playerId,
+    position: PLAYERS[playerId]?.position ?? null,
+    actualPoints,
+    projectedPoints: calculateProjectedPoints(projections[playerId], scoringSettings),
+    // No game found (bye, free agent, unmapped code) means no upside left, and
+    // the player must not be treated as swappable into an open slot.
+    gameState: game ? game.state : 'unknown',
+    remainingMinutes: game ? game.remainingMinutes : 0,
+  };
+}
+
+/**
+ * The lineup we actually price for one side: locked players stay put, and every
+ * still-open slot is filled with the best available not-yet-started player,
+ * bench included. See bestAvailableLineup for why.
+ */
+function buildStarters(
+  matchup: SleeperMatchup,
+  rosterPositions: string[],
+  projections: Record<string, Record<string, number>>,
+  scoringSettings: Record<string, number>,
+  games: NflGamesResponse,
+): { starters: StarterInput[]; promoted: LineupCandidate[]; demoted: LineupCandidate[] } {
+  const starterIds = matchup.starters ?? [];
   const starterPoints = matchup.starters_points ?? [];
+  const playersPoints = matchup.players_points ?? {};
 
-  return starters
-    .map((playerId, index): StarterInput | null => {
-      if (!playerId || playerId === '0') return null;
+  const current = starterIds.map((pid, i) =>
+    !pid || pid === '0'
+      ? null
+      : buildCandidate(pid, starterPoints[i] ?? 0, projections, scoringSettings, games),
+  );
 
-      const team = playerTeam(playerId);
-      const gameId = team ? games.teamToGame[team] : undefined;
-      const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+  const startingSet = new Set(starterIds.filter(p => p && p !== '0'));
+  const bench = (matchup.players ?? [])
+    .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
+    .map(pid => buildCandidate(pid, playersPoints[pid] ?? 0, projections, scoringSettings, games));
 
-      return {
-        playerId,
-        position: PLAYERS[playerId]?.position ?? null,
-        actualPoints: starterPoints[index] ?? 0,
-        projectedPoints: calculateProjectedPoints(projections[playerId], scoringSettings),
-        // No game found (bye, free agent, unmapped code) means no upside left.
-        gameState: game ? game.state : 'unknown',
-        remainingMinutes: game ? game.remainingMinutes : 0,
-      };
-    })
-    .filter((s): s is StarterInput => s !== null);
+  const best = bestAvailableLineup(rosterPositions, current, bench);
+
+  return {
+    starters: best.starters.map(c => ({
+      playerId: c.playerId,
+      position: c.position,
+      actualPoints: c.actualPoints,
+      projectedPoints: c.projectedPoints,
+      gameState: c.gameState,
+      remainingMinutes: c.remainingMinutes,
+    })),
+    promoted: best.promoted,
+    demoted: best.demoted,
+  };
 }
 
 /**
@@ -123,7 +161,8 @@ export async function buildMatchupMarkets(
   if (!league) return null;
 
   const scoringSettings = league.scoring_settings;
-  if (!scoringSettings) return null;
+  const rosterPositions = league.roster_positions;
+  if (!scoringSettings || !rosterPositions) return null;
 
   const [matchups, projections, rosters, users, gamesRes] = await Promise.all([
     SleeperService.getMatchups(leagueId, week, { skipCache: true }),
@@ -146,7 +185,11 @@ export async function buildMatchupMarkets(
     pairs.set(m.matchup_id, list);
   }
 
-  const buildSide = (m: SleeperMatchup, starters: StarterInput[]): MarketSide => {
+  const buildSide = (
+    m: SleeperMatchup,
+    starters: StarterInput[],
+    promoted: LineupCandidate[],
+  ): MarketSide => {
     const ownerId = ownerByRoster.get(m.roster_id) ?? null;
     const user = ownerId ? userById.get(ownerId) : undefined;
     return {
@@ -157,6 +200,11 @@ export async function buildMatchupMarkets(
       avatar: user?.avatar ?? undefined,
       distribution: sideDistribution(starters),
       playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
+      assumedPromotions: promoted.map(c => ({
+        playerId: c.playerId,
+        name: playerName(c.playerId),
+        projectedPoints: c.projectedPoints,
+      })),
     };
   };
 
@@ -165,11 +213,13 @@ export async function buildMatchupMarkets(
   for (const [matchupId, sides] of pairs) {
     if (sides.length !== 2) continue; // byes and odd league shapes have no market
 
-    const startersA = buildStarters(sides[0], projections, scoringSettings, gamesRes);
-    const startersB = buildStarters(sides[1], projections, scoringSettings, gamesRes);
+    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes);
+    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes);
+    const startersA = lineupA.starters;
+    const startersB = lineupB.starters;
 
-    const a = buildSide(sides[0], startersA);
-    const b = buildSide(sides[1], startersB);
+    const a = buildSide(sides[0], startersA, lineupA.promoted);
+    const b = buildSide(sides[1], startersB, lineupB.promoted);
 
     const probA = winProbability(a.distribution, b.distribution);
     const remaining = matchupRemainingMinutes(

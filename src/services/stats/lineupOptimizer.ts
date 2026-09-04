@@ -10,10 +10,10 @@ type PlayerRecord = { first_name: string; last_name: string; position: string };
 const players = (playerData as unknown as { players: Record<string, PlayerRecord> }).players ?? {};
 
 /** Non-bench slot types to fill */
-const BENCH_SLOTS = new Set(['BN', 'IR', 'TAXI']);
+export const BENCH_SLOTS = new Set(['BN', 'IR', 'TAXI']);
 
 /** Position eligibility per roster slot */
-const SLOT_ELIGIBILITY: Record<string, string[]> = {
+export const SLOT_ELIGIBILITY: Record<string, string[]> = {
   QB: ['QB'],
   RB: ['RB'],
   WR: ['WR'],
@@ -30,7 +30,7 @@ const SLOT_ELIGIBILITY: Record<string, string[]> = {
 };
 
 /** Fill most-restrictive slots first to avoid wasting elite players on flex */
-const SLOT_PRIORITY: string[] = [
+export const SLOT_PRIORITY: string[] = [
   'K', 'DEF', 'QB', 'TE', 'RB', 'WR',
   'DL', 'LB', 'DB',
   'REC_FLEX', 'FLEX', 'SUPER_FLEX', 'IDP_FLEX',

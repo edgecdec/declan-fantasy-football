@@ -36,10 +36,22 @@ function SideRow({ side, prob, odds, favourite }: {
             </Typography>
           )}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" component="div">
           {d.banked.toFixed(1)} pts
           {d.remaining > 0 && ` · ${d.remaining.toFixed(1)} projected to come · ${side.playersRemaining} yet to finish`}
         </Typography>
+        {side.assumedPromotions.length > 0 && (
+          <Tooltip
+            title="Anyone whose game hasn't kicked off can still be swapped in, so we price the best lineup they could field rather than the one currently set."
+          >
+            <Typography variant="caption" color="warning.main" component="div">
+              assumes they start{' '}
+              {side.assumedPromotions
+                .map(p => `${p.name} (${p.projectedPoints.toFixed(1)})`)
+                .join(', ')}
+            </Typography>
+          </Tooltip>
+        )}
       </Box>
       <Box sx={{ textAlign: 'right', minWidth: 110 }}>
         <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
@@ -181,8 +193,10 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
 
       <Alert severity="warning" sx={{ mt: 2 }}>
         Wagering isn&apos;t live yet — these are read-only odds. Probabilities come from a
-        normal approximation to each side&apos;s remaining scoring, with per-player variance
-        fitted from 4,636 player-weeks of 2025 projections. Prices include a{' '}
+        normal approximation to each side&apos;s remaining scoring, with per-position variance
+        and bias fitted from 68,011 player-weeks (2019&ndash;2025) scored under this
+        league&apos;s own settings. Players whose game hasn&apos;t kicked off are assumed to be
+        started optimally, since a manager can still swap them. Prices include a{' '}
         {(HOUSE_VIG * 100).toFixed(2)}% house edge.
       </Alert>
     </Box>
