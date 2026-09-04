@@ -46,7 +46,41 @@ type BettingAuthState = {
 
 const BettingAuthContext = React.createContext<BettingAuthState | undefined>(undefined);
 
+/**
+ * Cached hint about who was signed in last, so the nav can render the Declan
+ * Dollars entry immediately on load instead of popping in a moment later.
+ *
+ * This is NOT authentication. The only credential is the httpOnly cookie, which
+ * the browser sends and JavaScript cannot read or forge. Faking this key gets you
+ * a nav link and nothing else — every /api/betting handler still verifies the
+ * cookie, so a stale or tampered hint just lands you on the sign-in panel.
+ */
+const SESSION_HINT_KEY = 'declanalytics_betting_session_hint';
+
+function readSessionHint(): BettingUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_HINT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.username === 'string' ? (parsed as BettingUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionHint(user: BettingUser | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (user) localStorage.setItem(SESSION_HINT_KEY, JSON.stringify(user));
+    else localStorage.removeItem(SESSION_HINT_KEY);
+  } catch {
+    // Storage full or blocked — the cookie still works, we just lose the hint.
+  }
+}
+
 export function BettingAuthProvider({ children }: { children: React.ReactNode }) {
+  // Seeded from the hint so a reload doesn't flash the nav item away.
   const [user, setUser] = React.useState<BettingUser | null>(null);
   const [balanceCents, setBalanceCents] = React.useState(0);
   const [leagues, setLeagues] = React.useState<BettingLeagueRef[]>([]);
@@ -54,15 +88,24 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Read after mount, not in the initial state, so the server-rendered markup and
+  // the first client render agree and hydration doesn't mismatch.
+  React.useEffect(() => {
+    const hint = readSessionHint();
+    if (hint) setUser(hint);
+  }, []);
+
   const refresh = React.useCallback(async () => {
     try {
       const res = await fetch('/api/betting/me', { credentials: 'same-origin' });
       if (!res.ok) {
-        // 401 is the normal anonymous case, not an error worth surfacing.
+        // 401 is the normal anonymous case, not an error worth surfacing. Clear
+        // the hint too, or the nav would keep advertising a dead session.
         setUser(null);
         setBalanceCents(0);
         setLeagues([]);
         setLedger([]);
+        writeSessionHint(null);
         return;
       }
       const data = await res.json();
@@ -70,8 +113,10 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
       setBalanceCents(data.balanceCents ?? 0);
       setLeagues(data.leagues ?? []);
       setLedger(data.ledger ?? []);
+      writeSessionHint(data.user ?? null);
     } catch {
-      setUser(null);
+      // A network blip is not proof of sign-out, so keep the hint and leave the
+      // cookie to decide on the next successful call.
     } finally {
       setLoading(false);
     }
@@ -103,6 +148,7 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
     setBalanceCents(0);
     setLeagues([]);
     setLedger([]);
+    writeSessionHint(null);
   }, []);
 
   const value = React.useMemo(

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUser, setTokenCookie, signToken } from '@/lib/auth';
 import {
   NEGATIVE_OPEN_EXPOSURE_CAP_CENTS,
   findAccountById,
@@ -32,6 +32,15 @@ export async function GET(request: Request) {
     label: BETTING_LEAGUES.find(l => l.leagueId === row.league_id)?.label ?? 'Unknown league',
   }));
 
+  // Slide the session forward on every authenticated read. The token is good for
+  // 7 days from issue, so without this an active user gets logged out a week
+  // after signing in for no reason; with it, only genuine inactivity expires them.
+  const refreshedToken = signToken({
+    accountId: account.id,
+    username: account.username,
+    isAdmin: account.is_admin === 1,
+  });
+
   return NextResponse.json({
     ok: true,
     user: {
@@ -49,5 +58,5 @@ export async function GET(request: Request) {
       reason: e.reason,
       createdAt: e.created_at,
     })),
-  });
+  }, { headers: { 'Set-Cookie': setTokenCookie(refreshedToken) } });
 }

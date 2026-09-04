@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
-import { BettingAuthProvider } from '@/context/BettingAuthContext';
 
 export const metadata: Metadata = { title: 'Declan Dollars | FF Analytics' };
 
 /**
- * The betting session provider is scoped to this route subtree rather than the
- * root layout — no other page needs it, and keeping it here means the rest of
- * the app never fetches the session.
+ * Metadata only. BettingAuthProvider lives in the root layout because the nav
+ * needs the session too — nesting a second provider here would give this subtree
+ * its own copy of the state and they would drift.
  */
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <BettingAuthProvider>{children}</BettingAuthProvider>;
+  return children;
 }

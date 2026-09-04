@@ -40,6 +40,7 @@ import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand ic
 import ListAltIcon from '@mui/icons-material/ListAlt'; // Draft Assistant
 import PaidIcon from '@mui/icons-material/Paid'; // Declan Dollars
 import { useUser } from '@/context/UserContext';
+import { useBettingAuth } from '@/context/BettingAuthContext';
 
 const drawerWidth = 240;
 
@@ -53,8 +54,14 @@ const MENU_ITEMS = [
   { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
   { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
-  { text: 'Declan Dollars', href: '/betting', icon: <PaidIcon /> },
 ];
+
+/**
+ * Only shown to someone with a betting session. This is discovery, not security
+ * — the route stays reachable at /betting so a member can always sign in, and
+ * the real boundary is the session check in every /api/betting handler.
+ */
+const BETTING_MENU_ITEM = { text: 'Declan Dollars', href: '/betting', icon: <PaidIcon /> };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useUser();
@@ -63,7 +70,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
   
-  const menuItems = MENU_ITEMS;
+  const { user: bettingUser } = useBettingAuth();
+
+  // Append rather than filter so the betting entry sits last and the other items
+  // never shift position when a session appears.
+  const menuItems = React.useMemo(
+    () => (bettingUser ? [...MENU_ITEMS, BETTING_MENU_ITEM] : MENU_ITEMS),
+    [bettingUser],
+  );
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 

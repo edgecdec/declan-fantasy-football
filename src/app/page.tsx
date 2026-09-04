@@ -17,11 +17,33 @@ import {
 } from '@mui/material';
 import Link from 'next/link';
 import { useUser } from '@/context/UserContext';
+import { useBettingAuth } from '@/context/BettingAuthContext';
 import LogoutIcon from '@mui/icons-material/Logout';
+
+const BASE_FEATURES = [
+  { title: 'Draft Assistant', desc: 'Live draft companion with dynamic rankings and VBD analysis.', href: '/draft-assistant', cta: 'Start Drafting' },
+  { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
+  { title: 'Manager Skill', desc: 'Analyze your positional efficiency, lineup decisions, and historical trends.', href: '/skill', cta: 'View Skills' },
+  { title: 'Season Review', desc: 'Analyze your final placements and playoff performance.', href: '/performance', cta: 'View Results' },
+  { title: 'Legacy Analyzer', desc: 'Explore all-time history, rivalries, and head-to-head records.', href: '/league-history', cta: 'Explore History' },
+  { title: 'Roster Medic', desc: 'Scan rosters for empty spots, IR violations, and inactive starters.', href: '/medic', cta: 'Scan Rosters' },
+  { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
+  { title: 'Player Database', desc: 'Search and filter all active NFL players.', href: '/players', cta: 'Search Players' },
+];
+
+const BETTING_FEATURE = { title: 'Declan Dollars', desc: 'Wager fake money on league matchups. League members only.', href: '/betting', cta: 'Place Bets' };
 
 export default function HomePage() {
   const { user, fetchUser, logout, loading } = useUser();
+  const { user: bettingUser } = useBettingAuth();
   const [usernameInput, setUsernameInput] = React.useState('');
+
+  // Betting is only advertised to someone who already has a session, matching the
+  // sidebar. Anyone with a setup link can still reach /betting directly.
+  const features = React.useMemo(
+    () => (bettingUser ? [...BASE_FEATURES, BETTING_FEATURE] : BASE_FEATURES),
+    [bettingUser],
+  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,17 +129,7 @@ export default function HomePage() {
 
       {/* Feature Cards */}
       <Grid container spacing={4} sx={{ mt: 2 }}>
-        {[
-          { title: 'Draft Assistant', desc: 'Live draft companion with dynamic rankings and VBD analysis.', href: '/draft-assistant', cta: 'Start Drafting' },
-          { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
-          { title: 'Manager Skill', desc: 'Analyze your positional efficiency, lineup decisions, and historical trends.', href: '/skill', cta: 'View Skills' },
-          { title: 'Season Review', desc: 'Analyze your final placements and playoff performance.', href: '/performance', cta: 'View Results' },
-          { title: 'Legacy Analyzer', desc: 'Explore all-time history, rivalries, and head-to-head records.', href: '/league-history', cta: 'Explore History' },
-          { title: 'Roster Medic', desc: 'Scan rosters for empty spots, IR violations, and inactive starters.', href: '/medic', cta: 'Scan Rosters' },
-          { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
-          { title: 'Player Database', desc: 'Search and filter all active NFL players.', href: '/players', cta: 'Search Players' },
-          { title: 'Declan Dollars', desc: 'Wager fake money on league matchups. League members only.', href: '/betting', cta: 'Place Bets' },
-        ].map((feature) => (
+        {features.map((feature) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={feature.title}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
