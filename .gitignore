@@ -40,6 +40,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# sqlite (betting). Deliberately NOT `data/` — that directory holds the
+# committed player database and rankings JSON.
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # ralph
 .ralph/.server-env
 /tmp/ralph-*-logs/

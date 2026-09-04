@@ -38,6 +38,7 @@ import BarChartIcon from '@mui/icons-material/BarChart'; // Positional
 import BugReportIcon from '@mui/icons-material/BugReport';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand icon
 import ListAltIcon from '@mui/icons-material/ListAlt'; // Draft Assistant
+import PaidIcon from '@mui/icons-material/Paid'; // Declan Dollars
 import { useUser } from '@/context/UserContext';
 
 const drawerWidth = 240;
@@ -52,6 +53,7 @@ const MENU_ITEMS = [
   { text: 'Roster Medic', href: '/medic', icon: <MedicalServicesIcon /> },
   { text: 'Portfolio Tracker', href: '/portfolio', icon: <PieChartIcon /> },
   { text: 'Player Database', href: '/players', icon: <GroupsIcon /> },
+  { text: 'Declan Dollars', href: '/betting', icon: <PaidIcon /> },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

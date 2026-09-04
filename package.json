@@ -15,12 +15,17 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "@next/third-parties": "^16.1.6",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
+    "jsonwebtoken": "^9.0.3",
     "next": "^16.2.10",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

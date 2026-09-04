@@ -116,6 +116,7 @@ export default function HomePage() {
           { title: 'Roster Medic', desc: 'Scan rosters for empty spots, IR violations, and inactive starters.', href: '/medic', cta: 'Scan Rosters' },
           { title: 'Portfolio Tracker', desc: 'Track your player exposure across all leagues.', href: '/portfolio', cta: 'Analyze Portfolio' },
           { title: 'Player Database', desc: 'Search and filter all active NFL players.', href: '/players', cta: 'Search Players' },
+          { title: 'Declan Dollars', desc: 'Wager fake money on league matchups. League members only.', href: '/betting', cta: 'Place Bets' },
         ].map((feature) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={feature.title}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
