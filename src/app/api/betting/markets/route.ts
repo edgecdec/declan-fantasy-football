@@ -6,6 +6,7 @@ import { priceLeagueWeek } from '@/lib/betting/pricing';
 import { openExposureCents } from '@/lib/betting/wagers';
 import { NEGATIVE_OPEN_EXPOSURE_CAP_CENTS } from '@/lib/betting/constants';
 import { getDb } from '@/lib/db';
+import { settleQuietly } from '@/lib/betting/settlement';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,10 @@ const SLEEPER_BASE = 'https://api.sleeper.app/v1';
 export async function GET(request: Request) {
   const auth = getAuthUser(request);
   if (!auth) return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 });
+
+  // Settle anything whose games have finished before reading balances, so a payout
+  // shows up on the same refresh that reveals the result rather than the next one.
+  await settleQuietly();
 
   const account = findAccountById(auth.accountId);
   if (!account) return NextResponse.json({ ok: false, error: 'Account not found.' }, { status: 401 });

@@ -196,10 +196,14 @@ export function settleFinishedMarkets(
 
       const winner = score.a > score.b ? 'a' : score.b > score.a ? 'b' : 'push';
 
+      // The scores are stored, not just the verdict, so that if a Sleeper stat
+      // correction later moves a total we can see what we actually paid on.
       db.prepare(
-        `UPDATE markets SET status = 'settled', winner = ?, settled_at = datetime('now')
+        `UPDATE markets
+         SET status = 'settled', winner = ?, final_a = ?, final_b = ?,
+             settled_at = datetime('now')
          WHERE id = ?`,
-      ).run(winner, market.id);
+      ).run(winner, score.a, score.b, market.id);
       settled++;
 
       const wagers = db

@@ -265,6 +265,8 @@ export async function priceLeagueWeek(
 
     const ownerA = ownerByRoster.get(sides[0].roster_id) ?? null;
     const ownerB = ownerByRoster.get(sides[1].roster_id) ?? null;
+    const nameA = (ownerA && nameByUser.get(ownerA)) || `Roster ${sides[0].roster_id}`;
+    const nameB = (ownerB && nameByUser.get(ownerB)) || `Roster ${sides[1].roster_id}`;
 
     const existing = db
       .prepare(
@@ -284,18 +286,19 @@ export async function priceLeagueWeek(
     if (existing) {
       db.prepare(
         `UPDATE markets SET prob_a = ?, price_a = ?, price_b = ?, status = ?,
-           remaining_minutes = ?, owner_a = ?, owner_b = ?, priced_at = datetime('now')
+           remaining_minutes = ?, owner_a = ?, owner_b = ?, name_a = ?, name_b = ?,
+           priced_at = datetime('now')
          WHERE id = ?`,
-      ).run(probA, pricing.oddsA, pricing.oddsB, status, remaining, ownerA, ownerB, id);
+      ).run(probA, pricing.oddsA, pricing.oddsB, status, remaining, ownerA, ownerB, nameA, nameB, id);
     } else {
       db.prepare(
         `INSERT INTO markets
            (id, league_id, season, week, matchup_id, roster_a, roster_b, owner_a, owner_b,
-            prob_a, price_a, price_b, status, remaining_minutes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            name_a, name_b, prob_a, price_a, price_b, status, remaining_minutes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id, leagueId, cfg.season, week, matchupId,
-        sides[0].roster_id, sides[1].roster_id, ownerA, ownerB,
+        sides[0].roster_id, sides[1].roster_id, ownerA, ownerB, nameA, nameB,
         probA, pricing.oddsA, pricing.oddsB, status, remaining,
       );
     }
@@ -318,8 +321,8 @@ export async function priceLeagueWeek(
       projectedB: b.distribution.mean,
       sdA: Math.sqrt(a.distribution.variance),
       sdB: Math.sqrt(b.distribution.variance),
-      nameA: (ownerA && nameByUser.get(ownerA)) || `Roster ${sides[0].roster_id}`,
-      nameB: (ownerB && nameByUser.get(ownerB)) || `Roster ${sides[1].roster_id}`,
+      nameA,
+      nameB,
       detailA: a.detail,
       detailB: b.detail,
     });

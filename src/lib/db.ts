@@ -90,6 +90,15 @@ function initDb(database: Database.Database): void {
       UNIQUE (league_id, season, week, matchup_id)
     );
 
+    -- Small key/value store. Currently just the settlement sweep's last-run
+    -- timestamp, kept in the DB rather than in memory so a pm2 restart doesn't
+    -- reset the debounce and let a redeploy hammer ESPN.
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS wagers (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id),
@@ -111,4 +120,27 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_wagers_account ON wagers(account_id, placed_at);
     CREATE INDEX IF NOT EXISTS idx_wagers_market ON wagers(market_id, status);
   `);
+
+  addColumnIfMissing(database, 'markets', 'final_a', 'REAL');
+  addColumnIfMissing(database, 'markets', 'final_b', 'REAL');
+  // Manager names frozen at pricing time, so bet history stays readable without
+  // re-resolving owner ids against Sleeper — and still reads correctly if someone
+  // renames themselves after the bet was struck.
+  addColumnIfMissing(database, 'markets', 'name_a', 'TEXT');
+  addColumnIfMissing(database, 'markets', 'name_b', 'TEXT');
+}
+
+/**
+ * Additive migration. The DB already holds real balances on the VPS, so schema
+ * changes have to be applied in place rather than by recreating a table.
+ */
+function addColumnIfMissing(
+  database: Database.Database,
+  table: string,
+  column: string,
+  type: string,
+): void {
+  const cols = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (cols.some(c => c.name === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }

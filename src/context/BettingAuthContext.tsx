@@ -32,11 +32,51 @@ export type LedgerRow = {
   createdAt: string;
 };
 
+/**
+ * One placed bet and how it turned out.
+ *
+ * Kept alongside the ledger rather than derived from it, because a LOSS writes no
+ * ledger row — the stake left the balance at placement — so the ledger alone makes
+ * a losing bet look like it vanished.
+ */
+export type BetRow = {
+  id: string;
+  side: 'a' | 'b';
+  stake_cents: number;
+  price: number;
+  to_win_cents: number;
+  /** open | won | lost | void */
+  status: string;
+  placed_at: string;
+  settled_at: string | null;
+  league_id: string;
+  season: string;
+  week: number;
+  matchup_id: number;
+  roster_a: number;
+  roster_b: number;
+  /** Manager names as of pricing time, so a later Sleeper rename can't rewrite history. */
+  name_a: string | null;
+  name_b: string | null;
+  winner: string | null;
+  final_a: number | null;
+  final_b: number | null;
+};
+
+export type BetSummary = {
+  openStakeCents: number;
+  settledStakeCents: number;
+  settledReturnCents: number;
+  realisedPnlCents: number;
+};
+
 type BettingAuthState = {
   user: BettingUser | null;
   balanceCents: number;
   leagues: BettingLeagueRef[];
   ledger: LedgerRow[];
+  bets: BetRow[];
+  summary: BetSummary;
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
@@ -56,6 +96,13 @@ const BettingAuthContext = React.createContext<BettingAuthState | undefined>(und
  * cookie, so a stale or tampered hint just lands you on the sign-in panel.
  */
 const SESSION_HINT_KEY = 'declanalytics_betting_session_hint';
+
+const EMPTY_SUMMARY: BetSummary = {
+  openStakeCents: 0,
+  settledStakeCents: 0,
+  settledReturnCents: 0,
+  realisedPnlCents: 0,
+};
 
 function readSessionHint(): BettingUser | null {
   if (typeof window === 'undefined') return null;
@@ -85,6 +132,8 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
   const [balanceCents, setBalanceCents] = React.useState(0);
   const [leagues, setLeagues] = React.useState<BettingLeagueRef[]>([]);
   const [ledger, setLedger] = React.useState<LedgerRow[]>([]);
+  const [bets, setBets] = React.useState<BetRow[]>([]);
+  const [summary, setSummary] = React.useState<BetSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -105,6 +154,8 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
         setBalanceCents(0);
         setLeagues([]);
         setLedger([]);
+        setBets([]);
+        setSummary(EMPTY_SUMMARY);
         writeSessionHint(null);
         return;
       }
@@ -113,6 +164,13 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
       setBalanceCents(data.balanceCents ?? 0);
       setLeagues(data.leagues ?? []);
       setLedger(data.ledger ?? []);
+      setBets(data.bets ?? []);
+      setSummary({
+        openStakeCents: data.openStakeCents ?? 0,
+        settledStakeCents: data.settledStakeCents ?? 0,
+        settledReturnCents: data.settledReturnCents ?? 0,
+        realisedPnlCents: data.realisedPnlCents ?? 0,
+      });
       writeSessionHint(data.user ?? null);
     } catch {
       // A network blip is not proof of sign-out, so keep the hint and leave the
@@ -148,12 +206,14 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
     setBalanceCents(0);
     setLeagues([]);
     setLedger([]);
+    setBets([]);
+    setSummary(EMPTY_SUMMARY);
     writeSessionHint(null);
   }, []);
 
   const value = React.useMemo(
-    () => ({ user, balanceCents, leagues, ledger, loading, error, login, logout, refresh }),
-    [user, balanceCents, leagues, ledger, loading, error, login, logout, refresh],
+    () => ({ user, balanceCents, leagues, ledger, bets, summary, loading, error, login, logout, refresh }),
+    [user, balanceCents, leagues, ledger, bets, summary, loading, error, login, logout, refresh],
   );
 
   return <BettingAuthContext.Provider value={value}>{children}</BettingAuthContext.Provider>;
