@@ -6,10 +6,12 @@ import {
   Container, Box, Paper, Typography, Chip, LinearProgress, Alert,
   Tooltip, Button, Stack, TextField, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
+  Tabs, Tab,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PageHeader from '@/components/common/PageHeader';
 import MatchupMeter, { SideSwatch } from '@/components/betting/MatchupMeter';
+import LeagueStandings from '@/components/betting/LeagueStandings';
 import { MARKET_CLOSE_MINUTES, HOUSE_VIG, profitForStake } from '@/services/betting/liveOdds';
 import { formatCents, CENTS_PER_DOLLAR } from '@/lib/betting/constants';
 import { useBettingAuth } from '@/context/BettingAuthContext';
@@ -317,6 +319,9 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = React.useState<Date | null>(null);
   const [betTarget, setBetTarget] = React.useState<BetTarget | null>(null);
+  // A tab rather than another section, so the standings don't add scroll to the
+  // markets view the compaction work just tightened up.
+  const [tab, setTab] = React.useState<'markets' | 'standings'>('markets');
 
   const load = React.useCallback(async () => {
     try {
@@ -396,7 +401,16 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         </Stack>
       </Paper>
 
-      {data.markets.length === 0 ? (
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+          <Tab value="markets" label={`Week ${data.week} markets`} />
+          <Tab value="standings" label="League standings" />
+        </Tabs>
+      </Box>
+
+      {tab === 'standings' ? (
+        <LeagueStandings leagueId={leagueId} />
+      ) : data.markets.length === 0 ? (
         <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>
       ) : (
         data.markets.map(m => (
@@ -410,7 +424,7 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         ))
       )}
 
-      {data.myWagers.length > 0 && (
+      {tab === 'markets' && data.myWagers.length > 0 && (
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>Your week {data.week} bets</Typography>
           <TableContainer>
@@ -442,6 +456,7 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         </Paper>
       )}
 
+      {tab === 'markets' && (
       <Alert severity="info" sx={{ mt: 2 }}>
         Probabilities come from a normal approximation to each side&apos;s remaining scoring,
         with per-position variance and bias fitted from 68,011 player-weeks
@@ -449,6 +464,7 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         hasn&apos;t kicked off are assumed to be started optimally. Prices include a{' '}
         {(HOUSE_VIG * 100).toFixed(2)}% house edge.
       </Alert>
+      )}
 
       <BetDialog
         target={betTarget}
