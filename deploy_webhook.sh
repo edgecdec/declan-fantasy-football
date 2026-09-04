@@ -28,7 +28,10 @@ NEW_PKG_HASH=$(md5sum package.json | cut -d' ' -f1)
 
 if [ "$OLD_PKG_HASH" != "$NEW_PKG_HASH" ]; then
   echo "package.json changed, running npm install..."
-  npm install
+  # --include=dev is explicit on purpose: the build needs typescript, and if the
+  # dev tree is ever missing Next tries to `npm install typescript` from inside
+  # `next build`, which wedges on this box and leaves no .next at all.
+  npm install --include=dev
 fi
 
 rm -rf .next
