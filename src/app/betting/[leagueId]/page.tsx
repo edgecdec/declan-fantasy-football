@@ -3,12 +3,13 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import {
-  Container, Box, Paper, Typography, Chip, LinearProgress, Alert, Divider,
+  Container, Box, Paper, Typography, Chip, LinearProgress, Alert,
   Tooltip, Button, Stack, TextField, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PageHeader from '@/components/common/PageHeader';
+import MatchupMeter, { SideSwatch } from '@/components/betting/MatchupMeter';
 import { MARKET_CLOSE_MINUTES, HOUSE_VIG, profitForStake } from '@/services/betting/liveOdds';
 import { formatCents, CENTS_PER_DOLLAR } from '@/lib/betting/constants';
 import { useBettingAuth } from '@/context/BettingAuthContext';
@@ -148,53 +149,89 @@ function BetDialog({ target, balanceCents, onClose, onPlaced }: {
   );
 }
 
-function SideRow({ name, points, projected, detail, prob, odds, favourite, canBet, onBet }: {
-  name: string; points: number; projected: number; detail: SideDetail;
-  prob: number; odds: number; favourite: boolean; canBet: boolean; onBet: () => void;
+/** One line of supporting detail, only when there is something to say. */
+function SideNotes({ detail }: { detail: SideDetail }) {
+  const bits: React.ReactNode[] = [];
+  for (const s of detail.streams) {
+    bits.push(
+      <Tooltip
+        key={`s-${s.slot}`}
+        title="No rostered player for this slot, so we assume they pick one up before kickoff — averaged across the best available options rather than naming one."
+      >
+        <Chip
+          size="small"
+          variant="outlined"
+          color="info"
+          label={`streamed ${s.slot} ${s.projectedPoints.toFixed(1)}`}
+          sx={{ height: 18, fontSize: 10 }}
+        />
+      </Tooltip>,
+    );
+  }
+  if (detail.unfilledSlots.length > 0) {
+    bits.push(
+      <Tooltip key="unf" title="Nobody could fill this slot, so it scores nothing.">
+        <Chip
+          size="small"
+          variant="outlined"
+          color="error"
+          label={`${detail.unfilledSlots.join('/')} empty`}
+          sx={{ height: 18, fontSize: 10 }}
+        />
+      </Tooltip>,
+    );
+  }
+  if (detail.promotions.length > 0) {
+    bits.push(
+      <Tooltip
+        key="promo"
+        title="Anyone whose game hasn't kicked off can still be swapped in, so we price the best lineup they could field."
+      >
+        <Chip
+          size="small"
+          variant="outlined"
+          color="warning"
+          label={`optimal lineup (${detail.promotions.length})`}
+          sx={{ height: 18, fontSize: 10 }}
+        />
+      </Tooltip>,
+    );
+  }
+  if (bits.length === 0) return null;
+  return <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>{bits}</Stack>;
+}
+
+/** Name + swatch + score, with the odds button as the call to action. */
+function SideHeader({ side, name, points, projected, odds, canBet, onBet, align }: {
+  side: 'a' | 'b'; name: string; points: number; projected: number;
+  odds: number; canBet: boolean; onBet: () => void; align: 'left' | 'right';
 }) {
   const remaining = projected - points;
+  const right = align === 'right';
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, py: 1 }}>
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography variant="body1" fontWeight={favourite ? 'bold' : 'regular'} noWrap>{name}</Typography>
-        <Typography variant="caption" color="text.secondary" component="div">
-          {points.toFixed(1)} pts
-          {remaining > 0.05 && ` · ${remaining.toFixed(1)} projected to come · ${detail.playersRemaining} yet to finish`}
-        </Typography>
-        {detail.streams.map(s => (
-          <Tooltip
-            key={s.slot}
-            title="No rostered player for this slot, so we assume they pick one up before kickoff — averaged across the best available options rather than naming one."
-          >
-            <Typography variant="caption" color="info.main" component="div">
-              assumes a streamed {s.slot} — {s.projectedPoints.toFixed(1)} pts
-            </Typography>
-          </Tooltip>
-        ))}
-        {detail.unfilledSlots.length > 0 && (
-          <Typography variant="caption" color="error.main" component="div">
-            {detail.unfilledSlots.join(', ')} unfilled — scores nothing
-          </Typography>
-        )}
-        {detail.promotions.length > 0 && (
-          <Tooltip title="Anyone whose game hasn't kicked off can still be swapped in, so we price the best lineup they could field.">
-            <Typography variant="caption" color="warning.main" component="div">
-              assumes an optimal lineup ({detail.promotions.length} bench swap
-              {detail.promotions.length > 1 ? 's' : ''})
-            </Typography>
-          </Tooltip>
-        )}
-      </Box>
-      <Box sx={{ textAlign: 'right', minWidth: 130 }}>
-        <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{(prob * 100).toFixed(1)}%</Typography>
-        {canBet ? (
-          <Tooltip title={`Includes the ${(HOUSE_VIG * 100).toFixed(2)}% house edge`}>
-            <Button size="small" variant="outlined" onClick={onBet}>{formatOdds(odds)}</Button>
-          </Tooltip>
-        ) : (
-          <Chip label={formatOdds(odds)} size="small" variant="outlined" />
-        )}
-      </Box>
+    <Box sx={{ minWidth: 0, flex: 1, textAlign: align }}>
+      <Stack
+        direction={right ? 'row-reverse' : 'row'}
+        spacing={0.75}
+        alignItems="center"
+        sx={{ minWidth: 0 }}
+      >
+        <SideSwatch side={side} />
+        <Typography variant="body2" fontWeight={600} noWrap>{name}</Typography>
+      </Stack>
+      <Typography variant="caption" color="text.secondary" component="div">
+        {points.toFixed(1)}
+        {remaining > 0.05 && ` → ${projected.toFixed(1)}`}
+      </Typography>
+      {canBet ? (
+        <Tooltip title={`Back ${name} at ${formatOdds(odds)} — includes the ${(HOUSE_VIG * 100).toFixed(2)}% house edge`}>
+          <Button size="small" variant="outlined" onClick={onBet} sx={{ mt: 0.5, minWidth: 62, py: 0 }}>
+            {formatOdds(odds)}
+          </Button>
+        </Tooltip>
+      ) : (
+        <Chip label={formatOdds(odds)} size="small" variant="outlined" sx={{ mt: 0.5, height: 22 }} />
+      )}
     </Box>
   );
 }
@@ -202,49 +239,69 @@ function SideRow({ name, points, projected, detail, prob, odds, favourite, canBe
 function MarketCard({ market, isMine, myWagers, onBet }: {
   market: Market; isMine: boolean; myWagers: MyWager[]; onBet: (t: BetTarget) => void;
 }) {
-  const aFav = market.probA >= 1 - market.probA;
   const settled = market.remainingMinutes === 0;
   const canBet = market.open && !isMine;
   const mine = myWagers.filter(w => w.market_id === market.id);
 
+  // Status is a reserved colour, so it always ships with a label rather than
+  // relying on the colour alone.
+  const status = isMine
+    ? { label: 'Your matchup', color: undefined as 'success' | 'warning' | undefined,
+        title: "You're playing in this matchup. Betting on it is blocked — otherwise you could back your opponent and bench your own starters." }
+    : settled
+      ? { label: 'Final', color: undefined, title: 'All games finished.' }
+      : market.open
+        ? { label: `${Math.round(market.remainingMinutes)}m left`, color: 'success' as const,
+            title: 'Open for betting.' }
+        : { label: `Closed · ${Math.round(market.remainingMinutes)}m`, color: 'warning' as const,
+            title: `Markets close under ${MARKET_CLOSE_MINUTES} minutes of remaining game action — odds get unreliable in the last stretch.` };
+
   return (
-    <Paper sx={{ p: 2.5, mb: 2, ...(isMine ? { borderLeft: 3, borderColor: 'text.disabled' } : {}) }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1, flexWrap: 'wrap' }}>
-        <Typography variant="subtitle2" color="text.secondary">Matchup {market.matchupId}</Typography>
-        <Stack direction="row" spacing={1}>
-          {isMine && (
-            <Tooltip title="You're playing in this matchup. Betting on it is blocked — otherwise you could back your opponent and bench your own starters.">
-              <Chip label="Your matchup — no betting" size="small" />
+    <Paper variant="outlined" sx={{ px: 1.5, py: 1.25, mb: 1 }}>
+      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        <SideHeader
+          side="a" name={market.nameA} points={market.pointsA} projected={market.projectedA}
+          odds={market.priceA} canBet={canBet} align="left"
+          onBet={() => onBet({ market, side: 'a' })}
+        />
+        <Box sx={{ flex: '1 1 42%', minWidth: 130, pt: 0.5 }}>
+          <MatchupMeter
+            probA={market.probA} nameA={market.nameA} nameB={market.nameB} muted={!canBet}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.75 }}>
+            <Tooltip title={status.title}>
+              <Chip
+                label={status.label}
+                size="small"
+                color={status.color}
+                variant="outlined"
+                sx={{ height: 18, fontSize: 10 }}
+              />
             </Tooltip>
-          )}
-          {settled ? <Chip label="Final" size="small" />
-            : market.open
-              ? <Chip label={`Open · ${Math.round(market.remainingMinutes)} min left`} size="small" color="success" variant="outlined" />
-              : (
-                <Tooltip title={`Markets close under ${MARKET_CLOSE_MINUTES} minutes of remaining game action — odds get unreliable in the last stretch.`}>
-                  <Chip label={`Closed · ${Math.round(market.remainingMinutes)} min left`} size="small" color="warning" variant="outlined" />
-                </Tooltip>
-              )}
+          </Box>
+        </Box>
+        <SideHeader
+          side="b" name={market.nameB} points={market.pointsB} projected={market.projectedB}
+          odds={market.priceB} canBet={canBet} align="right"
+          onBet={() => onBet({ market, side: 'b' })}
+        />
+      </Stack>
+
+      {(market.detailA.streams.length > 0 || market.detailA.unfilledSlots.length > 0 ||
+        market.detailA.promotions.length > 0 || market.detailB.streams.length > 0 ||
+        market.detailB.unfilledSlots.length > 0 || market.detailB.promotions.length > 0) && (
+        <Stack direction="row" spacing={1} sx={{ mt: 0.75 }} justifyContent="space-between">
+          <SideNotes detail={market.detailA} />
+          <SideNotes detail={market.detailB} />
         </Stack>
-      </Box>
-      <SideRow
-        name={market.nameA} points={market.pointsA} projected={market.projectedA}
-        detail={market.detailA} prob={market.probA} odds={market.priceA}
-        favourite={aFav} canBet={canBet} onBet={() => onBet({ market, side: 'a' })}
-      />
-      <Divider />
-      <SideRow
-        name={market.nameB} points={market.pointsB} projected={market.projectedB}
-        detail={market.detailB} prob={1 - market.probA} odds={market.priceB}
-        favourite={!aFav} canBet={canBet} onBet={() => onBet({ market, side: 'b' })}
-      />
+      )}
+
       {mine.length > 0 && (
-        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ mt: 0.75, pt: 0.75, borderTop: 1, borderColor: 'divider' }}>
           {mine.map(w => (
             <Typography key={w.id} variant="caption" color="text.secondary" component="div">
-              your bet: {formatCents(w.stake_cents)} on{' '}
-              {w.side === 'a' ? market.nameA : market.nameB} at {formatOdds(w.price)} · to win{' '}
-              {formatCents(w.to_win_cents)} · <strong>{w.status}</strong>
+              you: {formatCents(w.stake_cents)} on {w.side === 'a' ? market.nameA : market.nameB}
+              {' '}at {formatOdds(w.price)} → {formatCents(w.to_win_cents)} · <strong>{w.status}</strong>
             </Typography>
           ))}
         </Box>
@@ -310,33 +367,34 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         <Alert severity="info" sx={{ mb: 2 }}>Sign in on the Declan Dollars page to place wagers.</Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={3} flexWrap="wrap" alignItems="center">
+      {/* Single headline numbers, so stat tiles rather than a chart. */}
+      <Paper variant="outlined" sx={{ px: 1.5, py: 1, mb: 1.5 }}>
+        <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap" useFlexGap>
           <Box>
             <Typography variant="caption" color="text.secondary" component="div">Balance</Typography>
-            <Typography variant="h6" color={negative ? 'error.main' : 'success.main'}>
+            <Typography variant="h6" color={negative ? 'error.main' : 'success.main'} sx={{ lineHeight: 1.2 }}>
               {formatCents(data.balanceCents)}
             </Typography>
           </Box>
           <Box>
             <Typography variant="caption" color="text.secondary" component="div">At risk</Typography>
-            <Typography variant="h6">{formatCents(data.openExposureCents)}</Typography>
+            <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{formatCents(data.openExposureCents)}</Typography>
           </Box>
           {negative && (
-            <Alert severity="warning" sx={{ py: 0 }}>
-              Balance is negative, so open wagers are capped at{' '}
-              {formatCents(data.negativeExposureCapCents)} in total.
-            </Alert>
+            <Tooltip title={`Your balance is below zero, so total unsettled stake is capped at ${formatCents(data.negativeExposureCapCents)}.`}>
+              <Chip size="small" color="warning" variant="outlined"
+                label={`capped at ${formatCents(data.negativeExposureCapCents)}`} />
+            </Tooltip>
           )}
+          <Box sx={{ flexGrow: 1 }} />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              {updatedAt && `${updatedAt.toLocaleTimeString()} · ${POLL_INTERVAL_MS / 1000}s`}
+            </Typography>
+            <Button size="small" startIcon={<RefreshIcon />} onClick={load}>Refresh</Button>
+          </Stack>
         </Stack>
       </Paper>
-
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          {updatedAt && `Updated ${updatedAt.toLocaleTimeString()} · refreshes every ${POLL_INTERVAL_MS / 1000}s`}
-        </Typography>
-        <Button size="small" startIcon={<RefreshIcon />} onClick={load}>Refresh</Button>
-      </Stack>
 
       {data.markets.length === 0 ? (
         <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>
