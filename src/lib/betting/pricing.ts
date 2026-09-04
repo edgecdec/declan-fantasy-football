@@ -58,6 +58,9 @@ export type PricedMarket = {
   pointsB: number;
   projectedA: number;
   projectedB: number;
+  /** Sd of the points still to come, needed by the season simulation. */
+  sdA: number;
+  sdB: number;
   nameA: string;
   nameB: string;
   /** Why the number is what it is, per side. */
@@ -313,6 +316,8 @@ export async function priceLeagueWeek(
       pointsB: b.distribution.banked,
       projectedA: a.distribution.mean,
       projectedB: b.distribution.mean,
+      sdA: Math.sqrt(a.distribution.variance),
+      sdB: Math.sqrt(b.distribution.variance),
       nameA: (ownerA && nameByUser.get(ownerA)) || `Roster ${sides[0].roster_id}`,
       nameB: (ownerB && nameByUser.get(ownerB)) || `Roster ${sides[1].roster_id}`,
       detailA: a.detail,

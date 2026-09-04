@@ -12,6 +12,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PageHeader from '@/components/common/PageHeader';
 import MatchupMeter, { SideSwatch } from '@/components/betting/MatchupMeter';
 import LeagueStandings from '@/components/betting/LeagueStandings';
+import SeasonOdds from '@/components/betting/SeasonOdds';
 import { MARKET_CLOSE_MINUTES, HOUSE_VIG, profitForStake } from '@/services/betting/liveOdds';
 import { formatCents, CENTS_PER_DOLLAR } from '@/lib/betting/constants';
 import { useBettingAuth } from '@/context/BettingAuthContext';
@@ -321,7 +322,7 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
   const [betTarget, setBetTarget] = React.useState<BetTarget | null>(null);
   // A tab rather than another section, so the standings don't add scroll to the
   // markets view the compaction work just tightened up.
-  const [tab, setTab] = React.useState<'markets' | 'standings'>('markets');
+  const [tab, setTab] = React.useState<'markets' | 'season' | 'standings'>('markets');
 
   const load = React.useCallback(async () => {
     try {
@@ -404,12 +405,15 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5 }}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)}>
           <Tab value="markets" label={`Week ${data.week} markets`} />
+          <Tab value="season" label="Season outlook" />
           <Tab value="standings" label="League standings" />
         </Tabs>
       </Box>
 
       {tab === 'standings' ? (
         <LeagueStandings leagueId={leagueId} />
+      ) : tab === 'season' ? (
+        <SeasonOdds leagueId={leagueId} />
       ) : data.markets.length === 0 ? (
         <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>
       ) : (
