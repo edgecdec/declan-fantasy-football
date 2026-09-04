@@ -40,14 +40,17 @@ function SideRow({ side, prob, odds, favourite }: {
           {d.banked.toFixed(1)} pts
           {d.remaining > 0 && ` · ${d.remaining.toFixed(1)} projected to come · ${side.playersRemaining} yet to finish`}
         </Typography>
-        {side.assumedStreams.length > 0 && (
-          <Tooltip title="This team has no rostered player for that slot, so we assume they pick the best unrostered option up before kickoff. Each unrostered player is only assigned to one team.">
+        {side.assumedStreams.map(s => (
+          <Tooltip
+            key={s.slot}
+            title={`No rostered player for this slot, so we assume they pick one up before kickoff. Averaged across the best available options (${s.optionNames.join(', ')}) rather than naming one, since they may not rank them the way we do.`}
+          >
             <Typography variant="caption" color="info.main" component="div">
-              assumes they stream in{' '}
-              {side.assumedStreams.map(p => `${p.name} (${p.projectedPoints.toFixed(1)})`).join(', ')}
+              assumes a streamed {s.slot} — {s.projectedPoints.toFixed(1)} pts
+              {s.spread > 0 && ` ±${s.spread.toFixed(1)}`}
             </Typography>
           </Tooltip>
-        )}
+        ))}
         {side.unfilledSlots.length > 0 && (
           <Typography variant="caption" color="error.main" component="div">
             {side.unfilledSlots.join(', ')} unfilled — scores nothing

@@ -1,6 +1,6 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
-import { bestAvailableLineup, LineupCandidate } from '@/services/betting/bestLineup';
+import { bestAvailableLineup, LineupCandidate, StreamedSlot } from '@/services/betting/bestLineup';
 import playerData from '../../../data/sleeper_players.json';
 import {
   StarterInput,
@@ -48,8 +48,13 @@ export type MarketSide = {
   playersRemaining: number;
   /** Bench players the model assumes will be started before kickoff. */
   assumedPromotions: { playerId: string; name: string; projectedPoints: number }[];
-  /** Free agents the model assumes get streamed in (typically K/DEF). */
-  assumedStreams: { playerId: string; name: string; projectedPoints: number }[];
+  /** Slots filled from waivers, priced as an averaged tier rather than a name. */
+  assumedStreams: {
+    slot: string;
+    projectedPoints: number;
+    spread: number;
+    optionNames: string[];
+  }[];
   /** Slots nobody could fill, which genuinely score nothing. */
   unfilledSlots: string[];
 };
@@ -119,11 +124,11 @@ function buildStarters(
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
   freeAgents: LineupCandidate[],
-  claimedFreeAgents: Set<string>,
+  streamsByPosition: Map<string, number>,
 ): {
   starters: StarterInput[];
   promoted: LineupCandidate[];
-  streamed: LineupCandidate[];
+  streamed: StreamedSlot[];
   unfilledSlots: string[];
 } {
   const starterIds = matchup.starters ?? [];
@@ -141,7 +146,7 @@ function buildStarters(
     .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
     .map(pid => buildCandidate(pid, playersPoints[pid] ?? 0, projections, scoringSettings, games));
 
-  const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, claimedFreeAgents);
+  const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, streamsByPosition);
 
   return {
     starters: best.starters.map(c => ({
@@ -151,6 +156,7 @@ function buildStarters(
       projectedPoints: c.projectedPoints,
       gameState: c.gameState,
       remainingMinutes: c.remainingMinutes,
+      extraSd: c.extraSd,
     })),
     promoted: best.promoted,
     streamed: best.streamed,
@@ -229,15 +235,15 @@ export async function buildMatchupMarkets(
   }
 
   const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, gamesRes);
-  // Shared across every side in the league: two teams cannot stream the same
-  // unrostered player, so the first to need him claims him.
-  const claimedFreeAgents = new Set<string>();
+  // Shared across every side in the league: each successive team needing the same
+  // position averages a tier one place further down the waiver board.
+  const streamsByPosition = new Map<string, number>();
 
   const buildSide = (
     m: SleeperMatchup,
     starters: StarterInput[],
     promoted: LineupCandidate[],
-    streamed: LineupCandidate[],
+    streamed: StreamedSlot[],
     unfilledSlots: string[],
   ): MarketSide => {
     const ownerId = ownerByRoster.get(m.roster_id) ?? null;
@@ -255,10 +261,11 @@ export async function buildMatchupMarkets(
         name: playerName(c.playerId),
         projectedPoints: c.projectedPoints,
       })),
-      assumedStreams: streamed.map(c => ({
-        playerId: c.playerId,
-        name: playerName(c.playerId),
-        projectedPoints: c.projectedPoints,
+      assumedStreams: streamed.map(s => ({
+        slot: s.slot,
+        projectedPoints: s.projectedPoints,
+        spread: s.spread,
+        optionNames: s.options.map(o => playerName(o.playerId)),
       })),
       unfilledSlots,
     };
@@ -269,8 +276,8 @@ export async function buildMatchupMarkets(
   for (const [matchupId, sides] of pairs) {
     if (sides.length !== 2) continue; // byes and odd league shapes have no market
 
-    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, claimedFreeAgents);
-    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, claimedFreeAgents);
+    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, streamsByPosition);
+    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes, freeAgents, streamsByPosition);
     const startersA = lineupA.starters;
     const startersB = lineupB.starters;
 

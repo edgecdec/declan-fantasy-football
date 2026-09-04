@@ -35,6 +35,24 @@ import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/l
  */
 const STREAMABLE_POSITIONS = new Set(['K', 'DEF']);
 
+/**
+ * How many of the best remaining waiver options to average when filling a slot
+ * from free agency.
+ *
+ * Naming a single player assumes the manager shares our projection ranking, which
+ * they very likely do not — they will pick on matchup, name recognition, or
+ * whatever their own app shows. Averaging the top few is the honest expectation:
+ * we know roughly what tier they will land in, not which name.
+ *
+ * It also sidesteps an impossibility the single-pick version had. Nine of Graham's
+ * ten teams would each "stream" the same top-projected defence, so the naive fix
+ * was to claim players exclusively. Averaging a tier means several teams can share
+ * the same expected value without any of them pretending to roster the same guy;
+ * depletion is handled by sliding the window down one place per streamer at that
+ * position.
+ */
+const STREAM_POOL_SIZE = 5;
+
 export type LineupCandidate = {
   playerId: string;
   position: string | null;
@@ -43,6 +61,23 @@ export type LineupCandidate = {
   /** 'pre' is swappable; 'in' and 'post' are locked; 'unknown' is treated as locked. */
   gameState: 'pre' | 'in' | 'post' | 'unknown';
   remainingMinutes: number;
+  /**
+   * Extra standard deviation beyond the position model. Set for a streamed slot,
+   * where we know the tier but not which player, so the spread across the tier is
+   * genuine additional uncertainty.
+   */
+  extraSd?: number;
+};
+
+/** A slot filled from waivers, as a tier average rather than a named player. */
+export type StreamedSlot = {
+  slot: string;
+  /** Mean projection of the options considered. */
+  projectedPoints: number;
+  /** Spread across those options — extra uncertainty about which they take. */
+  spread: number;
+  /** The options averaged, best first, for showing the reasoning. */
+  options: { playerId: string; projectedPoints: number }[];
 };
 
 export type BestLineupResult = {
@@ -50,8 +85,8 @@ export type BestLineupResult = {
   starters: LineupCandidate[];
   /** Rostered bench players the model assumes get started. */
   promoted: LineupCandidate[];
-  /** Free agents the model assumes get streamed in. */
-  streamed: LineupCandidate[];
+  /** Slots filled from waivers, as averaged tiers. */
+  streamed: StreamedSlot[];
   /** Currently-slotted players the model expects to be benched. */
   demoted: LineupCandidate[];
   /** Slots nobody at all could fill — these genuinely score nothing. */
@@ -85,11 +120,12 @@ export function bestAvailableLineup(
   bench: LineupCandidate[],
   freeAgents: LineupCandidate[] = [],
   /**
-   * Free agents already assigned to another team this week. Mutated as we claim.
-   * Two teams cannot stream the same player, so callers building every matchup in
-   * a league should pass one shared set.
+   * How many teams in the league have already streamed each position this week.
+   * Mutated as we go, so a second team needing a defence averages a tier one place
+   * further down the board. Callers building every matchup in a league should pass
+   * one shared map.
    */
-  claimedFreeAgents: Set<string> = new Set(),
+  streamsByPosition: Map<string, number> = new Map(),
 ): BestLineupResult {
   const startingSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
 
@@ -113,12 +149,7 @@ export function bestAvailableLineup(
 
   const rosteredPool = [...pool].sort((a, b) => b.projectedPoints - a.projectedPoints);
   const agentPool = freeAgents
-    .filter(
-      f =>
-        f.gameState === 'pre' &&
-        f.projectedPoints > 0 &&
-        !claimedFreeAgents.has(f.playerId),
-    )
+    .filter(f => f.gameState === 'pre' && f.projectedPoints > 0)
     .sort((a, b) => b.projectedPoints - a.projectedPoints);
 
   // Most restrictive slots first, so an elite flex-eligible player isn't burned
@@ -127,38 +158,66 @@ export function bestAvailableLineup(
     (a, b) => SLOT_PRIORITY.indexOf(a) - SLOT_PRIORITY.indexOf(b),
   );
 
-  const agentIds = new Set(agentPool.map(a => a.playerId));
   const chosen: LineupCandidate[] = [];
   const used = new Set<string>();
-  const streamedIds = new Set<string>();
+  const streamed: StreamedSlot[] = [];
   const unfilledSlots: string[] = [];
 
   for (const slot of orderedOpen) {
-    const fromRoster = rosteredPool.find(p => !used.has(p.playerId) && eligible(slot, p.position));
-    const fromWaivers = agentPool.find(p => !used.has(p.playerId) && eligible(slot, p.position));
-
     // The roster always wins when it can cover the slot. Waivers are a fallback
     // for a slot nobody on the roster can fill, and only at a streamable
     // position — see STREAMABLE_POSITIONS for why we don't assume upgrades.
-    const pick: LineupCandidate | undefined =
-      fromRoster ?? (slotIsStreamable(slot) ? fromWaivers : undefined);
+    const fromRoster = rosteredPool.find(p => !used.has(p.playerId) && eligible(slot, p.position));
+    if (fromRoster) {
+      used.add(fromRoster.playerId);
+      chosen.push(fromRoster);
+      continue;
+    }
 
-    if (!pick) {
+    if (!slotIsStreamable(slot)) {
       unfilledSlots.push(slot);
       continue;
     }
-    used.add(pick.playerId);
-    if (agentIds.has(pick.playerId)) {
-      streamedIds.add(pick.playerId);
-      // Claim it so no other team in the league streams the same player.
-      claimedFreeAgents.add(pick.playerId);
+
+    const eligibleAgents = agentPool.filter(p => eligible(slot, p.position));
+    // Skip past the tiers earlier streamers are assumed to have taken.
+    const alreadyStreamed = streamsByPosition.get(slot) ?? 0;
+    const window = eligibleAgents.slice(alreadyStreamed, alreadyStreamed + STREAM_POOL_SIZE);
+
+    if (window.length === 0) {
+      unfilledSlots.push(slot);
+      continue;
     }
-    chosen.push(pick);
+    streamsByPosition.set(slot, alreadyStreamed + 1);
+
+    const mean = window.reduce((s, p) => s + p.projectedPoints, 0) / window.length;
+    const variance =
+      window.reduce((s, p) => s + (p.projectedPoints - mean) ** 2, 0) / window.length;
+    const spread = Math.sqrt(variance);
+
+    streamed.push({
+      slot,
+      projectedPoints: mean,
+      spread,
+      options: window.map(p => ({ playerId: p.playerId, projectedPoints: p.projectedPoints })),
+    });
+
+    // Priced as a synthetic player carrying the tier's mean. `spread` is reported
+    // separately so the caller can fold it into variance — we know the tier, not
+    // the name, and that extra uncertainty is real.
+    chosen.push({
+      playerId: `stream:${slot}:${alreadyStreamed}`,
+      position: window[0].position,
+      projectedPoints: mean,
+      actualPoints: 0,
+      gameState: 'pre',
+      remainingMinutes: window[0].remainingMinutes,
+      extraSd: spread,
+    });
   }
 
   const benchIds = new Set(bench.map(b => b.playerId));
   const promoted = chosen.filter(p => benchIds.has(p.playerId));
-  const streamed = chosen.filter(p => streamedIds.has(p.playerId));
   const demoted = pool.filter(p => !used.has(p.playerId) && !benchIds.has(p.playerId));
 
   return {

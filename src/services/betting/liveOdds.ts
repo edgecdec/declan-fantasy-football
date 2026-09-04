@@ -102,6 +102,12 @@ export type StarterInput = {
   gameState: PlayerGameState;
   /** Regulation minutes left in this player's game (0 when final, 60 pre-kick). */
   remainingMinutes: number;
+  /**
+   * Extra sd on top of the position model, added in quadrature. Used where the
+   * player himself is uncertain — a streamed slot is an averaged tier, so the
+   * spread across that tier is real uncertainty the position model can't see.
+   */
+  extraSd?: number;
 };
 
 export type SideDistribution = {
@@ -159,7 +165,11 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
     if (fraction <= 0) continue;
 
     remaining += adjustedProjection(s.projectedPoints, s.position) * fraction;
-    const sd = projectionSd(s.projectedPoints, s.position) * Math.sqrt(fraction);
+    // Independent sources of error add in quadrature, so square-sum rather than
+    // summing the sds.
+    const base = projectionSd(s.projectedPoints, s.position);
+    const extra = s.extraSd ?? 0;
+    const sd = Math.sqrt(base * base + extra * extra) * Math.sqrt(fraction);
     variance += sd * sd;
   }
 
