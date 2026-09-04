@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import {
-  Container, Box, Paper, Typography, TextField, Button, Chip, Alert,
+  Container, Box, Paper, Typography, TextField, Button, Alert,
   LinearProgress, Table, TableBody, TableCell, TableHead, TableRow,
   TableContainer, Divider,
 } from '@mui/material';
+import Link from 'next/link';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PageHeader from '@/components/common/PageHeader';
 import { useBettingAuth } from '@/context/BettingAuthContext';
 import { formatCents, LEDGER_REASON_LABELS } from '@/lib/betting/constants';
@@ -94,11 +96,20 @@ function Dashboard() {
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Eligible leagues
+              Your leagues
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               {leagues.map(l => (
-                <Chip key={l.leagueId} label={`${l.label} (${l.season})`} size="small" />
+                <Button
+                  key={l.leagueId}
+                  component={Link}
+                  href={`/betting/${l.leagueId}`}
+                  variant="contained"
+                  size="small"
+                  endIcon={<ArrowForwardIcon />}
+                >
+                  {l.label} ({l.season}) odds
+                </Button>
               ))}
             </Box>
           </>
@@ -106,8 +117,7 @@ function Dashboard() {
       </Paper>
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        Markets aren&apos;t open yet. Matchup odds and wagering are the next step — this page
-        currently just holds your account and balance.
+        Matchup odds are live — open your league above. Placing wagers is the next step.
       </Alert>
 
       <Paper sx={{ p: 3 }}>

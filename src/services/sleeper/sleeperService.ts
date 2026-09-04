@@ -6,6 +6,9 @@ const BASE_URL = 'https://api.sleeper.app/v1';
 /** Draft-pick trades change during a live draft, so they cannot use the 1-hour default TTL. */
 const TRADED_PICKS_TTL = 15 * 1000;
 
+/** Live scores during the week being played; short enough that betting odds move. */
+const LIVE_MATCHUPS_TTL = 20 * 1000;
+
 export type SleeperUser = {
   username: string;
   user_id: string;
@@ -142,6 +145,8 @@ export type SleeperLeagueUser = {
   username: string;
   display_name: string;
   avatar: string | null;
+  /** Sleeper puts the manager's custom team name here when they set one. */
+  metadata?: { team_name?: string };
 };
 
 export type SleeperWaiverBudget = {
@@ -243,16 +248,31 @@ export const SleeperService = {
     }
   },
 
-  async getMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
+  /**
+   * `skipCache` bypasses the read for live polling. Scores in the week currently
+   * being played change every few minutes, and the 1-hour default TTL would
+   * freeze them for a whole Sunday — a 15s poll cannot fix that on its own,
+   * because the poll hits the same cache. Same reasoning as TRADED_PICKS_TTL.
+   */
+  async getMatchups(
+    leagueId: string,
+    week: number,
+    options: { skipCache?: boolean } = {},
+  ): Promise<SleeperMatchup[]> {
     const cacheKey = `matchups_${leagueId}_${week}`;
-    const cached = CacheService.get<SleeperMatchup[]>(cacheKey, 'session');
-    if (cached) return cached;
+    if (!options.skipCache) {
+      const cached = CacheService.get<SleeperMatchup[]>(cacheKey, 'session');
+      if (cached) return cached;
+    }
 
     try {
       const res = await fetch(`${BASE_URL}/league/${leagueId}/matchups/${week}`);
       if (!res.ok) return [];
       const data = await res.json();
-      CacheService.set(cacheKey, data, { storage: 'session' });
+      CacheService.set(cacheKey, data, {
+        storage: 'session',
+        ttl: options.skipCache ? LIVE_MATCHUPS_TTL : undefined,
+      });
       return data;
     } catch (e) {
       console.error(`Error fetching matchups for league ${leagueId} week ${week}`, e);
