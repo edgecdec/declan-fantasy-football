@@ -15,6 +15,7 @@ import Link from 'next/link';
 import PageHeader from '@/components/common/PageHeader';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
+import { compareDraftsBySchedule } from '@/services/draft/draftSchedule';
 import { calculateDraftEfficiency, aggregateManagerDraftEfficiency, fetchHistoricalDraftEfficiency } from '@/services/stats/draftEfficiency';
 import { DraftPickEfficiency, LogCurveCoefficients, HistoricalDraftData } from '@/types/draftEfficiency';
 import { getPositionColor } from '@/constants/colors';
@@ -100,7 +101,11 @@ export default function DraftEfficiencyPage() {
           SleeperService.getLeagueDrafts(leagueId),
           SleeperService.getRosters(leagueId),
         ]);
-        const completeDraft = drafts.find(d => d.status === 'complete') || drafts[0];
+        // Sorted so that among several finished drafts we take the most recent, not
+        // whichever Sleeper happened to list first.
+        const completeDraft =
+          [...drafts].sort(compareDraftsBySchedule).find(d => d.status === 'complete')
+          ?? drafts[0];
         if (!completeDraft) { setError('No drafts found.'); setLoading(false); return; }
 
         const fullDraft = await SleeperService.getDraft(completeDraft.draft_id);

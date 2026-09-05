@@ -16,25 +16,23 @@ import useValuedPlayers from '@/hooks/useValuedPlayers';
 import { useCustomRankings } from '@/context/CustomRankingsContext';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick } from '@/services/sleeper/sleeperService';
+import { compareDraftsBySchedule } from '@/services/draft/draftSchedule';
 import { recommendedDynastyVariant, recommendedRedraftVariant } from '@/services/draft/rankingsVariant';
 import Link from 'next/link';
 
 const DYNASTY_LEAGUE_TYPE = 2;
 
-const DRAFT_STATUS_PRIORITY: Record<string, number> = {
-  drafting: 0,
-  paused: 1,
-  pre_draft: 2,
-  complete: 3,
-};
-
+/**
+ * Picks which of a league's drafts to show.
+ *
+ * Same ordering as the draft list, so the two agree. Sorting on status alone left ties
+ * in whatever order Sleeper returned them, which matters for a renewed dynasty league
+ * carrying several drafts: now two upcoming drafts resolve to the one starting soonest
+ * and two finished ones to the most recent, rather than to an arbitrary pick.
+ */
 function selectBestDraft(drafts: SleeperDraft[]): SleeperDraft | null {
   if (drafts.length === 0) return null;
-  return [...drafts].sort((a, b) => {
-    const pA = DRAFT_STATUS_PRIORITY[a.status] ?? 99;
-    const pB = DRAFT_STATUS_PRIORITY[b.status] ?? 99;
-    return pA - pB;
-  })[0];
+  return [...drafts].sort(compareDraftsBySchedule)[0];
 }
 
 export default function LeagueDraftPage() {

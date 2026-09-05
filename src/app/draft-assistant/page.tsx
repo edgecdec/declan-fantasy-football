@@ -2,28 +2,66 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Container, Typography, Box, Paper, Button, Alert, List, ListItemText, ListItemButton, Chip, Divider, LinearProgress, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import { Container, Typography, Box, Paper, Button, Alert, List, ListItemText, ListItemButton, Chip, Divider, LinearProgress, Accordion, AccordionSummary, AccordionDetails, Tooltip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import YearSelector from '@/components/common/YearSelector';
 import { useUser } from '@/context/UserContext';
 import { SleeperService, SleeperDraft } from '@/services/sleeper/sleeperService';
+import { compareDraftsBySchedule, formatDraftTime } from '@/services/draft/draftSchedule';
 
 const REAL_LEAGUE_STATUSES = new Set(['in_season', 'complete', 'playoffs']);
-const STATUS_ORDER: Record<string, number> = { drafting: 0, paused: 1, pre_draft: 2, complete: 3 };
 
 function DraftListItem({ draft, onSelect }: { draft: SleeperDraft; onSelect: (d: SleeperDraft) => void }) {
+  // Computed on render rather than memoised: the relative label ("in 3 hours") is only
+  // right as of now, and this list is short.
+  const time = formatDraftTime(draft);
+  const emphasise = time?.imminent || time?.overdue;
+
   return (
-    <ListItemButton onClick={() => onSelect(draft)}>
+    <ListItemButton onClick={() => onSelect(draft)} sx={{ gap: 2 }}>
       <ListItemText
         primary={draft.metadata.name || `Draft ${draft.season}`}
         secondary={`${draft.type} • ${draft.settings.teams} Teams • ${draft.settings.rounds} Rounds`}
       />
+
+      <Box sx={{ textAlign: 'right', minWidth: 150, flexShrink: 0 }}>
+        {time ? (
+          <>
+            <Typography
+              variant="body2"
+              sx={{
+                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5,
+                fontWeight: emphasise ? 600 : 400,
+                color: time.overdue ? 'warning.main' : time.imminent ? 'error.main' : 'text.primary',
+              }}
+            >
+              <ScheduleIcon sx={{ fontSize: 14 }} />
+              {time.absolute}
+            </Typography>
+            {time.relative && (
+              <Typography
+                variant="caption"
+                sx={{ color: time.overdue ? 'warning.main' : time.imminent ? 'error.main' : 'text.secondary' }}
+              >
+                {time.overdue ? `${time.relative} — not started` : time.relative}
+              </Typography>
+            )}
+          </>
+        ) : (
+          <Tooltip title="Sleeper has no scheduled start time for this draft, so it sorts after the dated ones.">
+            <Typography variant="caption" color="text.disabled">No time set</Typography>
+          </Tooltip>
+        )}
+      </Box>
+
       <Chip
         label={draft.status.replace('_', ' ')}
         color={draft.status === 'drafting' ? 'success' : draft.status === 'complete' ? 'default' : 'warning'}
         size="small"
+        sx={{ flexShrink: 0 }}
       />
     </ListItemButton>
   );
@@ -84,8 +122,10 @@ export default function DraftAssistantPage() {
         }
       }
 
-      const foundDrafts = [...draftMap.values()];
-      foundDrafts.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+      // Live first, then whatever drafts soonest, then finished newest-first. Sorting
+      // on status alone left everything not-yet-drafted in Map insertion order, so the
+      // league drafting tonight could sit below one three weeks out.
+      const foundDrafts = [...draftMap.values()].sort(compareDraftsBySchedule);
 
       // Classify drafts as real or mock. Any league the user actually belongs to
       // (per the /leagues endpoint) counts as real, regardless of its current

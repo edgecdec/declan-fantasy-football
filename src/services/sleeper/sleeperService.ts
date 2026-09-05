@@ -85,6 +85,13 @@ export type SleeperDraft = {
   season: string;
   status: string; // "pre_draft", "drafting", "complete"
   type: string; // "snake", "linear"
+  /**
+   * Epoch milliseconds. For a `pre_draft` draft this is the SCHEDULED start, so it can
+   * be in the future; for one already run it is when it actually began. Often absent —
+   * 6 of 23 real 2026 drafts on one account had no time set at all — so every consumer
+   * has to treat it as optional rather than assuming a date exists.
+   */
+  start_time?: number | null;
   slot_to_roster_id?: Record<string, number> | null;
   /** user_id -> draft slot (1-indexed). UNRELIABLE as a source of truth for "which seat
    *  am I": in a live 16-team draft this reported slot 1 for a user whose actual picks

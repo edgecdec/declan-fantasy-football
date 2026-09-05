@@ -30,10 +30,7 @@ import { useUser } from '@/context/UserContext';
 import {
   SleeperService, SleeperDraft, SleeperDraftPick, SleeperTradedPick,
 } from '@/services/sleeper/sleeperService';
-
-const DRAFT_STATUS_PRIORITY: Record<string, number> = {
-  drafting: 0, paused: 1, pre_draft: 2, complete: 3,
-};
+import { compareDraftsBySchedule } from '@/services/draft/draftSchedule';
 
 /** Fallback settings for useValuedPlayers before the draft object arrives. Mirrors the
  *  board page so the two routes value players identically while loading. */
@@ -78,7 +75,7 @@ export default function PredictionsPage() {
         ]);
         if (cancelled) return;
         const best = [...drafts].sort((a, b) =>
-          (DRAFT_STATUS_PRIORITY[a.status] ?? 99) - (DRAFT_STATUS_PRIORITY[b.status] ?? 99))[0];
+          compareDraftsBySchedule(a, b))[0];
         if (!best) { setError('No drafts found for this league.'); setLoading(false); return; }
 
         const [full, fetchedPicks, traded] = await Promise.all([
