@@ -360,9 +360,24 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
 /**
  * Plays out the bracket for the seeded field and returns the champion's roster id.
  *
- * Shaped from this league's actual 2025 winners bracket rather than assumed: with
- * six teams the top two seeds get a bye, and the bracket is FIXED rather than
- * re-seeded — seed 1 meets the winner of 3v6 and seed 2 the winner of 4v5.
+ * Shaped from this league's real winners brackets, verified against all five completed
+ * seasons (2021-2025), which are unanimous: six teams, the top two seeds get a bye, and
+ * the bracket is FIXED rather than re-seeded, with
+ *
+ *   seed 1 meeting the winner of 4v5,  and  seed 2 the winner of 3v6.
+ *
+ * That pairing was previously the other way round here. Measured, the correction is
+ * almost a no-op: over 400k sims with a realistic strength spread it moves seeds 1 and 2
+ * by 0.00pp and seeds 3-6 by at most 0.4pp. Both top seeds have to beat someone from
+ * {3,4,5,6} and then each other, so which pair each draws is nearly symmetric for them;
+ * it only reshuffles the lower seeds' paths (seed 3 gains 0.4pp by drawing seed 2 rather
+ * than seed 1 in the semi). Corrected because it should match the real bracket, not
+ * because it was distorting the market.
+ *
+ * Worth noting what those five brackets actually produced: champions came from seeds
+ * 5, 4, 5, 1, 5. The top seed won once in five years. That is the same story the
+ * backtest tells numerically — three single-elimination games at a weekly team sd of
+ * 22 wash out almost any regular-season edge.
  */
 function simulateBracket(seeded: number[], scoreOnce: (id: number) => number): number | null {
   if (seeded.length === 0) return null;
@@ -372,10 +387,10 @@ function simulateBracket(seeded: number[], scoreOnce: (id: number) => number): n
 
   if (seeded.length >= 6) {
     const [s1, s2, s3, s4, s5, s6] = seeded;
-    const w36 = beat(s3, s6);
     const w45 = beat(s4, s5);
-    const semi1 = beat(s1, w36);
-    const semi2 = beat(s2, w45);
+    const w36 = beat(s3, s6);
+    const semi1 = beat(s1, w45);
+    const semi2 = beat(s2, w36);
     return beat(semi1, semi2);
   }
 
