@@ -147,6 +147,141 @@ export function adjustedProjection(projectedPoints: number, position?: string | 
  * with variance scaled by the fraction of the game left — uncertainty shrinks
  * with the clock, which is what makes the price move during a slate.
  */
+/**
+ * Per-position outcome shape, fitted on 33,841 player-weeks (2021-2025 weeks 1-17)
+ * scored under this league's own settings.
+ *
+ * A plain normal around the projection is the natural model and it is wrong in a
+ * specific, measurable way: it puts a large slab of probability BELOW zero, when in
+ * reality a skill-position player almost never scores negative but very often scores
+ * exactly zero.
+ *
+ *   position   P(exactly 0)   P(negative)   skew
+ *   QB              1.0%          1.2%      0.31
+ *   RB             14.5%          1.1%      1.39
+ *   WR             19.4%          0.8%      1.50
+ *   TE             34.4%          0.4%      1.97
+ *   K               2.9%          1.2%      0.53
+ *   DEF             0.2%          3.4%      0.86
+ *
+ * So DEF is the one position where a negative is a real outcome (3.4%, and it barely
+ * ever posts an exact zero), while TE posts an exact zero more than a third of the
+ * time and essentially never goes negative. The old normal fit gave a TE projected
+ * around 4 points a 22% chance of finishing NEGATIVE — that probability mass belongs
+ * at exactly zero instead.
+ *
+ * The zeros are genuine goose eggs, not missing data: 0.0-0.1% of projected players
+ * are absent from Sleeper's stats payload, so a 0 means they played and did not score.
+ *
+ * P(zero) falls steeply with the projection, which is why it is a logistic in the
+ * projection rather than a constant — a TE projected under 5 blanks 47.5% of the
+ * time, one projected 15-25 essentially never does.
+ *
+ * Why bother, when the sum of ten starters is near-normal by the central limit
+ * theorem either way? Two reasons. Aggregate matchup Brier is indeed unchanged
+ * (0.2280 vs 0.2281 over 325 real games), but calibration improves where the sample
+ * is thick (the 50-60% bucket lands 0.8pp off its target instead of 2.8pp). And CLT
+ * stops applying exactly when the money is live: late in a slate with one or two
+ * players left, a fake 20% negative tail on a single starter visibly distorts the
+ * price.
+ */
+type PositionShape = {
+  /** P(exactly zero) = sigmoid(zeroIntercept + zeroSlope * projection). */
+  zeroIntercept: number;
+  zeroSlope: number;
+  /** The small, position-specific chance of a negative, and its shape. */
+  negProb: number;
+  negMean: number;
+  negSd: number;
+  /** Mean and sd GIVEN the player scored something, both linear in the projection. */
+  scoreMean: number;
+  scoreMeanSlope: number;
+  scoreSd: number;
+  scoreSdSlope: number;
+};
+
+const POSITION_SHAPE: Record<string, PositionShape> = {
+  QB: {
+    zeroIntercept: 0.680, zeroSlope: -0.5260,
+    negProb: 0.0125, negMean: -1.72, negSd: 1.66,
+    scoreMean: 2.97, scoreMeanSlope: 0.788,
+    scoreSd: 4.81, scoreSdSlope: 0.162,
+  },
+  RB: {
+    zeroIntercept: 0.365, zeroSlope: -0.7059,
+    negProb: 0.0114, negMean: -0.51, negSd: 0.52,
+    scoreMean: 1.74, scoreMeanSlope: 0.965,
+    scoreSd: 3.27, scoreSdSlope: 0.367,
+  },
+  WR: {
+    zeroIntercept: 0.237, zeroSlope: -0.3966,
+    negProb: 0.0081, negMean: -0.82, negSd: 0.67,
+    scoreMean: 2.06, scoreMeanSlope: 0.880,
+    scoreSd: 3.14, scoreSdSlope: 0.376,
+  },
+  TE: {
+    zeroIntercept: 0.965, zeroSlope: -0.5820,
+    negProb: 0.0036, negMean: -0.70, negSd: 0.48,
+    scoreMean: 2.17, scoreMeanSlope: 0.839,
+    scoreSd: 2.53, scoreSdSlope: 0.437,
+  },
+  K: {
+    zeroIntercept: -0.031, zeroSlope: -0.5071,
+    negProb: 0.0124, negMean: -1.29, negSd: 0.45,
+    scoreMean: 6.75, scoreMeanSlope: 0.285,
+    scoreSd: 5.38, scoreSdSlope: -0.080,
+  },
+  DEF: {
+    zeroIntercept: -0.085, zeroSlope: -0.7126,
+    negProb: 0.0336, negMean: -1.53, negSd: 1.06,
+    scoreMean: 2.45, scoreMeanSlope: 0.704,
+    scoreSd: 3.06, scoreSdSlope: 0.266,
+  },
+};
+
+const sigmoid = (z: number): number => 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+
+/**
+ * Mean and variance of one starter's score, as a three-part mixture: a small chance
+ * of a negative, a projection-dependent chance of exactly zero, and otherwise a
+ * normal truncated at zero.
+ *
+ * Falls back to the old plain-normal moments for a player whose position we cannot
+ * identify, so an unmapped id degrades rather than throwing.
+ */
+export function starterMoments(
+  projectedPoints: number,
+  position: string | null,
+): { mean: number; variance: number } {
+  const shape = position ? POSITION_SHAPE[position] : undefined;
+  if (!shape) {
+    const mean = adjustedProjection(projectedPoints, position);
+    const sd = projectionSd(projectedPoints, position);
+    return { mean, variance: sd * sd };
+  }
+
+  const proj = Math.max(0, projectedPoints);
+  const pZero = sigmoid(shape.zeroIntercept + shape.zeroSlope * proj);
+  const pNeg = shape.negProb;
+  const pScore = Math.max(0, 1 - pZero - pNeg);
+
+  // Mean and sd GIVEN the player scored. Fitted straight off the empirical
+  // conditional moments per projection bin, so no distributional shape is assumed —
+  // which matters because these are strongly right-skewed (skew 1.4 at RB, 2.0 at
+  // TE) and a symmetric fit understates the spread.
+  const scoreMean = Math.max(0.1, shape.scoreMean + shape.scoreMeanSlope * proj);
+  const scoreSd = Math.max(0.8, shape.scoreSd + shape.scoreSdSlope * proj);
+
+  // Three-part mixture. The zero component contributes nothing to the mean but a lot
+  // to the variance: a coin flip between 0 and a real score is genuinely volatile,
+  // which a single normal could only imitate by being too wide everywhere.
+  const mean = pNeg * shape.negMean + pScore * scoreMean;
+  const second =
+    pNeg * (shape.negMean * shape.negMean + shape.negSd * shape.negSd) +
+    pScore * (scoreMean * scoreMean + scoreSd * scoreSd);
+  return { mean, variance: Math.max(0.2, second - mean * mean) };
+}
+
 export function sideDistribution(starters: StarterInput[]): SideDistribution {
   let banked = 0;
   let remaining = 0;
@@ -164,13 +299,12 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
 
     if (fraction <= 0) continue;
 
-    remaining += adjustedProjection(s.projectedPoints, s.position) * fraction;
+    const m = starterMoments(s.projectedPoints, s.position ?? null);
+    remaining += m.mean * fraction;
     // Independent sources of error add in quadrature, so square-sum rather than
     // summing the sds.
-    const base = projectionSd(s.projectedPoints, s.position);
     const extra = s.extraSd ?? 0;
-    const sd = Math.sqrt(base * base + extra * extra) * Math.sqrt(fraction);
-    variance += sd * sd;
+    variance += m.variance * fraction + extra * extra * fraction;
   }
 
   return { mean: banked + remaining, variance, banked, remaining };

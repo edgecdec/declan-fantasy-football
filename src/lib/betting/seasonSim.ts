@@ -2,40 +2,121 @@
  * Monte Carlo simulation of the rest of a fantasy season, for a "wins the league"
  * market.
  *
- * Every constant here is fitted from this league's own 650 completed team-weeks
- * (2021-2025, scored under its own settings), not assumed. Two measurements drive
- * the whole design:
+ * Every constant is fitted from this league's own 650 completed team-weeks
+ * (2021-2025, scored under its own settings). The fits are SEASON-CENTERED, which is
+ * the correction that matters most here — see PERSISTENCE below for what going
+ * without it cost.
  *
- *   team-week scoring         mean 125.4, sd 23.3
- *   spread of TEAM means      sd  9.4   <- how much teams actually differ
- *   within-team week to week   sd 20.8   <- 2.2x larger than the skill spread
- *   first half -> second half  r 0.326, regression slope 0.362
+ *   team-week scoring, pooled     mean 125.4, sd 23.3
+ *   within-team, week to week     sd 22.2   <- real weekly noise
+ *   observed spread of team means sd  7.5
+ *   ...of which luck alone explains  6.2
+ *   => TRUE spread between teams  sd  4.2   <- only 32% of the observed spread
  *
- * That last number is the one that matters most. Only about 36% of an observed
- * scoring edge carries into the rest of the season, so an observed mean has to be
- * shrunk hard toward the league average. Skipping that step is what makes naive
- * season simulators wildly overconfident about who is good — with noise 2.2x the
- * size of real skill, most of a hot start is luck.
+ * That last line is the whole story: weekly noise is 5.2x the real difference
+ * between teams. Almost everything that looks like a team being good is variance,
+ * so an observed scoring edge has to be shrunk hard, and a PRESEASON edge has to be
+ * shrunk almost to nothing.
  */
 
-/** Weekly scoring noise for a single team, fitted within-team. */
-export const TEAM_WEEK_SD = 20.8;
+/**
+ * Weekly scoring noise for a single team, fitted within-team and season-centered.
+ *
+ * Was 20.8, which came from a fit that did not remove season-to-season scoring
+ * drift. This league's mean moved 121.0 -> 136.4 across the five seasons, and
+ * leaving that in understated the within-team figure.
+ */
+export const TEAM_WEEK_SD = 22.16;
 
-/** League-average team-week score, the target we shrink observed means toward. */
+/**
+ * League-average team-week score across all five seasons.
+ *
+ * Only used as a level anchor before any games are played. Once the season starts
+ * we anchor on THIS season's observed mean instead, because the level moves a lot
+ * year to year (121.0 to 136.4). The level mostly cancels in a head-to-head market
+ * anyway — both sides shift together — so it matters for the displayed points-per-week
+ * far more than for any probability.
+ */
 export const LEAGUE_MEAN_SCORE = 125.4;
 
 /**
- * Fraction of an observed scoring edge that persists. Fitted by regressing each
- * team-season's second-half mean on its first-half mean across 50 team-seasons.
+ * TRUE spread of team ability, in points per week, with luck removed.
+ *
+ * Derived by decomposing the observed spread of team season means (sd 7.46) against
+ * what pure sampling noise would produce over ~13 games (sd 6.15):
+ * sqrt(7.46^2 - 6.15^2) = 4.23. Only 32% of the observed variance in team means is
+ * real; the rest is luck.
  */
-export const PERSISTENCE = 0.362;
+export const TRUE_SKILL_SD = 4.23;
 
 /**
- * Weeks of observed scoring needed before we lean on it as much as PERSISTENCE
- * allows. Below this we blend toward the projection-based estimate, because six
- * games of noise at sd 20.8 says very little.
+ * Fraction of an observed scoring edge that carries forward.
+ *
+ * NOT a constant — it depends on how many games you have seen, which is the point.
+ * See `observedShrinkage`.
+ *
+ * The previous value was a flat 0.362, and it was wrong by about 3x early in the
+ * season. It came from regressing each team-season's second-half mean on its
+ * first-half mean WITHOUT centering each season first. Because this league's scoring
+ * level swung from 121.0 to 136.4 across the five seasons, a merely average team in
+ * a high-scoring year looked "persistently above average" in both halves, and that
+ * shared season effect was counted as team skill. Season-centering the identical
+ * regression drops the slope from 0.362 to 0.123.
+ *
+ * Cross-checked directly: regressing each team's remaining-weeks scoring on its
+ * scoring so far gives 0.11 at 3 weeks, 0.13 at 7, 0.39 at 10, 0.62 at 11 — a curve,
+ * matching `observedShrinkage`, never a flat 0.362.
  */
-const OBSERVED_WEIGHT_FULL_WEEKS = 6;
+export const PERSISTENCE_NOTE = 'see observedShrinkage';
+
+/**
+ * How much of a PRESEASON projected edge is real: essentially none.
+ *
+ * Measured directly. For all 50 completed team-seasons, a team's week-1 projected
+ * starting lineup (Sleeper projections under this league's scoring) was regressed
+ * against the points it actually averaged over that season. Season-centered:
+ *
+ *   correlation r = +0.030   (r^2 = 0.1%)   regression slope = 0.037
+ *   per season:  -0.171, +0.095, +0.103, +0.405, +0.002
+ *
+ * At n=50 the standard error on r is about 0.15, so +0.030 is statistically
+ * indistinguishable from zero. Preseason roster projections carry no measurable
+ * information about season-long scoring in this league.
+ *
+ * The term is kept rather than hard-zeroed, at its measured coefficient, so the
+ * mechanism stays visible and degrades gracefully if that ever changes. In practice
+ * it converts a +9 point projected edge into +0.3, which is the honest answer.
+ *
+ * Why so useless? Two reasons visible in the data. Roster-shape differences dominate
+ * the raw number (a WR-heavy lineup projects +12.7 at WR and -11.8 at RB, which is
+ * not an edge, just a shape). And the residual is concentrated in the positions
+ * projections predict worst: DEF projections explain 7% of week-1 variance, and a
+ * defense's week-1 score correlates with its rest-of-season average at r = -0.011,
+ * -0.051, +0.030 across three seasons. Defense is not sticky at all.
+ */
+export const PROJECTION_PERSISTENCE = 0.037;
+
+/**
+ * Bayesian shrinkage for an observed scoring mean, given how many weeks it covers.
+ *
+ * k = tau^2 / (tau^2 + sigma^2/n) — the standard posterior weight on an observation
+ * whose noise is sigma^2/n against a prior spread of tau^2. This replaces the old
+ * `min(1, n/6) * 0.362`, which was both too confident early and, because it capped
+ * at 0.362, too timid late.
+ *
+ *   weeks:   1      3      6      10     13
+ *   k:       0.035  0.098  0.179  0.267  0.321
+ *   measured 0.11   0.11   0.12   0.39   0.62   (direct, remaining-weeks regression)
+ *
+ * The measured column is noisy (r never exceeds 0.27 at n=50) but tracks the curve
+ * and rules out anything like a flat 0.36.
+ */
+export function observedShrinkage(weeksPlayed: number): number {
+  if (weeksPlayed <= 0) return 0;
+  const tau2 = TRUE_SKILL_SD * TRUE_SKILL_SD;
+  const sigma2 = TEAM_WEEK_SD * TEAM_WEEK_SD;
+  return tau2 / (tau2 + sigma2 / weeksPlayed);
+}
 
 /**
  * Maximum weekly scoring bump from having a full FAAB budget left rather than none.
@@ -77,6 +158,19 @@ export type TeamState = {
   weeksPlayed: number;
   /** Fraction of the FAAB budget still unspent, 0..1. */
   faabRemaining: number;
+  /**
+   * Scoring level to anchor on: this season's observed league mean once games exist,
+   * else LEAGUE_MEAN_SCORE. Shared by every team, so it cancels in head-to-head.
+   */
+  leagueMeanScore: number;
+  /**
+   * Mean projected score across the whole field this week. The projection tilt is
+   * measured relative to THIS, not to the historical scoring mean — projections and
+   * actuals sit on different scales (the 2026 field projects 132.7 against a
+   * historical actual mean of 125.4), and differencing against the wrong one would
+   * shift every team by the same several points for no reason.
+   */
+  leagueMeanProjection: number;
   /** Live current week: points already banked. */
   currentBanked: number;
   /** Live current week: expected points still to come. */
@@ -103,20 +197,25 @@ export type SeasonSimResult = {
 /**
  * The per-week mean actually simulated.
  *
- * Blends the projection-based estimate with observed scoring, shrinking any
- * observed edge by PERSISTENCE and weighting it in only as games accumulate. Then
- * a small FAAB term.
+ * Starts from a prior that is the field's own scoring level, tilted by the team's
+ * projection at the projection's measured worth (about 4% — see
+ * PROJECTION_PERSISTENCE), then moves toward observed scoring by the Bayesian weight
+ * for however many games have been played.
+ *
+ * Before any games this is deliberately almost flat across the league, because
+ * nothing in the preseason data distinguishes these teams. A model that spread them
+ * out here would be inventing confidence: the previous version took the week-1
+ * projection at FACE VALUE as a season-long ability, which turned a +9.8 projected
+ * edge into a +9.8 modeled edge and a 29.6% title chance for the top team, when the
+ * measured value of that edge is +0.36.
  */
 export function effectiveWeekMean(t: TeamState): number {
-  const projected = t.projectedWeekMean;
+  const tilt = (t.projectedWeekMean - t.leagueMeanProjection) * PROJECTION_PERSISTENCE;
+  const prior = t.leagueMeanScore + tilt;
 
-  let base = projected;
+  let base = prior;
   if (t.observedWeekMean !== null && t.weeksPlayed > 0) {
-    // Only the persistent part of an observed edge is real.
-    const shrunkObserved =
-      LEAGUE_MEAN_SCORE + (t.observedWeekMean - LEAGUE_MEAN_SCORE) * PERSISTENCE;
-    const w = Math.min(1, t.weeksPlayed / OBSERVED_WEIGHT_FULL_WEEKS);
-    base = projected * (1 - w) + shrunkObserved * w;
+    base = prior + (t.observedWeekMean - prior) * observedShrinkage(t.weeksPlayed);
   }
 
   // Budget left is optionality, so it is centred: a team at half budget gets

@@ -35,7 +35,15 @@ type Payload = {
   playoffTeams: number;
   sims: number;
   weeksRemaining: number;
-  model: { teamWeekSd: number; leagueMeanScore: number; persistence: number; maxFaabEdgePoints: number };
+  model: {
+    teamWeekSd: number;
+    trueSkillSd: number;
+    leagueMeanScore: number;
+    leagueMeanProjection: number;
+    observedShrinkage: number;
+    projectionPersistence: number;
+    maxFaabEdgePoints: number;
+  };
   results: Result[];
 };
 
@@ -144,27 +152,44 @@ export default function SeasonOdds({ leagueId }: { leagueId: string }) {
       </Paper>
 
       <Alert severity="warning" sx={{ mb: 1.5 }}>
-        <strong>Trust the playoff number more than the title number.</strong> Backtested on
-        this league&apos;s five completed seasons: playoff odds score a Brier of 0.150 against
-        a 0.240 base rate and calibrate closely (teams given 75&ndash;100% made it 90.5% of the
-        time). The title number does not beat picking at random — the eventual champion was
-        rated 7.9% on average against a 10% baseline. That is not a bug in the simulation, it
-        is the format: a weekly team sd of {data.model.teamWeekSd} makes one playoff game
-        nearly a coin flip, so even a 10-point-per-week edge only wins three straight about a
-        quarter of the time.
+        <strong>Trust the playoff number more than the title number.</strong> Backtested
+        across this league&apos;s five completed seasons, playoff odds beat the base rate
+        clearly (Brier 0.14 against 0.24) and calibrate close to the diagonal — teams given
+        75&ndash;100% made it 91% of the time. The title number does not beat picking at
+        random. That is the format, not a bug: at a weekly team sd of {data.model.teamWeekSd}
+        {' '}one playoff game is nearly a coin flip, so even a 10-point-per-week edge wins
+        three straight only about a quarter of the time.
+      </Alert>
+
+      <Alert severity="info" sx={{ mb: 1.5 }}>
+        <strong>Why nobody is a big favourite this early.</strong> Teams really do differ,
+        but only by about <strong>{data.model.trueSkillSd} points a week</strong>, and weekly
+        noise is {(data.model.teamWeekSd / data.model.trueSkillSd).toFixed(1)}&times; that.
+        Decomposing 650 real team-weeks: the observed spread of team season averages is 7.5
+        points, but luck alone over 13 games would produce 6.2 of it, so only{' '}
+        <strong>32%</strong> of the apparent difference between these teams is real. An
+        observed scoring edge is carried forward at{' '}
+        {(data.model.observedShrinkage * 100).toFixed(0)}% of face value at this point in
+        the season, rising as games accumulate.
       </Alert>
 
       <Alert severity="info">
-        Every constant is fitted from this league&apos;s own 650 completed team-weeks
-        (2021&ndash;2025) in its own scoring, not assumed. Weekly team sd{' '}
-        {data.model.teamWeekSd}, league mean {data.model.leagueMeanScore}. An observed
-        scoring edge is shrunk to {(data.model.persistence * 100).toFixed(0)}% of itself,
-        because that is how much of a first-half edge actually carried into the second half
-        (r = 0.33) — week-to-week noise is 2.2&times; the real spread between teams, so most
-        of a hot start is luck. Remaining FAAB moves a team by at most{' '}
-        {data.model.maxFaabEdgePoints} points a week; the historical correlation between FAAB
-        spent and scoring is noise (&minus;0.28 pooled), so that term reflects the optionality
-        to patch an injury rather than a measured effect.
+        <strong>Preseason projections are worth almost nothing here, and are weighted
+        accordingly.</strong> Regressing each team&apos;s week-1 projected lineup against
+        what it actually averaged that season, across all 50 completed team-seasons, gives
+        r = +0.03 (slope {data.model.projectionPersistence}) — indistinguishable from zero at
+        this sample size. So a projected edge enters at{' '}
+        {(data.model.projectionPersistence * 100).toFixed(1)}% of its size: a team projected
+        9 points clear of the field is modelled about a third of a point clear. Two reasons
+        it fails. Most of the raw gap is roster <em>shape</em>, not strength — a
+        receiver-heavy lineup projects far above the field at WR and far below at RB, which
+        nets to nothing. And much of the rest sits in the positions projections predict
+        worst: defence projections explain 7% of week-1 variance, and a defence&apos;s week-1
+        score correlates with its rest-of-season average at r = &minus;0.01, &minus;0.05,
+        +0.03 across three seasons. Defence is not sticky. Remaining FAAB moves a team by at
+        most {data.model.maxFaabEdgePoints} points a week; the historical correlation between
+        FAAB spent and scoring is noise (&minus;0.28 pooled), so that term stands for the
+        option to patch an injury rather than a measured effect.
       </Alert>
     </Box>
   );

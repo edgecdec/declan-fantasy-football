@@ -4,8 +4,8 @@ import { findAccountById } from '@/lib/betting/accounts';
 import { accountCanBetInLeague, findBettingLeague } from '@/lib/betting/leagues';
 import { priceLeagueWeek } from '@/lib/betting/pricing';
 import {
-  LEAGUE_MEAN_SCORE, PERSISTENCE, TEAM_WEEK_SD, MAX_FAAB_EDGE_POINTS,
-  TeamState, WeekPairings, simulateSeason,
+  LEAGUE_MEAN_SCORE, TEAM_WEEK_SD, TRUE_SKILL_SD, MAX_FAAB_EDGE_POINTS,
+  PROJECTION_PERSISTENCE, TeamState, WeekPairings, observedShrinkage, simulateSeason,
 } from '@/lib/betting/seasonSim';
 
 export const dynamic = 'force-dynamic';
@@ -125,6 +125,26 @@ export async function GET(request: Request) {
     projectedByRoster.set(m.rosterB, m.projectedB);
   }
 
+  /*
+   * Level anchor. Once games exist we use THIS season's observed mean rather than the
+   * five-year average, because the league's scoring level swings a lot year to year
+   * (121.0 to 136.4) and anchoring on the wrong level would shift every team's
+   * displayed points-per-week by several points.
+   */
+  const observedAll = [...observed.values()].flat();
+  const leagueMeanScore = observedAll.length > 0
+    ? observedAll.reduce((a, b) => a + b, 0) / observedAll.length
+    : LEAGUE_MEAN_SCORE;
+
+  // The projection tilt is measured against the FIELD's mean projection, since
+  // projections and actual scores sit on different scales.
+  const projValues = rosters
+    .map(r => projectedByRoster.get(r.roster_id))
+    .filter((v): v is number => typeof v === 'number' && v > 0);
+  const leagueMeanProjection = projValues.length > 0
+    ? projValues.reduce((a, b) => a + b, 0) / projValues.length
+    : leagueMeanScore;
+
   const teams: TeamState[] = rosters.map(r => {
     const obs = observed.get(r.roster_id) ?? [];
     const l = live.get(r.roster_id);
@@ -141,6 +161,8 @@ export async function GET(request: Request) {
       observedWeekMean: obs.length > 0 ? obs.reduce((a, b) => a + b, 0) / obs.length : null,
       weeksPlayed: obs.length,
       faabRemaining: faabBudget > 0 ? Math.max(0, Math.min(1, 1 - used / faabBudget)) : 0.5,
+      leagueMeanScore,
+      leagueMeanProjection,
       currentBanked: l?.banked ?? 0,
       currentRemainingMean: l?.remainingMean ?? 0,
       currentRemainingSd: l?.remainingSd ?? 0,
@@ -167,8 +189,15 @@ export async function GET(request: Request) {
     weeksRemaining: remainingSchedule.length + (currentWeekPairs.length > 0 ? 1 : 0),
     model: {
       teamWeekSd: TEAM_WEEK_SD,
-      leagueMeanScore: LEAGUE_MEAN_SCORE,
-      persistence: PERSISTENCE,
+      trueSkillSd: TRUE_SKILL_SD,
+      leagueMeanScore,
+      leagueMeanProjection,
+      // How much of an observed edge we are currently carrying forward, and how much
+      // of the preseason projection — both surfaced so the UI can be honest about it.
+      observedShrinkage: observedShrinkage(
+        Math.max(0, ...teams.map(t => t.weeksPlayed)),
+      ),
+      projectionPersistence: PROJECTION_PERSISTENCE,
       maxFaabEdgePoints: MAX_FAAB_EDGE_POINTS,
     },
     results,
