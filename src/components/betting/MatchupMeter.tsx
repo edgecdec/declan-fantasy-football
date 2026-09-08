@@ -32,9 +32,20 @@ type Props = {
   nameB: string;
   /** Dims the whole meter when the market can't be bet. */
   muted?: boolean;
+  /**
+   * Draw the bar only, without inline names.
+   *
+   * For callers that already show both names immediately above the bar and aligned to its
+   * two ends — repeating them inside would be noise, and the inline labels appear only
+   * above a width threshold so on a lopsided line one name would show and the other would
+   * not. Names still reach screen readers and tooltips.
+   */
+  showLabels?: boolean;
 };
 
-export default function MatchupMeter({ probA, nameA, nameB, muted = false }: Props) {
+export default function MatchupMeter({
+  probA, nameA, nameB, muted = false, showLabels = true,
+}: Props) {
   const a = Math.min(1, Math.max(0, probA));
   const b = 1 - a;
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
@@ -63,7 +74,7 @@ export default function MatchupMeter({ probA, nameA, nameB, muted = false }: Pro
               cursor: 'default',
             }}
           >
-            {a >= MIN_INLINE_LABEL_SHARE && (
+            {showLabels && a >= MIN_INLINE_LABEL_SHARE && (
               // Inside a filled segment is the one place a label may sit on the
               // data colour, so it takes a fixed light ink for contrast.
               <Typography
@@ -90,7 +101,7 @@ export default function MatchupMeter({ probA, nameA, nameB, muted = false }: Pro
               cursor: 'default',
             }}
           >
-            {b >= MIN_INLINE_LABEL_SHARE && (
+            {showLabels && b >= MIN_INLINE_LABEL_SHARE && (
               <Typography
                 variant="caption"
                 sx={{ pr: 0.75, color: '#fff', fontWeight: 700, lineHeight: 1, fontSize: 11 }}
@@ -118,7 +129,7 @@ export default function MatchupMeter({ probA, nameA, nameB, muted = false }: Pro
       </Box>
 
       {/* Values that didn't fit inline still appear, so nothing is gated on width. */}
-      {(a < MIN_INLINE_LABEL_SHARE || b < MIN_INLINE_LABEL_SHARE) && (
+      {showLabels && (a < MIN_INLINE_LABEL_SHARE || b < MIN_INLINE_LABEL_SHARE) && (
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.25 }}>
           <Typography variant="caption" color="text.secondary">
             {a < MIN_INLINE_LABEL_SHARE ? pct(a) : ''}

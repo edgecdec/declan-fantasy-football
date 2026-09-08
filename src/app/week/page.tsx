@@ -10,8 +10,8 @@ import DataTable, { Column } from '@/components/common/DataTable';
 import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
-import MatchupMeter from '@/components/betting/MatchupMeter';
 import NetLeaguesBar from '@/components/week/NetLeaguesBar';
+import MatchupScoreboard from '@/components/week/MatchupScoreboard';
 import useRememberedUsername from '@/hooks/useRememberedUsername';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
@@ -176,7 +176,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
     {
       id: 'leagueName',
       label: 'League',
-      width: 220,
+      width: 180,
       render: r => (
         <Typography variant="body2" component="div" noWrap>
           <LeagueLink leagueId={r.leagueId} name={r.leagueName} noWrap />
@@ -184,45 +184,58 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       ),
     },
     {
-      id: 'me.distribution.banked',
-      label: 'You',
-      numeric: true,
+      id: 'scoreboard',
+      label: 'Matchup',
+      sortable: false,
+      // Not sortable itself: it presents four numbers at once, so there is no single
+      // ordering it could mean. The numbers worth sorting on get their own columns below.
       render: r => (
-        <Box component="span" sx={{ fontWeight: 600 }}>{r.me.distribution.banked.toFixed(1)}</Box>
+        r.opponent ? (
+          <MatchupScoreboard
+            leftName="You"
+            leftIsYou
+            rightName={r.opponent.displayName}
+            leftScore={r.me.distribution.banked}
+            rightScore={r.opponent.distribution.banked}
+            leftProjected={r.me.distribution.mean}
+            rightProjected={r.opponent.distribution.mean}
+            leftWinProbability={r.winProbability}
+            leftToPlay={r.me.playersRemaining}
+            rightToPlay={r.opponent.playersRemaining}
+            final={r.status === 'final'}
+          />
+        ) : <Box component="span" sx={{ color: 'text.disabled' }}>no opponent this week</Box>
       ),
     },
     {
-      id: 'opponentScore',
-      label: 'Opponent',
+      id: 'margin',
+      label: 'Margin',
       numeric: true,
-      // Derived: the cell shows a score AND a name, and the useful order is the score.
-      sortValue: r => r.opponent?.distribution.banked ?? null,
-      render: r => (
-        <Box component="span" sx={{ color: 'text.secondary' }}>
-          {r.opponent ? `${r.opponent.distribution.banked.toFixed(1)} · ${r.opponent.displayName}` : '—'}
-        </Box>
-      ),
+      tooltip: 'Points you are ahead right now. Sort ascending to find the games you are losing.',
+      sortValue: r => (r.opponent ? r.me.distribution.banked - r.opponent.distribution.banked : null),
+      render: r => {
+        if (!r.opponent) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>;
+        const m = r.me.distribution.banked - r.opponent.distribution.banked;
+        return (
+          <Box component="span" sx={{
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+            color: m > 0 ? 'success.main' : m < 0 ? 'error.main' : 'text.disabled',
+          }}>
+            {m > 0 ? '+' : ''}{m.toFixed(1)}
+          </Box>
+        );
+      },
     },
     {
       id: 'winProbability',
       label: 'Win %',
-      width: 190,
-      tooltip: 'Chance you win this matchup, from the same model the betting markets use. Sort descending for the ones you are most likely to win.',
+      numeric: true,
+      tooltip: 'Chance you win this matchup. The bar in the Matchup column is the same number.',
       render: r => (
-        r.opponent ? (
-          <Box sx={{ minWidth: 150 }}>
-            <MatchupMeter
-              probA={r.winProbability}
-              nameA="You"
-              nameB={r.opponent.displayName}
-              muted={r.status === 'final'}
-            />
-            <Typography variant="caption" color="text.secondary">
-              {(r.winProbability * 100).toFixed(0)}%
-              {r.status !== 'final' && ` · ${Math.round(r.remainingMinutes)} min left`}
-            </Typography>
-          </Box>
-        ) : <>—</>
+        <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+          {(r.winProbability * 100).toFixed(0)}%
+        </Box>
       ),
     },
     {
@@ -230,25 +243,23 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       label: 'Closeness',
       numeric: true,
       tooltip: 'Distance from a coin flip. Sort ascending to put the matchups actually in the balance at the top — this is the default.',
-      // The whole point of the sortValue extension: this is not a field on the row, and it
-      // is the ordering that matters most on this page.
       sortValue: r => Math.abs(r.winProbability - 0.5),
       render: r => (
-        <Box component="span" sx={{ color: 'text.secondary' }}>
+        <Box component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
           ±{(Math.abs(r.winProbability - 0.5) * 100).toFixed(0)}
         </Box>
       ),
     },
     {
-      id: 'projected',
-      label: 'Projected',
+      id: 'toPlay',
+      label: 'To play',
       numeric: true,
-      tooltip: 'Projected final score: points already banked plus what the remaining starters are expected to add.',
-      sortValue: r => r.me.distribution.mean,
+      tooltip: 'Your starters who can still score. A lead with nobody left is safe; the same lead with eight to play is not.',
+      sortValue: r => r.me.playersRemaining,
       render: r => (
-        <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
-          {r.me.distribution.mean.toFixed(1)}
-          {r.opponent && ` – ${r.opponent.distribution.mean.toFixed(1)}`}
+        <Box component="span" sx={{ color: 'text.secondary' }}>
+          {r.me.playersRemaining}
+          {r.opponent && <Box component="span" sx={{ color: 'text.disabled' }}> / {r.opponent.playersRemaining}</Box>}
         </Box>
       ),
     },
