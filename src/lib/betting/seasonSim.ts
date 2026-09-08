@@ -379,7 +379,7 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
  * backtest tells numerically — three single-elimination games at a weekly team sd of
  * 22 wash out almost any regular-season edge.
  */
-function simulateBracket(seeded: number[], scoreOnce: (id: number) => number): number | null {
+export function simulateBracket(seeded: number[], scoreOnce: (id: number) => number): number | null {
   if (seeded.length === 0) return null;
   if (seeded.length === 1) return seeded[0];
 

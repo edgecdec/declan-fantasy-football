@@ -1,0 +1,61 @@
+name: Notify on scheduled failure
+
+# The daily player update failed silently for three days before anyone noticed, which is
+# the actual reason it went unfixed for so long — the bug itself was one line. This turns
+# a silent failure into a GitHub notification.
+on:
+  workflow_run:
+    workflows: ["Daily Player Update"]
+    types: [completed]
+
+jobs:
+  open-issue:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const title = 'Daily Player Update is failing';
+            const body = [
+              `The scheduled **${run.name}** run failed.`,
+              '',
+              `- Run: ${run.html_url}`,
+              `- Started: ${run.run_started_at}`,
+              `- Commit: \`${run.head_sha.slice(0, 7)}\``,
+              '',
+              'While this is failing, `data/sleeper_players.json`, `data/player_index.json`',
+              'and both rankings directories stop updating. The three scripts share one',
+              '`bash -e` step on purpose, so a failure in the first stops the rankings too —',
+              'stale player data and stale rankings travel together.',
+            ].join('\n');
+
+            // Reuse one issue rather than opening a new one every morning, or a week of
+            // failures buries everything else in the tracker.
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'daily-update-failure',
+            });
+
+            if (open.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body: `Still failing — ${run.html_url}`,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['daily-update-failure'],
+            });

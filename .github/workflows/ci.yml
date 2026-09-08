@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # THE point of this job. next.config.ts sets `typescript.ignoreBuildErrors: true`,
+      # so `next build` happily succeeds with type errors and the deploy script only runs
+      # the build — meaning a type error reaches production and first shows up as a
+      # runtime fault. Until now the only thing standing in the way was remembering to
+      # run this by hand.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=3072
+
+      # Non-blocking on purpose: there is a pre-existing backlog of 69 errors across 21
+      # files (mostly `no-explicit-any` in older analytics code) that predates this job.
+      # Failing on it would mean every PR is red for reasons unrelated to its change,
+      # which trains people to ignore the whole job. The count is printed so it can be
+      # ratcheted down, and this should become blocking once it reaches zero.
+      - name: Lint (informational — backlog of 69 errors)
+        continue-on-error: true
+        run: npm run lint -- src/

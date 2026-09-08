@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": ".test-build",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "noEmitOnError": false
+  },
+  "include": ["tests/**/*.ts", "src/lib/**/*.ts", "src/services/**/*.ts", "src/types/**/*.ts"]
+}
