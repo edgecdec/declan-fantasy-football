@@ -61,7 +61,18 @@ fi
 # `tsc --noEmit` aborts with an out-of-memory on this 1.9GB box even at a 1400MB heap.
 # Typechecking lives in CI, which has the memory for it. Note CI runs in PARALLEL with
 # this script rather than gating it, so this rollback is the real safety net, not CI.
-export NODE_OPTIONS='--max-old-space-size=3072'
+# 1536, NOT 3072. This box has 1919MB of RAM and runs ten other pm2 apps holding about
+# 1.1GB, leaving roughly 860MB free. Telling V8 it may use 3072MB on a box that cannot
+# back it means V8 never collects aggressively — it just grows until the kernel OOM-killer
+# takes it, which is precisely what happened on the first run of the atomic-swap deploy
+# (killed at 1.09GB anon-rss with a 36GB virtual reservation).
+#
+# Note the earlier bump from 1536 to 3072 was aimed at a DIFFERENT failure: a clean V8
+# "heap out of memory" JS error. Raising the ceiling only converted that into a kernel
+# kill. Measured on this box: both 1024 and 1536 complete the build in about 28s, so a
+# smaller ceiling is strictly better here — it makes V8 do the collecting instead of the
+# kernel doing the killing.
+export NODE_OPTIONS='--max-old-space-size=1536'
 
 rm -rf .next.new .next.old
 if ! NEXT_DIST_DIR=.next.new npm run build; then
@@ -90,6 +101,11 @@ if ! pm2 restart "$PM2_NAME"; then
 fi
 
 rm -rf .next.old
+
+# `next build` rewrites tsconfig.json to add distDir-specific type globs, so building into
+# a scratch dir leaves a modified tracked file behind. Harmless (the next run resets it)
+# but it makes the checkout look dirty, so put it back.
+git checkout -- tsconfig.json 2>/dev/null || true
 
 echo "Deploy finished: $(date)"
 echo "=========================================="
