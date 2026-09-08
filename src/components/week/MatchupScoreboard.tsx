@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
 import MatchupMeter from '@/components/betting/MatchupMeter';
 import { MARKET_SIDE_COLORS } from '@/constants/colors';
+import { formatProjection, formatScore } from '@/services/common/formatPoints';
 
 /**
  * A head-to-head scoreboard: names flanking centred scores, mirrored inward.
@@ -107,11 +108,11 @@ export default function MatchupScoreboard({
         <Box sx={{ textAlign: 'center', lineHeight: 1.15 }}>
           <Typography component="div" variant="body1" sx={{ fontVariantNumeric: 'tabular-nums' }}>
             <Box component="span" sx={{ fontWeight: leftLeading ? 700 : 500 }}>
-              {leftScore.toFixed(1)}
+              {formatScore(leftScore)}
             </Box>
             <Box component="span" sx={{ color: 'text.disabled', mx: 0.6 }}>–</Box>
             <Box component="span" sx={{ fontWeight: rightLeading ? 700 : 500 }}>
-              {rightScore.toFixed(1)}
+              {formatScore(rightScore)}
             </Box>
           </Typography>
           <Tooltip title="Projected final score for each side">
@@ -120,7 +121,7 @@ export default function MatchupScoreboard({
               color="text.secondary"
               sx={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              {leftProjected.toFixed(0)} – {rightProjected.toFixed(0)} proj
+              {formatProjection(leftProjected)} – {formatProjection(rightProjected)} proj
             </Typography>
           </Tooltip>
         </Box>

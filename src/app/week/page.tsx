@@ -12,6 +12,8 @@ import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import NetLeaguesBar from '@/components/week/NetLeaguesBar';
 import MatchupScoreboard from '@/components/week/MatchupScoreboard';
+import WinRatingScale from '@/components/week/WinRatingScale';
+import { rateWinProbability } from '@/services/week/winRating';
 import useRememberedUsername from '@/hooks/useRememberedUsername';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
@@ -21,6 +23,7 @@ import {
 } from '@/services/week/weeklyOutlook';
 import { leagueUrl } from '@/services/common/leagueLinks';
 import { getPositionColor } from '@/constants/colors';
+import { formatProjection, formatScore, formatScoreDelta } from '@/services/common/formatPoints';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /** Live pages refresh on the same cadence the NFL scoreboard proxy revalidates. */
@@ -168,8 +171,8 @@ function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
       render: r => <PositionTag label={r.slot} size="0.72rem" />,
     },
     { id: 'mineName', label: 'You', render: r => <PlayerCell name={r.mineName} position={r.minePosition} state={r.mineState} /> },
-    { id: 'minePoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{r.minePoints.toFixed(1)}</Box> },
-    { id: 'mineProjected', label: 'Proj', numeric: true, tooltip: 'Full-week projection under this league\'s scoring', render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{r.mineProjected.toFixed(1)}</Box> },
+    { id: 'minePoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{formatScore(r.minePoints)}</Box> },
+    { id: 'mineProjected', label: 'Proj', numeric: true, tooltip: 'Full-week projection under this league\'s scoring', render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{formatProjection(r.mineProjected)}</Box> },
     {
       id: 'edge',
       label: 'Slot edge',
@@ -177,12 +180,12 @@ function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
       tooltip: 'Points you are ahead in this slot. Sort to find where the matchup is being won and lost.',
       render: r => (
         <Box component="span" sx={{ fontWeight: 600, color: r.edge > 0 ? 'success.main' : r.edge < 0 ? 'error.main' : 'text.disabled' }}>
-          {r.edge > 0 ? '+' : ''}{r.edge.toFixed(1)}
+          {formatScoreDelta(r.edge)}
         </Box>
       ),
     },
-    { id: 'theirsPoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{r.theirsPoints.toFixed(1)}</Box> },
-    { id: 'theirsProjected', label: 'Proj', numeric: true, render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{r.theirsProjected.toFixed(1)}</Box> },
+    { id: 'theirsPoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{formatScore(r.theirsPoints)}</Box> },
+    { id: 'theirsProjected', label: 'Proj', numeric: true, render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{formatProjection(r.theirsProjected)}</Box> },
     { id: 'theirsName', label: row.opponent.displayName, render: r => <PlayerCell name={r.theirsName} position={r.theirsPosition} state={r.theirsState} /> },
   ];
 
@@ -262,7 +265,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
             fontVariantNumeric: 'tabular-nums',
             color: m > 0 ? 'success.main' : m < 0 ? 'error.main' : 'text.disabled',
           }}>
-            {m > 0 ? '+' : ''}{m.toFixed(1)}
+            {formatScoreDelta(m)}
           </Box>
         );
       },
@@ -280,10 +283,24 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       ),
     },
     {
+      id: 'rating',
+      label: 'Rating',
+      width: 172,
+      tooltip: 'Forecast-style rating, Solid you through Toss-up to Solid them. Thresholds checked against 650 predictions from 325 real completed matchups. Sorts from most-favoured to least.',
+      // Sorts along the scale rather than by the raw probability, so equal ratings group
+      // together and the ordering matches what the reader sees.
+      sortValue: r => rateWinProbability(r.winProbability).index,
+      render: r => (
+        r.opponent
+          ? <WinRatingScale probability={r.winProbability} muted={r.status === 'final'} />
+          : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+      ),
+    },
+    {
       id: 'closeness',
       label: 'Closeness',
       numeric: true,
-      width: 108,
+      width: 104,
       tooltip: 'Distance from a coin flip. Sort ascending to put the matchups actually in the balance at the top — this is the default.',
       sortValue: r => Math.abs(r.winProbability - 0.5),
       render: r => (
@@ -363,7 +380,7 @@ function RootingDetail({ row }: { row: RootingRow }) {
       <Box>
         <Typography variant="caption" color="text.secondary" display="block">Projected points at stake</Typography>
         <Typography variant="body2">
-          {row.forPoints.toFixed(1)} for · {row.againstPoints.toFixed(1)} against
+          {formatProjection(row.forPoints)} for · {formatProjection(row.againstPoints)} against
         </Typography>
         {row.swingLeagues > 0 && (
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
@@ -608,10 +625,18 @@ export default function WeekPage() {
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary" display="block">Coin flips</Typography>
-                <Tooltip title="Matchups between 40% and 60% — the ones actually in the balance">
+                <Typography variant="caption" color="text.secondary" display="block">Toss-ups</Typography>
+                <Tooltip title="Matchups rated Toss-up (45-55%). Most of the slate sits here before kickoff and fans out as games are played.">
                   <Typography variant="h6">
-                    {data.matchups.filter(m => Math.abs(m.winProbability - 0.5) <= 0.1).length}
+                    {data.matchups.filter(m => rateWinProbability(m.winProbability).key === 'tossup').length}
+                  </Typography>
+                </Tooltip>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" display="block">Favoured</Typography>
+                <Tooltip title="Matchups where the rating leans your way at all (Lean you or better)">
+                  <Typography variant="h6">
+                    {data.matchups.filter(m => rateWinProbability(m.winProbability).favours === 'you').length}
                   </Typography>
                 </Tooltip>
               </Box>
