@@ -228,15 +228,20 @@ export default function DataTable<T>({
         </Table>
       </TableContainer>
       
-      <TablePagination
-        rowsPerPageOptions={rowsPerPageOptions}
-        component="div"
-        count={data.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-      />
+      {/* No pagination control when there is nothing to paginate. A "1-10 of 10" footer
+          under a ten-row table is pure noise, and it is especially wrong on a small table
+          nested inside an expanded row. */}
+      {data.length > rowsPerPage && (
+        <TablePagination
+          rowsPerPageOptions={rowsPerPageOptions}
+          component="div"
+          count={data.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      )}
     </Paper>
   );
 }
