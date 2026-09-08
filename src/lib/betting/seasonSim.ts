@@ -405,3 +405,6 @@ export function simulateBracket(seeded: number[], scoreOnce: (id: number) => num
   for (let i = 1; i < seeded.length; i++) survivor = beat(survivor, seeded[i]);
   return survivor;
 }
+
+// TEMPORARY: deliberate type error, to prove the CI typecheck gate actually fails.
+export const CI_SELFTEST: number = 'this is not a number';
