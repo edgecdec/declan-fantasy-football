@@ -92,14 +92,57 @@ always select a previous year on any page.
 - **Data**: Sleeper API (client-side) + FantasyCalc (trade values) + GitHub Actions pipeline
 - **Hosting**: Self-hosted VPS behind nginx, managed by pm2
 
+## ✅ Checks
+
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | 44 tests, ~1s |
+| `npm run lint` | ESLint |
+
+CI runs typecheck, tests and build on every push to `main` and every PR.
+
+`npm run typecheck` is **not optional**, because `next.config.ts` sets
+`typescript.ignoreBuildErrors: true` — `next build` succeeds with type errors, so without a
+separate typecheck a type error ships and first appears as a runtime fault.
+
+The test runner adds **no dependencies**: it uses the `typescript` already in devDeps plus
+Node's built-in `node:test`. `scripts/run-tests.mjs` compiles, rewrites `@/` path aliases
+to real relative paths (tsc emits them verbatim and Node doesn't understand them), then
+runs `node --test`. Tests are hermetic — no network — so anything needing live Sleeper data
+belongs in a script, not the suite.
+
 ## 🚢 Deployment
 
 Pushes to `main` auto-deploy. `server.js` wraps Next.js and exposes a signed GitHub webhook
 at `/api/webhook`; on a push to `main` it runs `deploy_webhook.sh`, which fetches, installs
-if `package.json` changed, rebuilds, and restarts the pm2 process.
+if `package.json` changed, builds, and restarts the pm2 process.
 
-The build needs a raised heap (`--max-old-space-size=3072`) — Next 16 exceeds the VPS
-default and a killed build leaves no `.next` directory, which takes the site down.
+Three properties of that script are load-bearing. Changing any of them has taken the site
+down before:
+
+**It builds into a scratch directory and swaps on success.** `NEXT_DIST_DIR=.next.new` (wired
+through `distDir` in `next.config.ts`) means the live `.next` keeps serving throughout, and
+the swap is two renames on one filesystem. A failed build changes nothing. This replaced
+`rm -rf .next && npm run build`, under which the server had no build for the whole build and
+permanently if it failed — which is exactly how the site 502'd after a Next bump OOMed.
+`.next.old` is kept as one generation of rollback material: `mv .next.old .next && pm2
+restart fantasy-football`.
+
+**The heap is capped at 1536MB, deliberately below what the box has.** The VPS has 1919MB and
+runs ten other pm2 apps holding ~1.1GB. Telling V8 it may use 3072MB on a box that can't
+back it means it never collects aggressively and gets kernel-OOM-killed instead. Measured:
+1024 and 1536 both build in ~28s.
+
+**Nothing may follow `pm2 restart`.** That restarts the process which launched the script, so
+pm2 takes the whole process group down with it. For 384 deploys the log showed "Deploy
+started" 384 times and "Deploy finished" zero times. All cleanup, and releasing the lock,
+must happen before the handoff.
+
+A pre-build typecheck on the VPS is **not** possible: `tsc --noEmit` aborts with an OOM
+there even at a 1400MB heap. That check lives in CI. Note CI runs in *parallel* with the
+deploy rather than gating it, so the scratch-build swap is the real safety net for a direct
+push to `main`.
 
 ## 🔄 Data Pipeline
 
@@ -111,7 +154,16 @@ A **GitHub Action** runs daily at 8:00 AM UTC and commits the results:
 | `scripts/generate_rankings.py` | `data/redraft/` — 18 redraft rankings variants |
 | `scripts/generate_dynasty_rankings.py` | `data/dynasty/` — 18 dynasty rankings variants |
 
-This keeps the Player Database current without hammering Sleeper's API from the client.
+It also writes `data/player_index.json`, a slim position+team index (~114KB vs 22MB) that
+server-side betting code uses instead of parsing the full database.
+
+This keeps the Player Database current without hammering Sleeper's API from the client. A
+failure opens a GitHub issue — the job once broke for three days unnoticed, and the bug was
+one line.
+
+> The three scripts share one `bash -e` step deliberately: the rankings scripts read the
+> player database the first one writes, so a failure there must stop them rather than let
+> them regenerate from stale input.
 
 > `update_players.py` writes with `sort_keys=True`. This is load-bearing: Sleeper doesn't
 > serialize object keys in a stable order, and without it the daily commit rewrote ~83% of
