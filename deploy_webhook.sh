@@ -92,20 +92,34 @@ fi
 if [ -d .next ]; then mv .next .next.old; fi
 mv .next.new .next
 
-if ! pm2 restart "$PM2_NAME"; then
-  echo "RESTART FAILED -- rolling back to the previous build."
-  rm -rf .next
-  if [ -d .next.old ]; then mv .next.old .next; fi
-  pm2 restart "$PM2_NAME" || true
-  exit 1
-fi
-
-rm -rf .next.old
-
 # `next build` rewrites tsconfig.json to add distDir-specific type globs, so building into
-# a scratch dir leaves a modified tracked file behind. Harmless (the next run resets it)
-# but it makes the checkout look dirty, so put it back.
+# a scratch dir leaves a tracked file modified. Put it back, or the checkout drifts.
 git checkout -- tsconfig.json 2>/dev/null || true
 
-echo "Deploy finished: $(date)"
+# .next.old is deliberately NOT deleted here. It is one generation of rollback material,
+# and `rm -rf .next.new .next.old` at the top of the next deploy bounds it to a single
+# copy (94M against 7.4G free). If a deploy ever ships a build that will not boot,
+# `mv .next.old .next && pm2 restart fantasy-football` is the manual way back.
+
+# EVERYTHING MUST HAPPEN ABOVE THIS LINE.
+#
+# `pm2 restart fantasy-football` restarts the very process that launched this script:
+# server.js receives the webhook and does execFile("bash", ["deploy_webhook.sh"]), so pm2
+# takes the whole process group down with it. Nothing below survives.
+#
+# This is not a theory. Across 384 recorded deploys the log contains "Deploy started" 384
+# times and "Deploy finished" exactly zero times — the old script's final lines had never
+# once executed, which is why a `.next.old` was left on disk and tsconfig.json stayed
+# dirty. An `if ! pm2 restart; then rollback; fi` guard used to sit here and was
+# unreachable dead code for the same reason; it has been removed rather than left to
+# imply a safety net that cannot fire.
+#
+# Release the lock explicitly first: the EXIT trap is not guaranteed to run when pm2
+# terminates the group, and a leftover lock would make every future deploy exit early
+# with "Deploy already in progress".
+rm -f "$LOCK"
+trap - EXIT
+
+echo "Deploy finished (handing off to pm2, which ends this script): $(date)"
 echo "=========================================="
+pm2 restart "$PM2_NAME"
