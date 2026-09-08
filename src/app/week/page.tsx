@@ -3,9 +3,11 @@
 import * as React from 'react';
 import {
   Alert, Box, Button, Chip, Container, Divider, LinearProgress, MenuItem, Paper, Select,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tab, Tabs, Tooltip,
-  Typography,
+  Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
+import MuiLink from '@mui/material/Link';
+import DataTable, { Column } from '@/components/common/DataTable';
+import SmartTable, { SmartColumn } from '@/components/common/SmartTable';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import MatchupMeter from '@/components/betting/MatchupMeter';
@@ -14,10 +16,41 @@ import useRememberedUsername from '@/hooks/useRememberedUsername';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { getNflStateOrFallback } from '@/services/common/seasonService';
-import { RootingRow, WeeklyOutlook, buildWeeklyOutlook } from '@/services/week/weeklyOutlook';
+import {
+  LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildWeeklyOutlook,
+} from '@/services/week/weeklyOutlook';
+import { leagueUrl } from '@/services/common/leagueLinks';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /** Live pages refresh on the same cadence the NFL scoreboard proxy revalidates. */
 const REFRESH_MS = 30_000;
+
+/**
+ * A league name, always clickable.
+ *
+ * Project rule: any mention of a league links to it. One component so that is true by
+ * construction rather than by remembering.
+ */
+function LeagueLink({ leagueId, name, noWrap }: { leagueId: string; name: string; noWrap?: boolean }) {
+  return (
+    <MuiLink
+      href={leagueUrl(leagueId)}
+      target="_blank"
+      rel="noopener noreferrer"
+      underline="hover"
+      color="inherit"
+      onClick={e => e.stopPropagation()}
+      sx={{
+        display: 'inline-flex', alignItems: 'center', gap: 0.4,
+        maxWidth: '100%', ...(noWrap ? { whiteSpace: 'nowrap' } : {}),
+      }}
+      title={`Open ${name} on Sleeper`}
+    >
+      <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</Box>
+      <OpenInNewIcon sx={{ fontSize: 12, opacity: 0.5, flexShrink: 0 }} />
+    </MuiLink>
+  );
+}
 
 const STATUS_LABEL: Record<string, { label: string; color: 'default' | 'success' | 'warning' }> = {
   not_started: { label: 'Not started', color: 'default' },
@@ -25,76 +58,270 @@ const STATUS_LABEL: Record<string, { label: string; color: 'default' | 'success'
   final: { label: 'Final', color: 'warning' },
 };
 
+/**
+ * One starting slot with both managers' players side by side.
+ *
+ * Pairing by slot is meaningful because both sides of a matchup share the league's
+ * roster_positions, so row 3 really is my RB2 against their RB2. This uses the lineup as
+ * actually set, not the priced lineup, which returns locked players first and so carries no
+ * slot meaning.
+ */
+type PairedSlot = {
+  index: number;
+  slot: string;
+  minePoints: number;
+  mineProjected: number;
+  theirsPoints: number;
+  theirsProjected: number;
+  mineName: string | null;
+  minePosition: string | null;
+  mineState: string;
+  theirsName: string | null;
+  theirsPosition: string | null;
+  theirsState: string;
+  /** Points I am up in this slot; negative means losing it. */
+  edge: number;
+};
+
+const STATE_MARK: Record<string, string> = { pre: '○', in: '●', post: '✓', unknown: '·' };
+
+function PlayerCell({ name, position, state }: { name: string | null; position: string | null; state: string }) {
+  if (!name) return <Box component="span" sx={{ color: 'text.disabled' }}>— empty —</Box>;
+  return (
+    <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
+      <Tooltip title={state === 'post' ? 'Game final' : state === 'in' ? 'Playing now' : state === 'pre' ? 'Not started' : 'No game found'}>
+        <Box component="span" sx={{ mr: 0.5, color: state === 'in' ? 'success.main' : 'text.disabled', fontSize: '0.7rem' }}>
+          {STATE_MARK[state] ?? '·'}
+        </Box>
+      </Tooltip>
+      {name}
+      {position && <Box component="span" sx={{ color: 'text.secondary', ml: 0.5, fontSize: '0.75rem' }}>{position}</Box>}
+    </Box>
+  );
+}
+
+function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
+  if (!row.opponent) return null;
+  const mine = row.me.lineup;
+  const theirs = row.opponent.lineup;
+  const slots = Math.max(mine.length, theirs.length);
+
+  const paired: PairedSlot[] = Array.from({ length: slots }, (_, i) => {
+    const a = mine[i];
+    const b = theirs[i];
+    return {
+      index: i,
+      slot: a?.slot ?? b?.slot ?? '—',
+      minePoints: a?.points ?? 0,
+      mineProjected: a?.projectedPoints ?? 0,
+      theirsPoints: b?.points ?? 0,
+      theirsProjected: b?.projectedPoints ?? 0,
+      mineName: a?.name ?? null,
+      minePosition: a?.position ?? null,
+      mineState: a?.gameState ?? 'unknown',
+      theirsName: b?.name ?? null,
+      theirsPosition: b?.position ?? null,
+      theirsState: b?.gameState ?? 'unknown',
+      edge: (a?.points ?? 0) - (b?.points ?? 0),
+    };
+  });
+
+  const columns: Column<PairedSlot>[] = [
+    { id: 'slot', label: 'Slot', width: 70, sortable: false },
+    { id: 'mineName', label: 'You', render: r => <PlayerCell name={r.mineName} position={r.minePosition} state={r.mineState} /> },
+    { id: 'minePoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{r.minePoints.toFixed(1)}</Box> },
+    { id: 'mineProjected', label: 'Proj', numeric: true, tooltip: 'Full-week projection under this league\'s scoring', render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{r.mineProjected.toFixed(1)}</Box> },
+    {
+      id: 'edge',
+      label: 'Slot edge',
+      numeric: true,
+      tooltip: 'Points you are ahead in this slot. Sort to find where the matchup is being won and lost.',
+      render: r => (
+        <Box component="span" sx={{ fontWeight: 600, color: r.edge > 0 ? 'success.main' : r.edge < 0 ? 'error.main' : 'text.disabled' }}>
+          {r.edge > 0 ? '+' : ''}{r.edge.toFixed(1)}
+        </Box>
+      ),
+    },
+    { id: 'theirsPoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{r.theirsPoints.toFixed(1)}</Box> },
+    { id: 'theirsProjected', label: 'Proj', numeric: true, render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{r.theirsProjected.toFixed(1)}</Box> },
+    { id: 'theirsName', label: row.opponent.displayName, render: r => <PlayerCell name={r.theirsName} position={r.theirsPosition} state={r.theirsState} /> },
+  ];
+
+  return (
+    <Box sx={{ py: 1 }}>
+      <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+        <LeagueLink leagueId={row.leagueId} name={row.leagueName} /> · week {row.week} ·
+        {' '}lineups as actually set. ○ not started · ● playing · ✓ final
+      </Typography>
+      <DataTable
+        data={paired}
+        columns={columns}
+        keyField={r => String(r.index)}
+        defaultSortBy="slot"
+        defaultSortOrder="asc"
+        defaultRowsPerPage={25}
+        rowsPerPageOptions={[25]}
+        noDataMessage="No lineup available."
+      />
+    </Box>
+  );
+}
+
 function MatchupsView({ data }: { data: WeeklyOutlook }) {
   if (data.matchups.length === 0) {
     return <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>;
   }
+
+  const columns: Column<LeagueWeekOutlook>[] = [
+    {
+      id: 'leagueName',
+      label: 'League',
+      width: 220,
+      render: r => (
+        <Typography variant="body2" component="div" noWrap>
+          <LeagueLink leagueId={r.leagueId} name={r.leagueName} noWrap />
+        </Typography>
+      ),
+    },
+    {
+      id: 'me.distribution.banked',
+      label: 'You',
+      numeric: true,
+      render: r => (
+        <Box component="span" sx={{ fontWeight: 600 }}>{r.me.distribution.banked.toFixed(1)}</Box>
+      ),
+    },
+    {
+      id: 'opponentScore',
+      label: 'Opponent',
+      numeric: true,
+      // Derived: the cell shows a score AND a name, and the useful order is the score.
+      sortValue: r => r.opponent?.distribution.banked ?? null,
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary' }}>
+          {r.opponent ? `${r.opponent.distribution.banked.toFixed(1)} · ${r.opponent.displayName}` : '—'}
+        </Box>
+      ),
+    },
+    {
+      id: 'winProbability',
+      label: 'Win %',
+      width: 190,
+      tooltip: 'Chance you win this matchup, from the same model the betting markets use. Sort descending for the ones you are most likely to win.',
+      render: r => (
+        r.opponent ? (
+          <Box sx={{ minWidth: 150 }}>
+            <MatchupMeter
+              probA={r.winProbability}
+              nameA="You"
+              nameB={r.opponent.displayName}
+              muted={r.status === 'final'}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {(r.winProbability * 100).toFixed(0)}%
+              {r.status !== 'final' && ` · ${Math.round(r.remainingMinutes)} min left`}
+            </Typography>
+          </Box>
+        ) : <>—</>
+      ),
+    },
+    {
+      id: 'closeness',
+      label: 'Closeness',
+      numeric: true,
+      tooltip: 'Distance from a coin flip. Sort ascending to put the matchups actually in the balance at the top — this is the default.',
+      // The whole point of the sortValue extension: this is not a field on the row, and it
+      // is the ordering that matters most on this page.
+      sortValue: r => Math.abs(r.winProbability - 0.5),
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary' }}>
+          ±{(Math.abs(r.winProbability - 0.5) * 100).toFixed(0)}
+        </Box>
+      ),
+    },
+    {
+      id: 'projected',
+      label: 'Projected',
+      numeric: true,
+      tooltip: 'Projected final score: points already banked plus what the remaining starters are expected to add.',
+      sortValue: r => r.me.distribution.mean,
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+          {r.me.distribution.mean.toFixed(1)}
+          {r.opponent && ` – ${r.opponent.distribution.mean.toFixed(1)}`}
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: r => {
+        const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.not_started;
+        return <Chip label={s.label} color={s.color} size="small" variant="outlined" />;
+      },
+    },
+  ];
+
   return (
-    <TableContainer component={Paper} variant="outlined">
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>League</TableCell>
-            <TableCell align="right">You</TableCell>
-            <TableCell align="right">Opponent</TableCell>
-            <TableCell sx={{ minWidth: 180 }}>Win probability</TableCell>
-            <TableCell align="right">
-              <Tooltip title="Projected final score, counting points already banked plus what the remaining starters are expected to add">
-                <span>Projected</span>
+    <DataTable
+      data={data.matchups}
+      columns={columns}
+      keyField={r => r.leagueId}
+      defaultSortBy="closeness"
+      defaultSortOrder="asc"
+      defaultRowsPerPage={25}
+      rowsPerPageOptions={[10, 25, 50]}
+      noDataMessage="No matchups this week."
+      renderDetailPanel={r => <MatchupDetail row={r} />}
+    />
+  );
+}
+
+/** Which leagues a player is starting in, each one a link. */
+function LeagueRefList({ label, refs, color }: { label: string; refs: RootingLeagueRef[]; color: string }) {
+  if (refs.length === 0) return null;
+  return (
+    <Box sx={{ minWidth: 240 }}>
+      <Typography variant="caption" sx={{ color, fontWeight: 700 }}>{label} ({refs.length})</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, mt: 0.5 }}>
+        {refs.map(ref => (
+          <Box key={ref.leagueId} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Typography variant="body2" component="div">
+              <LeagueLink leagueId={ref.leagueId} name={ref.leagueName} />
+            </Typography>
+            {!ref.headToHead && (
+              <Tooltip title="No head-to-head opponent in this format, so it counts toward the +/- but not the weighted number.">
+                <Chip label="no opponent" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
               </Tooltip>
-            </TableCell>
-            <TableCell>Status</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {data.matchups.map(m => {
-            const status = STATUS_LABEL[m.status] ?? STATUS_LABEL.not_started;
-            const opp = m.opponent;
-            return (
-              <TableRow key={m.leagueId} hover>
-                <TableCell sx={{ maxWidth: 220 }}>
-                  <Typography variant="body2" noWrap title={m.leagueName}>{m.leagueName}</Typography>
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {m.me.distribution.banked.toFixed(1)}
-                </TableCell>
-                <TableCell align="right" sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
-                  {opp ? `${opp.distribution.banked.toFixed(1)} · ${opp.displayName}` : '—'}
-                </TableCell>
-                <TableCell sx={{ py: 0.5 }}>
-                  {opp ? (
-                    <>
-                      <MatchupMeter
-                        probA={m.winProbability}
-                        nameA="You"
-                        nameB={opp.displayName}
-                        muted={m.status === 'final'}
-                      />
-                      <Typography variant="caption" color="text.secondary">
-                        {(m.winProbability * 100).toFixed(0)}% to win
-                        {m.status !== 'final' && ` · ${Math.round(m.remainingMinutes)} min of game left`}
-                      </Typography>
-                    </>
-                  ) : '—'}
-                </TableCell>
-                <TableCell align="right" sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
-                  {m.me.distribution.mean.toFixed(1)}
-                  {opp && ` – ${opp.distribution.mean.toFixed(1)}`}
-                </TableCell>
-                <TableCell>
-                  <Chip label={status.label} color={status.color} size="small" variant="outlined" />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            )}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function RootingDetail({ row }: { row: RootingRow }) {
+  return (
+    <Box sx={{ display: 'flex', gap: 5, flexWrap: 'wrap', py: 1 }}>
+      <LeagueRefList label="Starting FOR you" refs={row.forLeagues} color="primary.main" />
+      <LeagueRefList label="Starting AGAINST you" refs={row.againstLeagues} color="error.main" />
+      <Box>
+        <Typography variant="caption" color="text.secondary" display="block">Projected points at stake</Typography>
+        <Typography variant="body2">
+          {row.forPoints.toFixed(1)} for · {row.againstPoints.toFixed(1)} against
+        </Typography>
+        {row.swingLeagues > 0 && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+            Weighted across {row.swingLeagues} head-to-head league{row.swingLeagues === 1 ? '' : 's'}
+          </Typography>
+        )}
+      </Box>
+    </Box>
   );
 }
 
 function RootingView({ rows }: { rows: RootingRow[] }) {
-  const [showAll, setShowAll] = React.useState(false);
   if (rows.length === 0) {
     return (
       <Alert severity="info">
@@ -103,89 +330,113 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
     );
   }
   const maxNet = Math.max(1, ...rows.map(r => Math.abs(r.netLeagues)));
-  const shown = showAll ? rows : rows.slice(0, 40);
+
+  const columns: SmartColumn<RootingRow>[] = [
+    {
+      id: 'name',
+      label: 'Player',
+      render: r => (
+        <Box component="span" sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{r.name}</Box>
+      ),
+    },
+    {
+      id: 'position',
+      label: 'Pos',
+      filterVariant: 'multi-select',
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary' }}>{r.position ?? '—'}</Box>
+      ),
+    },
+    {
+      id: 'netLeagues',
+      label: 'Net +/−',
+      numeric: true,
+      width: 150,
+      tooltip: 'Leagues starting him FOR you minus leagues starting him AGAINST you. +2 means two more of your matchups want him to go off than want him to disappear.',
+      render: r => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
+          <Box component="span" sx={{ fontWeight: 700, minWidth: 24, textAlign: 'right' }}>
+            {r.netLeagues > 0 ? `+${r.netLeagues}` : r.netLeagues}
+          </Box>
+          <Box sx={{ width: 90 }}>
+            <NetLeaguesBar
+              net={r.netLeagues}
+              max={maxNet}
+              label={`${r.forLeagues.length} for, ${r.againstLeagues.length} against`}
+            />
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'forCount',
+      label: 'For',
+      numeric: true,
+      sortValue: r => r.forLeagues.length,
+      render: r => <>{r.forLeagues.length}</>,
+    },
+    {
+      id: 'againstCount',
+      label: 'Against',
+      numeric: true,
+      sortValue: r => r.againstLeagues.length,
+      render: r => <>{r.againstLeagues.length}</>,
+    },
+    {
+      id: 'netSwing',
+      label: 'Wins at stake',
+      numeric: true,
+      tooltip: 'Expected wins riding on this player across all your leagues, weighting each matchup by how close it actually is. A count of wins, not a percentage, so it exceeds 1.00 for someone in several of your lineups. Sort descending for who you most want to succeed, ascending for who you most want to fail.',
+      render: r => (
+        r.swingLeagues === 0 ? (
+          // No opponent anywhere, so there is no win probability to move. Saying "0.00"
+          // would claim he does not matter; a dash says we cannot weight him.
+          <Tooltip title="No head-to-head league — nothing to weight against, so this is not defined here.">
+            <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+          </Tooltip>
+        ) : (
+          <Box component="span" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {r.netSwing > 0 ? '+' : ''}{r.netSwing.toFixed(2)}
+          </Box>
+        )
+      ),
+    },
+    {
+      id: 'leagues',
+      label: 'Leagues',
+      sortable: false,
+      render: r => (
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+          {[
+            r.forLeagues.length ? `▲ ${r.forLeagues.length}` : '',
+            r.againstLeagues.length ? `▼ ${r.againstLeagues.length}` : '',
+          ].filter(Boolean).join('  ')}
+          {' · click to expand'}
+        </Typography>
+      ),
+    },
+  ];
 
   return (
     <>
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Player</TableCell>
-              <TableCell align="center">
-                <Tooltip title="Leagues starting him FOR you minus leagues starting him AGAINST you. +2 means two more of your matchups want him to go off than want him to disappear.">
-                  <span>Net +/&minus;</span>
-                </Tooltip>
-              </TableCell>
-              <TableCell sx={{ width: 120 }} />
-              <TableCell align="center">For / Against</TableCell>
-              <TableCell align="right">
-                <Tooltip title="Expected wins riding on this player across all your leagues, weighting each matchup by how close it actually is. A blowout barely counts; a coin flip counts a lot. Can exceed 1.0 when he is in several of your lineups.">
-                  <span>Wins at stake</span>
-                </Tooltip>
-              </TableCell>
-              <TableCell>Leagues</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {shown.map(r => {
-              return (
-                <TableRow key={r.playerId} hover>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Typography variant="body2" component="span" sx={{ fontWeight: 600 }}>{r.name}</Typography>
-                    {r.position && (
-                      <Typography variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>{r.position}</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    {r.netLeagues > 0 ? `+${r.netLeagues}` : r.netLeagues}
-                  </TableCell>
-                  <TableCell sx={{ py: 0 }}>
-                    <NetLeaguesBar
-                      net={r.netLeagues}
-                      max={maxNet}
-                      label={`${r.forLeagues.length} for, ${r.againstLeagues.length} against`}
-                    />
-                  </TableCell>
-                  <TableCell align="center" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                    {r.forLeagues.length} / {r.againstLeagues.length}
-                  </TableCell>
-                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                    <Typography variant="body2" component="span" sx={{ fontWeight: 600 }}>
-                      {/* Expected wins, not a probability — summed across leagues it can
-                          exceed 1.0, so a percentage would read as nonsense. */}
-                      {r.netSwing > 0 ? '+' : ''}{r.netSwing.toFixed(2)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 260 }}>
-                    <Typography variant="caption" color="text.secondary" noWrap
-                      title={[
-                        r.forLeagues.length ? `For: ${r.forLeagues.join(', ')}` : '',
-                        r.againstLeagues.length ? `Against: ${r.againstLeagues.join(', ')}` : '',
-                      ].filter(Boolean).join(' | ')}>
-                      {r.forLeagues.length > 0 && `▲ ${r.forLeagues.join(', ')}`}
-                      {r.forLeagues.length > 0 && r.againstLeagues.length > 0 && '  '}
-                      {r.againstLeagues.length > 0 && `▼ ${r.againstLeagues.join(', ')}`}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      {rows.length > shown.length && (
-        <Button size="small" sx={{ mt: 1 }} onClick={() => setShowAll(true)}>
-          Show all {rows.length} players
-        </Button>
-      )}
-      <Alert severity="info" sx={{ mt: 2 }}>
-        <strong>Net +/&minus; counts leagues; wins-at-stake weights them.</strong> They can
-        disagree, and when they do the weighted number is the better guide: a player you are
-        +2 on across two matchups already decided matters less than one you are &minus;1 on in
-        a coin flip. Wins at stake is a count of expected wins, not a percentage, so it goes
-        above 1.00 for someone in several of your lineups. Only players whose NFL game has not
-        finished appear, so this list empties out as the slate does.
+      <SmartTable
+        data={rows}
+        columns={columns}
+        keyField={r => r.playerId}
+        renderDetailPanel={r => <RootingDetail row={r} />}
+        defaultSortBy="netSwing"
+        defaultSortOrder="desc"
+        defaultRowsPerPage={25}
+        rowsPerPageOptions={[25, 50, 100]}
+        noDataMessage="Nobody left to root for."
+      />
+      <Alert severity="info" sx={{ mt: 1 }}>
+        <strong>Net +/− counts leagues; wins-at-stake weights them.</strong> They can disagree,
+        and when they do the weighted number is the better guide: a player you are +2 on across
+        two matchups already decided matters less than one you are −1 on in a coin flip. Sort
+        &quot;Wins at stake&quot; ascending to see who you most want to have a bad day. Only
+        players whose NFL game has not finished appear, so this list empties out as the slate
+        does.
       </Alert>
     </>
   );
@@ -335,7 +586,16 @@ export default function WeekPage() {
               <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
                 {data.skipped.map(s => (
                   <Tooltip key={s.leagueId} title={s.reason}>
-                    <Chip label={s.leagueName} size="small" variant="outlined" />
+                    <Chip
+                      label={s.leagueName}
+                      size="small"
+                      variant="outlined"
+                      component="a"
+                      clickable
+                      href={leagueUrl(s.leagueId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
                   </Tooltip>
                 ))}
               </Box>

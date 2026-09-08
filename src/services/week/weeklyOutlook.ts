@@ -5,6 +5,7 @@ import {
   playerName,
 } from '@/services/betting/matchupMarkets';
 import { REGULATION_MINUTES, SideDistribution } from '@/services/betting/liveOdds';
+import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
 import type { NflGamesResponse } from '@/app/api/betting/nfl-games/route';
 import playerData from '../../../data/sleeper_players.json';
 
@@ -38,6 +39,25 @@ export type LeagueWeekOutlook = {
   status: MatchupStatus;
 };
 
+/** A league a player is starting in, and whether that league has a real opponent. */
+export type RootingLeagueRef = {
+  leagueId: string;
+  leagueName: string;
+  /**
+   * False for formats with no head-to-head opponent — guillotine, chopped, survivor. In
+   * those every roster gets its own matchup_id, so there is nobody to beat, only a score
+   * to post.
+   */
+  headToHead: boolean;
+};
+
+/** My actual starters in a league that has no head-to-head opponent this week. */
+export type LineupOnlyLeague = {
+  leagueId: string;
+  leagueName: string;
+  starters: { playerId: string; position: string | null; projectedPoints: number; gameState: string; remainingMinutes: number }[];
+};
+
 export type RootingRow = {
   playerId: string;
   name: string;
@@ -49,7 +69,15 @@ export type RootingRow = {
   /** ...and where he starts AGAINST me. */
   againstPoints: number;
   /**
-   * Expected WINS riding on this player, netted across leagues. Positive means root for him.
+   * Expected WINS riding on this player, netted across HEAD-TO-HEAD leagues only.
+   * Positive means root for him.
+   *
+   * Restricted to head-to-head because that is the only format where it is defined. A
+   * guillotine or chopped league has no opponent and therefore no win probability to take a
+   * derivative of — you are trying not to post the lowest score in the league, which is a
+   * different and much less tractable quantity. Rather than invent a number for those, they
+   * contribute to the league count and to points, and `swingLeagues` records how many
+   * leagues the weighted figure actually covers so the UI can say so.
    *
    * Units matter here and are easy to get wrong. Per league the term is
    * (points still to come) x (win probability per point), which is a probability. Summed
@@ -63,8 +91,10 @@ export type RootingRow = {
    */
   netSwing: number;
   /** Leagues where he helps me, and where he hurts me. */
-  forLeagues: string[];
-  againstLeagues: string[];
+  forLeagues: RootingLeagueRef[];
+  againstLeagues: RootingLeagueRef[];
+  /** How many of those leagues are head-to-head, i.e. contributed to `netSwing`. */
+  swingLeagues: number;
   /**
    * The headline number: leagues starting him FOR me minus leagues starting him AGAINST
    * me. +3 means three more of my matchups want him to go off than want him to disappear.
@@ -82,14 +112,23 @@ export type WeeklyOutlook = {
   week: number;
   season: string;
   matchups: LeagueWeekOutlook[];
+  /**
+   * Leagues where I have a lineup but no opponent (guillotine, chopped). They produce no
+   * matchup row, but the players in them are absolutely still worth rooting for — which is
+   * the whole reason they are collected separately rather than dropped.
+   */
+  lineupOnly: LineupOnlyLeague[];
   rooting: RootingRow[];
   /** Leagues that returned nothing usable, so the UI can say so rather than hide them. */
   skipped: { leagueId: string; leagueName: string; reason: string }[];
 };
 
 const PLAYERS = (playerData as unknown as {
-  players: Record<string, { team?: string | null }>;
+  players: Record<string, { team?: string | null; position?: string | null }>;
 }).players;
+
+/** Same table, named for the lookup it serves in the lineup-only path. */
+const POSITIONS = PLAYERS;
 
 /** Sleeper team codes that differ from ESPN's. Same two aliases as the pricing path. */
 const TEAM_ALIASES: Record<string, string> = { WAS: 'WSH', OAK: 'LV' };
@@ -171,26 +210,19 @@ export async function buildWeeklyOutlook(
     }),
   );
 
-  for (const { league, priced } of results) {
-    if (!priced || priced.markets.length === 0) {
-      skipped.push({
-        leagueId: league.league_id,
-        leagueName: league.name,
-        // Most often a format with no head-to-head matchup, or a week not yet posted.
-        reason: 'no head-to-head matchup this week',
-      });
-      continue;
-    }
+  // Leagues with no head-to-head pairing, which still have a lineup worth rooting for.
+  const noOpponent: { leagueId: string; leagueName: string }[] = [];
 
-    const mine = priced.markets.find(
+  for (const { league, priced } of results) {
+    const mine = priced?.markets.find(
       m => m.a.ownerId === userId || m.b.ownerId === userId,
     );
+
     if (!mine) {
-      skipped.push({
-        leagueId: league.league_id,
-        leagueName: league.name,
-        reason: 'you are not in a matchup this week',
-      });
+      // Guillotine, chopped and survivor formats give every roster its own matchup_id, so
+      // there is no pair to price — but the starters are still playing, so collect them
+      // rather than discarding the league.
+      noOpponent.push({ leagueId: league.league_id, leagueName: league.name });
       continue;
     }
 
@@ -219,11 +251,36 @@ export async function buildWeeklyOutlook(
     (x, y) => Math.abs(x.winProbability - 0.5) - Math.abs(y.winProbability - 0.5),
   );
 
+  const lineupOnlyResults = await Promise.all(
+    noOpponent.map(async lg => {
+      try {
+        return await buildLineupOnly(lg.leagueId, lg.leagueName, season, week, userId, games);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const lineupOnly: LineupOnlyLeague[] = [];
+  noOpponent.forEach((lg, i) => {
+    const built = lineupOnlyResults[i];
+    if (built) lineupOnly.push(built);
+    else {
+      // Listed rather than silently dropped: usually a league that has not drafted yet.
+      skipped.push({
+        leagueId: lg.leagueId,
+        leagueName: lg.leagueName,
+        reason: 'no lineup set for this week yet',
+      });
+    }
+  });
+
   return {
     week,
     season,
     matchups,
-    rooting: buildRootingRows(matchups, games),
+    lineupOnly,
+    rooting: buildRootingRows(matchups, games, lineupOnly),
     skipped,
   };
 }
@@ -238,6 +295,11 @@ export async function buildWeeklyOutlook(
 export function buildRootingRows(
   matchups: LeagueWeekOutlook[],
   games: NflGamesResponse | null,
+  /**
+   * Leagues where I have a lineup but no opponent. Their starters are rooted FOR, and they
+   * contribute nothing to `netSwing` because there is no win probability to move.
+   */
+  lineupOnly: LineupOnlyLeague[] = [],
 ): RootingRow[] {
   const byPlayer = new Map<string, RootingRow>();
 
@@ -255,9 +317,14 @@ export function buildRootingRows(
       forLeagues: [],
       againstLeagues: [],
       netLeagues: 0,
+      swingLeagues: 0,
     };
     byPlayer.set(playerId, created);
     return created;
+  };
+
+  const addRef = (list: RootingLeagueRef[], ref: RootingLeagueRef) => {
+    if (!list.some(x => x.leagueId === ref.leagueId)) list.push(ref);
   };
 
   for (const m of matchups) {
@@ -265,6 +332,11 @@ export function buildRootingRows(
     if (m.status === 'final') continue; // nothing left to root for
 
     const sensitivity = winSensitivity(m.me.distribution, m.opponent.distribution);
+    const ref: RootingLeagueRef = {
+      leagueId: m.leagueId,
+      leagueName: m.leagueName,
+      headToHead: true,
+    };
 
     for (const s of m.me.starters) {
       const pts = remainingProjection(s);
@@ -272,7 +344,7 @@ export function buildRootingRows(
       const r = row(s.playerId, s.position ?? null);
       r.forPoints += pts;
       r.netSwing += pts * sensitivity;
-      if (!r.forLeagues.includes(m.leagueName)) r.forLeagues.push(m.leagueName);
+      addRef(r.forLeagues, ref);
     }
 
     for (const s of m.opponent.starters) {
@@ -281,7 +353,25 @@ export function buildRootingRows(
       const r = row(s.playerId, s.position ?? null);
       r.againstPoints += pts;
       r.netSwing -= pts * sensitivity;
-      if (!r.againstLeagues.includes(m.leagueName)) r.againstLeagues.push(m.leagueName);
+      addRef(r.againstLeagues, ref);
+    }
+  }
+
+  // Formats with no opponent: guillotine, chopped, survivor. You still want every one of
+  // these players to score as much as possible, so they count for — just without a weight,
+  // because "avoid being lowest in the league" has no clean derivative to take.
+  for (const lg of lineupOnly) {
+    const ref: RootingLeagueRef = {
+      leagueId: lg.leagueId,
+      leagueName: lg.leagueName,
+      headToHead: false,
+    };
+    for (const s of lg.starters) {
+      const pts = remainingProjection(s);
+      if (pts <= 0) continue;
+      const r = row(s.playerId, s.position ?? null);
+      r.forPoints += pts;
+      addRef(r.forLeagues, ref);
     }
   }
 
@@ -295,7 +385,12 @@ export function buildRootingRows(
   }
 
   const rows = [...byPlayer.values()];
-  for (const r of rows) r.netLeagues = r.forLeagues.length - r.againstLeagues.length;
+  for (const r of rows) {
+    r.netLeagues = r.forLeagues.length - r.againstLeagues.length;
+    r.swingLeagues =
+      r.forLeagues.filter(l => l.headToHead).length
+      + r.againstLeagues.filter(l => l.headToHead).length;
+  }
 
   // Strongest feelings first, in either direction. Ordered by swing rather than league
   // count because swing accounts for how much each matchup is actually in the balance;
@@ -306,6 +401,54 @@ export function buildRootingRows(
       || Math.abs(b.netLeagues) - Math.abs(a.netLeagues)
       || a.name.localeCompare(b.name),
   );
+}
+
+/**
+ * My actual starters in a league that produced no head-to-head matchup.
+ *
+ * Uses the starters as literally set, with no best-lineup substitution. That machinery
+ * exists to price a matchup fairly; here it would be inventing players to root for.
+ */
+async function buildLineupOnly(
+  leagueId: string,
+  leagueName: string,
+  season: string,
+  week: number,
+  userId: string,
+  games: NflGamesResponse | null,
+): Promise<LineupOnlyLeague | null> {
+  const [league, rosters, matchups] = await Promise.all([
+    SleeperService.getLeague(leagueId),
+    SleeperService.getRosters(leagueId),
+    SleeperService.getMatchups(leagueId, week, { skipCache: true }),
+  ]);
+  const scoring = league?.scoring_settings;
+  if (!scoring) return null;
+
+  const myRoster = rosters.find(r => r.owner_id === userId);
+  if (!myRoster) return null;
+  const mine = matchups.find(m => m.roster_id === myRoster.roster_id);
+  const starterIds = (mine?.starters ?? []).filter(p => p && p !== '0');
+  if (starterIds.length === 0) return null;
+
+  const projections = await SleeperService.getWeeklyProjections(season, week);
+
+  return {
+    leagueId,
+    leagueName,
+    starters: starterIds.map(pid => {
+      const team = espnTeamOf(pid);
+      const gameId = team && games ? games.teamToGame[team] : undefined;
+      const game = gameId && games ? games.games.find(g => g.id === gameId) : undefined;
+      return {
+        playerId: pid,
+        position: POSITIONS[pid]?.position ?? null,
+        projectedPoints: calculateProjectedPoints(projections[pid], scoring),
+        gameState: game ? game.state : 'unknown',
+        remainingMinutes: game ? game.remainingMinutes : 0,
+      };
+    }),
+  };
 }
 
 /** Re-exported so the page can render names without importing the betting module. */

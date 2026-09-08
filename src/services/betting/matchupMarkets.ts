@@ -1,6 +1,7 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
 import { bestAvailableLineup, LineupCandidate, StreamedSlot } from '@/services/betting/bestLineup';
+import { BENCH_SLOTS } from '@/services/stats/lineupSlots';
 import playerData from '../../../data/sleeper_players.json';
 import {
   StarterInput,
@@ -37,6 +38,25 @@ const PLAYERS = (playerData as unknown as { players: Record<string, PlayerRow> }
 /** Sleeper team codes that differ from ESPN's. */
 const TEAM_ALIASES: Record<string, string> = { WAS: 'WSH', OAK: 'LV' };
 
+/**
+ * One starting slot as the manager ACTUALLY set it, in roster order.
+ *
+ * Kept separate from `starters` (the priced lineup) because the two answer different
+ * questions. `starters` is what the model assumes will play, with bench promotions and
+ * waiver streams substituted in to price the matchup fairly. This is what is really in the
+ * lineup right now — which is what you want when you open a matchup to look at the players.
+ */
+export type LineupSlot = {
+  slot: string;
+  playerId: string | null;
+  name: string | null;
+  position: string | null;
+  /** Points scored so far. */
+  points: number;
+  projectedPoints: number;
+  gameState: 'pre' | 'in' | 'post' | 'unknown';
+};
+
 export type MarketSide = {
   rosterId: number;
   ownerId: string | null;
@@ -50,6 +70,8 @@ export type MarketSide = {
    * a rooting-interest view needs.
    */
   starters: StarterInput[];
+  /** The lineup as actually set, in roster-slot order. */
+  lineup: LineupSlot[];
   /** Starters still capable of scoring. */
   playersRemaining: number;
   /** Bench players the model assumes will be started before kickoff. */
@@ -171,6 +193,45 @@ function buildStarters(
 }
 
 /**
+ * The lineup exactly as Sleeper reports it, aligned to the league's starting slots.
+ *
+ * `starters` and `starters_points` are positionally aligned to the non-bench entries of
+ * `roster_positions`, which is what makes the slot labels trustworthy here — the priced
+ * lineup cannot be used for this, because it returns locked players first and then fills
+ * open slots, so its order carries no slot meaning.
+ */
+function buildLineup(
+  matchup: SleeperMatchup,
+  rosterPositions: string[],
+  projections: Record<string, Record<string, number>>,
+  scoringSettings: Record<string, number>,
+  games: NflGamesResponse,
+): LineupSlot[] {
+  const startingSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
+  const ids = matchup.starters ?? [];
+  const pts = matchup.starters_points ?? [];
+
+  return startingSlots.map((slot, i) => {
+    const pid = ids[i];
+    if (!pid || pid === '0') {
+      return { slot, playerId: null, name: null, position: null, points: 0, projectedPoints: 0, gameState: 'unknown' as const };
+    }
+    const team = playerTeam(pid);
+    const gameId = team ? games.teamToGame[team] : undefined;
+    const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+    return {
+      slot,
+      playerId: pid,
+      name: playerName(pid),
+      position: PLAYERS[pid]?.position ?? null,
+      points: pts[i] ?? 0,
+      projectedPoints: calculateProjectedPoints(projections[pid], scoringSettings),
+      gameState: game ? game.state : ('unknown' as const),
+    };
+  });
+}
+
+/**
  * Everyone at a streamable position who is not on any roster in the league.
  *
  * A manager who carries no kicker or defence all week and grabs one right before
@@ -270,6 +331,7 @@ export async function buildMatchupMarkets(
       avatar: user?.avatar ?? undefined,
       distribution: sideDistribution(starters),
       starters,
+      lineup: buildLineup(m, rosterPositions, projections, scoringSettings, gamesRes),
       playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
       assumedPromotions: promoted.map(c => ({
         playerId: c.playerId,

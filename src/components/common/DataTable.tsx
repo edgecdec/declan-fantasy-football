@@ -14,23 +14,26 @@ import {
   Box,
   Typography,
   Collapse,
-  IconButton
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { Order, SortableColumn, getComparator } from './tableSort';
 
 // --- Types ---
 
-export type Order = 'asc' | 'desc';
+export type { Order };
 
-export interface Column<T> {
-  id: string; 
+export interface Column<T> extends SortableColumn<T> {
   label: string;
   numeric?: boolean;
   sortable?: boolean;
   width?: string | number;
   align?: 'left' | 'right' | 'center';
-  render?: (row: T) => React.ReactNode; 
+  render?: (row: T) => React.ReactNode;
+  /** Optional header tooltip, so a derived column can explain what it means. */
+  tooltip?: string;
 }
 
 interface DataTableProps<T> {
@@ -44,45 +47,6 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   noDataMessage?: string;
   renderDetailPanel?: (row: T) => React.ReactNode; // New prop for expansion
-}
-
-// --- Sorting Helpers ---
-
-function descendingComparator<T>(a: T, b: T, orderBy: string) {
-  let aValue: any;
-  let bValue: any;
-
-  if (orderBy.includes('.')) {
-    const keys = orderBy.split('.');
-    aValue = a;
-    bValue = b;
-    for (const key of keys) {
-      aValue = (aValue as any)?.[key];
-      bValue = (bValue as any)?.[key];
-    }
-  } else {
-    aValue = (a as any)[orderBy];
-    bValue = (b as any)[orderBy];
-  }
-
-  if (bValue === null || bValue === undefined) return -1;
-  if (aValue === null || aValue === undefined) return 1;
-
-  if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-  if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-  if (bValue < aValue) return -1;
-  if (bValue > aValue) return 1;
-  return 0;
-}
-
-function getComparator<T>(
-  order: Order,
-  orderBy: string,
-): (a: T, b: T) => number {
-  return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
 // --- Inner Row Component ---
@@ -194,9 +158,9 @@ export default function DataTable<T>({
   };
 
   const visibleRows = React.useMemo(() => {
-    const sorted = [...data].sort(getComparator(order, orderBy));
+    const sorted = [...data].sort(getComparator(order, orderBy, columns));
     return sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [data, order, orderBy, page, rowsPerPage]);
+  }, [data, order, orderBy, page, rowsPerPage, columns]);
 
   React.useEffect(() => {
     if (page > 0 && data.length < page * rowsPerPage) {
@@ -218,17 +182,24 @@ export default function DataTable<T>({
                   sortDirection={orderBy === column.id ? order : false}
                   sx={{ fontWeight: 'bold', width: column.width }}
                 >
-                  {column.sortable !== false ? (
-                    <TableSortLabel
-                      active={orderBy === column.id}
-                      direction={orderBy === column.id ? order : 'asc'}
-                      onClick={() => handleRequestSort(column.id)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  ) : (
-                    column.label
-                  )}
+                  {(() => {
+                    const heading = column.sortable !== false ? (
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={orderBy === column.id ? order : 'asc'}
+                        onClick={() => handleRequestSort(column.id)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    ) : (
+                      <span>{column.label}</span>
+                    );
+                    // Wrapped rather than replaced, so a column can be both sortable and
+                    // explained — a derived column usually needs to be both.
+                    return column.tooltip
+                      ? <Tooltip title={column.tooltip} arrow>{heading}</Tooltip>
+                      : heading;
+                  })()}
                 </TableCell>
               ))}
             </TableRow>
