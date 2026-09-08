@@ -180,7 +180,7 @@ export default function DataTable<T>({
                   key={column.id}
                   align={column.align || (column.numeric ? 'right' : 'left')}
                   sortDirection={orderBy === column.id ? order : false}
-                  sx={{ fontWeight: 'bold', width: column.width }}
+                  sx={{ fontWeight: 'bold', width: column.width, whiteSpace: 'nowrap' }}
                 >
                   {(() => {
                     const heading = column.sortable !== false ? (

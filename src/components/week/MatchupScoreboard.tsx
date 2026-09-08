@@ -39,33 +39,42 @@ type Props = {
 };
 
 function SideName({
-  name, align, isYou, leading, color,
+  name, side, isYou, leading, color,
 }: {
-  name: string; align: 'right' | 'left'; isYou?: boolean; leading: boolean; color: string;
+  name: string; side: 'left' | 'right'; isYou?: boolean; leading: boolean; color: string;
 }) {
+  const swatch = (
+    // Ties the name to its segment of the bar below, so identity does not rest on which
+    // side of the row you are on. Always on the inward edge, next to the score.
+    <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: color, flexShrink: 0 }} />
+  );
+  const label = (
+    <Typography
+      variant="body2"
+      noWrap
+      title={name}
+      sx={{
+        fontWeight: leading ? 700 : 400,
+        color: leading ? 'text.primary' : 'text.secondary',
+        overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
+      }}
+    >
+      {isYou ? 'You' : name}
+    </Typography>
+  );
+
   return (
     <Box
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0,
-        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
-        flexDirection: align === 'right' ? 'row' : 'row-reverse',
+        // Both sides hug the centre so the names sit against the scores rather than
+        // drifting to the outer edges of a wide cell. Explicit child order rather than
+        // row-reverse: with row-reverse the main axis flips, so `flex-start` aligns to the
+        // RIGHT — which is what pushed the right-hand name away from the score.
+        justifyContent: side === 'left' ? 'flex-end' : 'flex-start',
       }}
     >
-      <Typography
-        variant="body2"
-        noWrap
-        title={name}
-        sx={{
-          fontWeight: leading ? 700 : 400,
-          color: leading ? 'text.primary' : 'text.secondary',
-          overflow: 'hidden', textOverflow: 'ellipsis',
-        }}
-      >
-        {isYou ? 'You' : name}
-      </Typography>
-      {/* Swatch ties the name to its segment of the bar below, so identity never rests on
-          position alone. */}
-      <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: color, flexShrink: 0 }} />
+      {side === 'left' ? <>{label}{swatch}</> : <>{swatch}{label}</>}
     </Box>
   );
 }
@@ -79,19 +88,19 @@ export default function MatchupScoreboard({
   const rightLeading = margin < 0;
 
   return (
-    <Box sx={{ opacity: final ? 0.7 : 1, minWidth: 320 }}>
+    <Box sx={{ opacity: final ? 0.7 : 1, minWidth: 300, maxWidth: 400, mx: 'auto' }}>
       <Box
         sx={{
           display: 'grid',
           // Names take the slack; the score block stays a fixed centred width so scores
           // line up vertically down the whole table rather than drifting with name length.
-          gridTemplateColumns: '1fr 108px 1fr',
+          gridTemplateColumns: 'minmax(0, 1fr) 104px minmax(0, 1fr)',
           alignItems: 'center',
           columnGap: 1,
         }}
       >
         <SideName
-          name={leftName} align="right" isYou={leftIsYou}
+          name={leftName} side="left" isYou={leftIsYou}
           leading={leftLeading} color={MARKET_SIDE_COLORS.a}
         />
 
@@ -117,7 +126,7 @@ export default function MatchupScoreboard({
         </Box>
 
         <SideName
-          name={rightName} align="left"
+          name={rightName} side="right"
           leading={rightLeading} color={MARKET_SIDE_COLORS.b}
         />
       </Box>

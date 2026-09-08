@@ -211,6 +211,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       id: 'margin',
       label: 'Margin',
       numeric: true,
+      width: 90,
       tooltip: 'Points you are ahead right now. Sort ascending to find the games you are losing.',
       sortValue: r => (r.opponent ? r.me.distribution.banked - r.opponent.distribution.banked : null),
       render: r => {
@@ -231,6 +232,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       id: 'winProbability',
       label: 'Win %',
       numeric: true,
+      width: 84,
       tooltip: 'Chance you win this matchup. The bar in the Matchup column is the same number.',
       render: r => (
         <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
@@ -242,6 +244,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       id: 'closeness',
       label: 'Closeness',
       numeric: true,
+      width: 108,
       tooltip: 'Distance from a coin flip. Sort ascending to put the matchups actually in the balance at the top — this is the default.',
       sortValue: r => Math.abs(r.winProbability - 0.5),
       render: r => (
@@ -254,6 +257,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       id: 'toPlay',
       label: 'To play',
       numeric: true,
+      width: 96,
       tooltip: 'Your starters who can still score. A lead with nobody left is safe; the same lead with eight to play is not.',
       sortValue: r => r.me.playersRemaining,
       render: r => (
