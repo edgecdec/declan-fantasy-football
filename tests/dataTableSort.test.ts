@@ -102,3 +102,32 @@ test('the comparator never reorders equal values (stable within ties)', () => {
   const out = [...tied].sort(getComparator<Row>('desc', 'score')).map(r => r.name);
   assert.deepEqual(out, ['first', 'second', 'third']);
 });
+
+test('a roster-slot column must sort by roster order, not alphabetically', () => {
+  // The real bug this guards: sorting the slot NAME gave DEF, FLEX, K, QB, RB, RB, TE, WR,
+  // WR — alphabetical, which is not an order any fantasy player recognises. Sleeper's order
+  // is simply the order of roster_positions, so the column has to sort by index.
+  type Slot = { index: number; slot: string };
+  const lineup: Slot[] = [
+    { index: 0, slot: 'QB' }, { index: 1, slot: 'RB' }, { index: 2, slot: 'RB' },
+    { index: 3, slot: 'WR' }, { index: 4, slot: 'WR' }, { index: 5, slot: 'TE' },
+    { index: 6, slot: 'FLEX' }, { index: 7, slot: 'FLEX' }, { index: 8, slot: 'K' },
+    { index: 9, slot: 'DEF' },
+  ];
+  const shuffled = [lineup[9], lineup[3], lineup[0], lineup[8], lineup[5], lineup[1],
+    lineup[6], lineup[2], lineup[7], lineup[4]];
+
+  const byIndex: SortableColumn<Slot>[] = [{ id: 'slot', sortValue: r => r.index }];
+  assert.deepEqual(
+    [...shuffled].sort(getComparator<Slot>('asc', 'slot', byIndex)).map(r => r.slot),
+    ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'FLEX', 'K', 'DEF'],
+    'sorting by index must reproduce roster order exactly',
+  );
+
+  // And prove the failure mode, so a future change back to the string is caught.
+  assert.deepEqual(
+    [...shuffled].sort(getComparator<Slot>('asc', 'slot')).map(r => r.slot),
+    ['DEF', 'FLEX', 'FLEX', 'K', 'QB', 'RB', 'RB', 'TE', 'WR', 'WR'],
+    'sorting the slot name is alphabetical -- the bug',
+  );
+});

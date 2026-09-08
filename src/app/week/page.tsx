@@ -20,6 +20,7 @@ import {
   LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildWeeklyOutlook,
 } from '@/services/week/weeklyOutlook';
 import { leagueUrl } from '@/services/common/leagueLinks';
+import { getPositionColor } from '@/constants/colors';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /** Live pages refresh on the same cadence the NFL scoreboard proxy revalidates. */
@@ -85,6 +86,34 @@ type PairedSlot = {
 
 const STATE_MARK: Record<string, string> = { pre: '○', in: '●', post: '✓', unknown: '·' };
 
+/**
+ * A position or slot label in the project's position colour.
+ *
+ * Uses `getPositionColor` from constants/colors rather than a local map — three other files
+ * already redefine that palette locally, which is how they drift.
+ *
+ * Applied as TEXT colour, not as a fill. Those colours are deliberately light (L 0.71-0.84)
+ * because the app uses them for chart strokes and labels on a dark surface, where that is
+ * right; as solid fills they sit outside the validator's band and DEF (#94a3b8, chroma
+ * 0.035) reads gray. The letters are always present next to the colour, so identity never
+ * rests on hue alone — which also covers the RB/QB pair sitting at ΔE 7.9 for deuteranopia.
+ */
+function PositionTag({ label, size = '0.7rem' }: { label: string; size?: string }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        color: getPositionColor(label),
+        fontWeight: 700,
+        fontSize: size,
+        letterSpacing: '0.03em',
+      }}
+    >
+      {label}
+    </Box>
+  );
+}
+
 function PlayerCell({ name, position, state }: { name: string | null; position: string | null; state: string }) {
   if (!name) return <Box component="span" sx={{ color: 'text.disabled' }}>— empty —</Box>;
   return (
@@ -95,7 +124,7 @@ function PlayerCell({ name, position, state }: { name: string | null; position: 
         </Box>
       </Tooltip>
       {name}
-      {position && <Box component="span" sx={{ color: 'text.secondary', ml: 0.5, fontSize: '0.75rem' }}>{position}</Box>}
+      {position && <Box component="span" sx={{ ml: 0.6 }}><PositionTag label={position} /></Box>}
     </Box>
   );
 }
@@ -127,7 +156,17 @@ function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
   });
 
   const columns: Column<PairedSlot>[] = [
-    { id: 'slot', label: 'Slot', width: 70, sortable: false },
+    {
+      id: 'slot',
+      label: 'Slot',
+      width: 78,
+      tooltip: 'Roster slot, in the order Sleeper lists them. Sorting this returns to that order.',
+      // Sorts by roster POSITION, not by the slot's name. Sorting the string gave
+      // DEF, FLEX, K, QB, RB, RB, TE, WR, WR — alphabetical, which is not an order any
+      // fantasy player recognises. Sleeper's order is simply roster_positions order.
+      sortValue: r => r.index,
+      render: r => <PositionTag label={r.slot} size="0.72rem" />,
+    },
     { id: 'mineName', label: 'You', render: r => <PlayerCell name={r.mineName} position={r.minePosition} state={r.mineState} /> },
     { id: 'minePoints', label: 'Pts', numeric: true, render: r => <Box component="span" sx={{ fontWeight: 600 }}>{r.minePoints.toFixed(1)}</Box> },
     { id: 'mineProjected', label: 'Proj', numeric: true, tooltip: 'Full-week projection under this league\'s scoring', render: r => <Box component="span" sx={{ color: 'text.secondary' }}>{r.mineProjected.toFixed(1)}</Box> },
@@ -359,7 +398,9 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
       label: 'Pos',
       filterVariant: 'multi-select',
       render: r => (
-        <Box component="span" sx={{ color: 'text.secondary' }}>{r.position ?? '—'}</Box>
+        r.position
+          ? <PositionTag label={r.position} size="0.75rem" />
+          : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
       ),
     },
     {
