@@ -49,3 +49,38 @@ export const MARKET_SIDE_COLORS = {
 
 /** Reference marker at an even market, drawn as a recessive hairline. */
 export const MARKET_EVEN_REFERENCE = 'rgba(255, 255, 255, 0.38)';
+
+/**
+ * Diverging ramp for forecast-style matchup ratings, modelled on an election map.
+ *
+ * Darker is a stronger call on both sides, which is the convention readers already know from
+ * Safe/Likely/Leans maps, and each of the three steps gets its own hue rather than an opacity
+ * of one colour — three near-identical shades would make "Likely them" and "Solid them" the
+ * same colour with extra steps for nothing.
+ *
+ * Measured on the dark chart surface rather than chosen by eye:
+ *
+ *   blue triple  #1565c0 / #42a5f5 / #90caf9   adjacent ΔE 13.1, contrast all >= 3:1
+ *   pink triple  #ad1457 / #ec407a / #f48fb1   adjacent ΔE 15.2
+ *   the two LEAN steps against each other      ΔE 19.1  <- the pair a reader compares
+ *   leans either side of the tan midpoint      ΔE 15.9
+ *
+ * Two deliberate acceptances. `#ad1457` sits at 2.5:1 contrast, under the 3:1 target, and the
+ * blue triple's 13.1 is under the ΔE 15 floor. Both are legal here only because every use of
+ * this ramp carries a direct label — the count inside each segment and the rating name beneath
+ * it — so colour never has to be identified on its own. Do not reuse this ramp somewhere
+ * without labels.
+ *
+ * The toss-up is TAN, not gray. Gray put the two pale lean steps at ΔE 9.0 from each other,
+ * i.e. hard to tell apart; a warm midpoint separates them (15.9) because it sits off the
+ * blue-pink axis entirely. Its low chroma reads as neutral, which for a toss-up is the point.
+ */
+export const RATING_RAMP = {
+  solid_you: '#1565c0',
+  likely_you: '#42a5f5',
+  lean_you: '#90caf9',
+  tossup: '#b8a369',
+  lean_them: '#f48fb1',
+  likely_them: '#ec407a',
+  solid_them: '#ad1457',
+} as const;

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
-import { MARKET_SIDE_COLORS, MARKET_EVEN_REFERENCE } from '@/constants/colors';
+import { RATING_RAMP } from '@/constants/colors';
 import { RATING_SCALE, WinRating, rateWinProbability } from '@/services/week/winRating';
 
 /**
@@ -14,25 +14,18 @@ import { RATING_SCALE, WinRating, rateWinProbability } from '@/services/week/win
  * thing you actually want to know mid-slate. It reads like the win-probability bar it sits
  * with — same two identity hues, same left-is-you convention.
  *
- * On colour, deliberately: the seven segments are NOT seven distinct hues. Three intensities
- * of the validated blue, a neutral midpoint, three of the validated pink. Seven bespoke steps
- * were tried and the inner pairs came out at ΔE 2.6-5.9 — indistinguishable even with full
- * colour vision, so "Likely them" and "Solid them" would have been the same colour with extra
- * steps. Built from intensity instead, the two poles are the identity pair that passes every
- * check (ΔE 20.1 protan, 32.4 normal), so the only thing colour has to carry is DIRECTION.
- * Identity comes from the label, which is always rendered.
+ * Colour comes from RATING_RAMP, the shared election-style diverging scale: darker is a
+ * stronger call on each side, with a tan toss-up in the middle. See that constant for the
+ * measurements behind it. The label is always rendered, so colour never carries identity
+ * alone.
  */
 
 const SEGMENT_HEIGHT_PX = 10;
 const SEGMENT_GAP_PX = 2;
 const ROUNDED_END_PX = 4;
 
-/** Intensity per step out from the toss-up. Certainty reads as saturation. */
-const STEP_OPACITY: Record<number, number> = { 0: 1, 1: 0.4, 2: 0.68, 3: 1 };
-
 function segmentColor(rating: WinRating): string {
-  if (rating.favours === null) return MARKET_EVEN_REFERENCE;
-  return rating.favours === 'you' ? MARKET_SIDE_COLORS.a : MARKET_SIDE_COLORS.b;
+  return RATING_RAMP[rating.key];
 }
 
 type Props = {
@@ -64,7 +57,7 @@ export default function WinRatingScale({ probability, muted = false, showLabel =
                   bgcolor: segmentColor(rating),
                   // Inactive segments recede to context; the active one is at full strength
                   // and outlined, so the reader's eye lands on the rating, not the scale.
-                  opacity: active ? STEP_OPACITY[rating.step] : 0.16,
+                  opacity: active ? 1 : 0.2,
                   outline: active ? '2px solid' : 'none',
                   outlineColor: 'text.primary',
                   outlineOffset: '1px',

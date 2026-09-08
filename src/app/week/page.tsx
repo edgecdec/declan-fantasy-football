@@ -13,6 +13,7 @@ import UserSearchInput from '@/components/common/UserSearchInput';
 import NetLeaguesBar from '@/components/week/NetLeaguesBar';
 import MatchupScoreboard from '@/components/week/MatchupScoreboard';
 import WinRatingScale from '@/components/week/WinRatingScale';
+import RatingBreakdown from '@/components/week/RatingBreakdown';
 import { rateWinProbability } from '@/services/week/winRating';
 import useRememberedUsername from '@/hooks/useRememberedUsername';
 import { useUser } from '@/context/UserContext';
@@ -624,22 +625,6 @@ export default function WeekPage() {
                   {data.matchups.filter(m => m.status === 'live').length}
                 </Typography>
               </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" display="block">Toss-ups</Typography>
-                <Tooltip title="Matchups rated Toss-up (45-55%). Most of the slate sits here before kickoff and fans out as games are played.">
-                  <Typography variant="h6">
-                    {data.matchups.filter(m => rateWinProbability(m.winProbability).key === 'tossup').length}
-                  </Typography>
-                </Tooltip>
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" display="block">Favoured</Typography>
-                <Tooltip title="Matchups where the rating leans your way at all (Lean you or better)">
-                  <Typography variant="h6">
-                    {data.matchups.filter(m => rateWinProbability(m.winProbability).favours === 'you').length}
-                  </Typography>
-                </Tooltip>
-              </Box>
               {updatedAt && (
                 <Box sx={{ ml: 'auto' }}>
                   <Typography variant="caption" color="text.secondary">
@@ -648,6 +633,8 @@ export default function WeekPage() {
                 </Box>
               )}
             </Box>
+            <Divider sx={{ my: 2 }} />
+            <RatingBreakdown probabilities={data.matchups.map(m => m.winProbability)} />
           </Paper>
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
