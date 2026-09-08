@@ -125,7 +125,12 @@ export function seasonHasPlayedGames(state: SleeperNflState): boolean {
  */
 export function resolveDefaultSeason(state: SleeperNflState, mode: SeasonDefaultMode): string {
   if (mode === 'results' && !seasonHasPlayedGames(state)) {
-    return state.previous_season;
+    // Derive the previous season rather than trusting the field. `previous_season` is
+    // typed as a string and is populated in practice, but the type is only as honest as
+    // the payload — one absent field here returns undefined from a function declared to
+    // return string, and every consumer then fetches a year of "undefined" and renders
+    // an empty selector. Cheap to make impossible.
+    return state.previous_season || String(Number(state.season) - 1);
   }
   return state.season;
 }
@@ -155,4 +160,46 @@ export async function getNflStateOrFallback(): Promise<SleeperNflState> {
 export async function getDefaultSeason(mode: SeasonDefaultMode): Promise<string> {
   const state = await getNflStateOrFallback();
   return resolveDefaultSeason(state, mode);
+}
+
+/** A season choice the user made earlier, as persisted. */
+export type RememberedSeason = {
+  season: string;
+  /** Which season was CURRENT when the choice was made. */
+  pickedWhenCurrent: string;
+};
+
+export type SeasonSelection = {
+  /** The season a page should show. */
+  season: string;
+  /** True when the remembered value is unusable and should be deleted. */
+  dropRemembered: boolean;
+};
+
+/**
+ * Decides which season to show, given what was remembered and where the calendar is.
+ *
+ * Pulled out of useSeason as a pure function purely so it can be tested: the interesting
+ * behaviour is the invalidation, and getting that wrong is silent. Two ways it can be
+ * wrong, both bad in the same direction — a remembered choice that outlives its season
+ * pins a page to a year that has ended, and one outside the selectable range leaves the
+ * dropdown showing a value it cannot offer.
+ */
+export function resolveSeasonSelection(
+  remembered: RememberedSeason | null,
+  state: SleeperNflState,
+  mode: SeasonDefaultMode,
+): SeasonSelection {
+  const fallback = resolveDefaultSeason(state, mode);
+  if (!remembered) return { season: fallback, dropRemembered: false };
+
+  // Made in an earlier season: the calendar has moved on, so the choice has expired.
+  if (remembered.pickedWhenCurrent !== state.season) {
+    return { season: fallback, dropRemembered: true };
+  }
+  // Not offerable any more (range shifted, or the value was never valid).
+  if (!buildSeasonRange(state.season).includes(remembered.season)) {
+    return { season: fallback, dropRemembered: true };
+  }
+  return { season: remembered.season, dropRemembered: false };
 }

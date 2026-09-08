@@ -21,6 +21,7 @@ import { useBettingAuth } from '@/context/BettingAuthContext';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const BASE_FEATURES = [
+  { title: 'This Week', desc: 'Every matchup you have going, live win probabilities, and who to root for.', href: '/week', cta: 'See This Week' },
   { title: 'Draft Assistant', desc: 'Live draft companion with dynamic rankings and VBD analysis.', href: '/draft-assistant', cta: 'Start Drafting' },
   { title: 'Expected Wins', desc: 'Calculate your luck with All-Play win rates.', href: '/expected-wins', cta: 'Analyze Luck' },
   { title: 'Manager Skill', desc: 'Analyze your positional efficiency, lineup decisions, and historical trends.', href: '/skill', cta: 'View Skills' },

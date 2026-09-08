@@ -44,6 +44,12 @@ export type MarketSide = {
   teamName?: string;
   avatar?: string;
   distribution: SideDistribution;
+  /**
+   * The lineup actually priced, including assumed promotions and streams. Exposed so
+   * callers can attribute a side's projection back to individual players — which is what
+   * a rooting-interest view needs.
+   */
+  starters: StarterInput[];
   /** Starters still capable of scoring. */
   playersRemaining: number;
   /** Bench players the model assumes will be started before kickoff. */
@@ -205,6 +211,12 @@ function buildFreeAgentPool(
 export async function buildMatchupMarkets(
   leagueId: string,
   week: number,
+  /**
+   * Pre-fetched NFL game state. Supply it when pricing several leagues at once: the
+   * scoreboard is identical for all of them, so fetching it per league is N round trips
+   * for one answer.
+   */
+  sharedGames?: NflGamesResponse,
 ): Promise<MarketsResult | null> {
   const league = await SleeperService.getLeague(leagueId);
   if (!league) return null;
@@ -218,7 +230,9 @@ export async function buildMatchupMarkets(
     SleeperService.getWeeklyProjections(league.season, week),
     SleeperService.getRosters(leagueId),
     SleeperService.getLeagueUsers(leagueId),
-    fetch('/api/betting/nfl-games').then(r => r.json() as Promise<NflGamesResponse>),
+    sharedGames
+      ? Promise.resolve(sharedGames)
+      : fetch('/api/betting/nfl-games').then(r => r.json() as Promise<NflGamesResponse>),
   ]);
 
   if (!gamesRes?.ok) return null;
@@ -255,6 +269,7 @@ export async function buildMatchupMarkets(
       teamName: user?.metadata?.team_name,
       avatar: user?.avatar ?? undefined,
       distribution: sideDistribution(starters),
+      starters,
       playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
       assumedPromotions: promoted.map(c => ({
         playerId: c.playerId,

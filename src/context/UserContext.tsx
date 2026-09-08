@@ -35,11 +35,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setUserState(newUser);
     if (newUser) {
       safeLocalSet('sleeper_active_user', JSON.stringify(newUser));
-      // Also save to history
-      const history = JSON.parse(localStorage.getItem('sleeper_usernames') || '[]');
-      if (!history.includes(newUser.username)) {
-        safeLocalSet('sleeper_usernames', JSON.stringify([newUser.username, ...history].slice(0, 5)));
+      // Move to the front of the history, don't just append when absent.
+      //
+      // The previous version only wrote history when the name was NOT already in it, so
+      // re-selecting an earlier user left them buried in the list while
+      // sleeper_active_user pointed at them. Pages that seeded from `history[0]` then
+      // showed a different user than the one actually active.
+      let history: string[] = [];
+      try {
+        const raw = JSON.parse(localStorage.getItem('sleeper_usernames') || '[]');
+        if (Array.isArray(raw)) history = raw.filter((n): n is string => typeof n === 'string');
+      } catch {
+        // Corrupt history is not worth failing a sign-in over.
       }
+      const deduped = [newUser.username, ...history.filter(n => n !== newUser.username)].slice(0, 5);
+      safeLocalSet('sleeper_usernames', JSON.stringify(deduped));
       
       // Track in GA
       sendGAEvent('event', 'login', { method: 'Sleeper', username: newUser.username });
