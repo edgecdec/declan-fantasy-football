@@ -24,6 +24,7 @@ around it.** It already supports:
 | Nested field as sort key | dotted path in `id`, e.g. `me.distribution.banked` |
 | Expandable rows | `renderDetailPanel` |
 | Search / column filters | use `SmartTable` |
+| Show every row | an **All** page size is appended automatically |
 
 `sortValue` exists because a column's displayed value is often not the one worth ordering
 by — magnitude of a signed number, or distance from a coin flip. It is also the escape hatch

@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { Order, SortableColumn, getComparator } from './tableSort';
+import { ALL_ROWS, Order, SortableColumn, getComparator, pageSlice } from './tableSort';
 
 // --- Types ---
 
@@ -42,7 +42,12 @@ interface DataTableProps<T> {
   keyField: keyof T | ((row: T) => string); 
   defaultSortBy?: string;
   defaultSortOrder?: Order;
+  /**
+   * Page sizes offered. An "All" entry is appended automatically, so callers never have to
+   * remember it and no table is stuck at a page size.
+   */
   rowsPerPageOptions?: number[];
+  /** Pass ALL_ROWS to open unpaginated. */
   defaultRowsPerPage?: number;
   onRowClick?: (row: T) => void;
   noDataMessage?: string;
@@ -132,7 +137,7 @@ export default function DataTable<T>({
   keyField,
   defaultSortBy,
   defaultSortOrder = 'asc',
-  rowsPerPageOptions = [10, 25, 50, 100],
+  rowsPerPageOptions = [25, 50, 100, 250],
   defaultRowsPerPage = 25,
   noDataMessage = "No data found.",
   renderDetailPanel
@@ -159,8 +164,18 @@ export default function DataTable<T>({
 
   const visibleRows = React.useMemo(() => {
     const sorted = [...data].sort(getComparator(order, orderBy, columns));
-    return sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    return pageSlice(sorted, page, rowsPerPage);
   }, [data, order, orderBy, page, rowsPerPage, columns]);
+
+  // Every table can be shown unpaginated. Appended here rather than at each call site so it
+  // is always available and never duplicated if a caller already asked for it.
+  const pageSizeOptions = React.useMemo(
+    () => [
+      ...rowsPerPageOptions.filter(n => n !== ALL_ROWS),
+      { label: 'All', value: ALL_ROWS },
+    ],
+    [rowsPerPageOptions],
+  );
 
   React.useEffect(() => {
     if (page > 0 && data.length < page * rowsPerPage) {
@@ -231,9 +246,11 @@ export default function DataTable<T>({
       {/* No pagination control when there is nothing to paginate. A "1-10 of 10" footer
           under a ten-row table is pure noise, and it is especially wrong on a small table
           nested inside an expanded row. */}
-      {data.length > rowsPerPage && (
+      {/* Keep the control whenever it can do something: either there is more data than fits,
+          or the reader has switched to All and needs a way back. */}
+      {(rowsPerPage === ALL_ROWS || data.length > rowsPerPage) && (
         <TablePagination
-          rowsPerPageOptions={rowsPerPageOptions}
+          rowsPerPageOptions={pageSizeOptions}
           component="div"
           count={data.length}
           rowsPerPage={rowsPerPage}

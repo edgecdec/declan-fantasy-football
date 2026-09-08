@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SortableColumn, getComparator } from '@/components/common/tableSort';
+import { ALL_ROWS, SortableColumn, getComparator, pageSlice } from '@/components/common/tableSort';
 
 /**
  * Guards on the shared table's sorting. Every page's tables run through this, so a
@@ -130,4 +130,37 @@ test('a roster-slot column must sort by roster order, not alphabetically', () =>
     ['DEF', 'FLEX', 'FLEX', 'K', 'QB', 'RB', 'RB', 'TE', 'WR', 'WR'],
     'sorting the slot name is alphabetical -- the bug',
   );
+});
+
+test('ALL_ROWS returns every row, including the last one', () => {
+  // The quiet failure this guards: a naive slice with rowsPerPage = -1 evaluates to
+  // slice(-0, -1), which drops the LAST row. "All" showing everything but one item is not
+  // something anyone catches by eye.
+  const many = Array.from({ length: 137 }, (_, i) => i);
+  assert.equal(pageSlice(many, 0, ALL_ROWS).length, 137);
+  assert.deepEqual(pageSlice(many, 0, ALL_ROWS), many);
+  assert.equal(pageSlice(many, 0, ALL_ROWS).at(-1), 136, 'the last row must survive');
+  // Page number is irrelevant when unpaginated, and must not slice anything off.
+  assert.deepEqual(pageSlice(many, 4, ALL_ROWS), many);
+});
+
+test('paginates normally for real page sizes', () => {
+  const rows = Array.from({ length: 55 }, (_, i) => i);
+  assert.deepEqual(pageSlice(rows, 0, 25), rows.slice(0, 25));
+  assert.deepEqual(pageSlice(rows, 1, 25), rows.slice(25, 50));
+  assert.deepEqual(pageSlice(rows, 2, 25), rows.slice(50, 55), 'a short final page');
+  assert.deepEqual(pageSlice(rows, 9, 25), [], 'past the end is empty, not an error');
+});
+
+test('a nonsensical page size shows everything rather than nothing', () => {
+  // 0 or negative would otherwise produce an empty table, which looks like a data failure.
+  const rows = [1, 2, 3];
+  assert.deepEqual(pageSlice(rows, 0, 0), rows);
+  assert.deepEqual(pageSlice(rows, 0, -5), rows);
+});
+
+test('an empty dataset is empty at any page size', () => {
+  assert.deepEqual(pageSlice([], 0, 25), []);
+  assert.deepEqual(pageSlice([], 0, ALL_ROWS), []);
+  assert.deepEqual(pageSlice([], 3, 25), []);
 });

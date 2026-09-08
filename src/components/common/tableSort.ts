@@ -71,3 +71,25 @@ export function getComparator<T>(
     ? (a, b) => descendingComparator(a, b, orderBy, column)
     : (a, b) => -descendingComparator(a, b, orderBy, column);
 }
+
+/**
+ * Sentinel rows-per-page meaning "no limit".
+ *
+ * -1 rather than Infinity because that is the value MUI's TablePagination understands for an
+ * "All" option; using anything else means the control and the slicing disagree.
+ */
+export const ALL_ROWS = -1;
+
+/**
+ * The rows visible on the current page.
+ *
+ * Separate and pure so the unlimited case is actually tested. The failure mode is quiet: a
+ * naive `slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)` with rowsPerPage = -1
+ * computes `slice(-0, -1)`, which silently drops the last row — you get "All" showing
+ * everything except one item, which nobody would notice by eye.
+ */
+export function pageSlice<T>(rows: T[], page: number, rowsPerPage: number): T[] {
+  if (rowsPerPage === ALL_ROWS || rowsPerPage <= 0) return rows;
+  const start = page * rowsPerPage;
+  return rows.slice(start, start + rowsPerPage);
+}

@@ -9,8 +9,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  OutlinedInput,
-  Chip
+  OutlinedInput
 } from '@mui/material';
 import DataTable, { Column as BaseColumn } from './DataTable';
 import MultiSelectFilter from './MultiSelectFilter';
@@ -30,6 +29,7 @@ interface SmartTableProps<T> {
   defaultSortBy?: string;
   defaultSortOrder?: 'asc' | 'desc';
   defaultRowsPerPage?: number;
+  /** An "All" option is appended by DataTable, so it need not be listed here. */
   rowsPerPageOptions?: number[];
   enableGlobalSearch?: boolean;
   renderDetailPanel?: (row: T) => React.ReactNode;

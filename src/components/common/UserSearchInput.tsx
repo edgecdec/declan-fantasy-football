@@ -42,7 +42,7 @@ export default function UserSearchInput({ username, setUsername, disabled }: Use
           variant="outlined" 
           helperText={
             <span>
-              Don't have one? Try <strong style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setUsername('edgecdec')}>edgecdec</strong>
+              Don&apos;t have one? Try <strong style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setUsername('edgecdec')}>edgecdec</strong>
             </span>
           }
           sx={{ minWidth: { xs: '100%', sm: 250 }, flexGrow: 1 }} 

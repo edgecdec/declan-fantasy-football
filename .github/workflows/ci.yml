@@ -40,11 +40,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=3072
 
-      # Non-blocking on purpose: there is a pre-existing backlog of 69 errors across 21
+      # Non-blocking on purpose: there is a pre-existing backlog of 62 errors across 20
       # files (mostly `no-explicit-any` in older analytics code) that predates this job.
       # Failing on it would mean every PR is red for reasons unrelated to its change,
       # which trains people to ignore the whole job. The count is printed so it can be
       # ratcheted down, and this should become blocking once it reaches zero.
-      - name: Lint (informational — backlog of 69 errors)
+      - name: Lint (informational — backlog of 62 errors)
         continue-on-error: true
         run: npm run lint -- src/
