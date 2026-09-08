@@ -2,63 +2,71 @@
 
 import * as React from 'react';
 import { Box, Tooltip } from '@mui/material';
-import { MARKET_SIDE_COLORS, MARKET_EVEN_REFERENCE } from '@/constants/colors';
+import { MARKET_SIDE_COLORS } from '@/constants/colors';
 
 /**
- * Net rooting interest, drawn from a centre baseline.
+ * Net rooting interest, diverging from a centred zero.
  *
- * This is polarity data — "do I want him to do well, and how strongly" — so it gets a
- * diverging form with a fixed zero in the middle rather than a magnitude bar. Reading the
- * sign has to be possible at a glance across a long list, and a bar that always grows
- * rightward cannot do that.
+ * Polarity data — "do I want him to do well, and how strongly" — so it needs a fixed zero in
+ * the middle and growth in both directions. Reading the sign has to work at a glance down a
+ * long list, which a bar that always grows rightward cannot do.
  *
- * The two hues are the same identity pair the win-probability meter uses, so "my side" and
- * "their side" mean the same thing everywhere on the page. The value is always printed
- * next to the bar, so nothing depends on distinguishing the colours.
+ * Built as two equal halves rather than one absolutely-positioned bar, so zero is centred by
+ * construction and no arithmetic can move it. The previous version positioned a single bar at
+ * `left: 50%` with a `width: 1` hairline behind it for the zero mark, and that hairline was the
+ * bug: MUI's `sx` treats a width of 1 as 100%, not 1px, so the "hairline" rendered as a
+ * full-width block behind every row. It read as an outlined track that the bars then failed to
+ * line up inside.
+ *
+ * No track or background at all now. With the value printed beside every bar, an empty half is
+ * unambiguous, and a track would only invite the same misreading.
  */
 
 const BAR_HEIGHT_PX = 10;
 const ROUNDED_END_PX = 4;
+/** A net of ±1 must stay visible next to a ±8. */
+const MIN_SHARE = 0.08;
 
 type Props = {
   /** Leagues starting him for me, minus leagues starting him against me. */
   net: number;
-  /** Largest magnitude in the list, so bars share one scale. */
+  /** Largest magnitude in the list, so every bar shares one scale. */
   max: number;
   label: string;
 };
 
 export default function NetLeaguesBar({ net, max, label }: Props) {
-  // Half the width is available to each direction, so a full-scale value fills its side.
-  const share = max > 0 ? Math.min(1, Math.abs(net) / max) : 0;
-  const positive = net > 0;
+  const share = max > 0 && net !== 0
+    ? Math.max(MIN_SHARE, Math.min(1, Math.abs(net) / max))
+    : 0;
 
   return (
     <Tooltip title={label} arrow>
-      <Box sx={{ position: 'relative', height: BAR_HEIGHT_PX, width: '100%', minWidth: 80 }}>
-        {/* Zero reference, recessive so it orients without competing with the data. */}
-        <Box
-          sx={{
-            position: 'absolute', left: '50%', top: -1, bottom: -1,
-            width: 1, bgcolor: MARKET_EVEN_REFERENCE,
-          }}
-        />
-        {net !== 0 && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              height: BAR_HEIGHT_PX,
-              // Grows away from the centre in the direction of the sign.
-              left: positive ? '50%' : `calc(50% - ${share * 50}%)`,
-              width: `${share * 50}%`,
-              bgcolor: positive ? MARKET_SIDE_COLORS.a : MARKET_SIDE_COLORS.b,
-              borderRadius: positive
-                ? `0 ${ROUNDED_END_PX}px ${ROUNDED_END_PX}px 0`
-                : `${ROUNDED_END_PX}px 0 0 ${ROUNDED_END_PX}px`,
-            }}
-          />
-        )}
+      <Box sx={{ display: 'flex', width: '100%', minWidth: 80, height: BAR_HEIGHT_PX }}>
+        {/* Left half: against me, growing leftward from the centre. */}
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          {net < 0 && (
+            <Box
+              sx={{
+                width: `${share * 100}%`,
+                bgcolor: MARKET_SIDE_COLORS.b,
+                borderRadius: `${ROUNDED_END_PX}px 0 0 ${ROUNDED_END_PX}px`,
+              }}
+            />
+          )}
+        </Box>
+        {/* Right half: for me, growing rightward from the centre. */}
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+          {net > 0 && (
+            <Box
+              sx={{
+                width: `${share * 100}%`,
+                bgcolor: MARKET_SIDE_COLORS.a,
+                borderRadius: `0 ${ROUNDED_END_PX}px ${ROUNDED_END_PX}px 0`,
+              }}
+            />
+          )}
+        </Box>
       </Box>
     </Tooltip>
   );
