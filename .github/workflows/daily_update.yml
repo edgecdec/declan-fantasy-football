@@ -14,10 +14,10 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: '3.9'
         
@@ -26,6 +26,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
         
+    # One block on purpose: if the player database fails to build, the rankings
+    # scripts read it and would either crash anyway or regenerate from stale input.
+    # `bash -e` aborting here is the wanted behaviour.
     - name: Run update script
       run: |
         python scripts/update_players.py
