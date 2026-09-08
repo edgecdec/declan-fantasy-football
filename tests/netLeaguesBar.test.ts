@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
  * was invisible to type checking and to the build: a `width: 1` in MUI's `sx` means 100%, not
  * 1px, so a hairline became a full-width block.
  */
-const MIN_SHARE = 0.08;
+const MIN_SHARE = 0.1;
 function share(net: number, max: number): number {
   return max > 0 && net !== 0
     ? Math.max(MIN_SHARE, Math.min(1, Math.abs(net) / max))

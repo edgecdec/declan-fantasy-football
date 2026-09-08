@@ -425,14 +425,14 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
       id: 'netLeagues',
       label: 'Net +/−',
       numeric: true,
-      width: 150,
+      width: 200,
       tooltip: 'Leagues starting him FOR you minus leagues starting him AGAINST you. +2 means two more of your matchups want him to go off than want him to disappear.',
       render: r => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
           <Box component="span" sx={{ fontWeight: 700, minWidth: 24, textAlign: 'right' }}>
             {r.netLeagues > 0 ? `+${r.netLeagues}` : r.netLeagues}
           </Box>
-          <Box sx={{ width: 90 }}>
+          <Box sx={{ width: 140 }}>
             <NetLeaguesBar
               net={r.netLeagues}
               max={maxNet}

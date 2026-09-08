@@ -25,7 +25,7 @@ import { MARKET_SIDE_COLORS } from '@/constants/colors';
 const BAR_HEIGHT_PX = 10;
 const ROUNDED_END_PX = 4;
 /** A net of ±1 must stay visible next to a ±8. */
-const MIN_SHARE = 0.08;
+const MIN_SHARE = 0.1;
 
 type Props = {
   /** Leagues starting him for me, minus leagues starting him against me. */
