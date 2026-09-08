@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+# Scratch and rollback copies used by the atomic-swap deploy.
+/.next.new/
+/.next.old/
 /out/
 
 # production
