@@ -125,9 +125,14 @@ if __name__ == "__main__":
         # discovery needs the whole K/DEF universe rather than a snapshot. Position
         # and team are all pricing needs.
         FANTASY_POSITIONS = {'QB', 'RB', 'WR', 'TE', 'K', 'DEF'}
+        # Read back out of final_data rather than from a separate variable, so the
+        # index provably describes the same players that were just written above.
+        # (This line previously said `players.items()`, which is only a parameter name
+        # inside process_data and does not exist here -- it raised NameError on every
+        # run and broke the daily job for three days.)
         index = {
             pid: {'p': p.get('position'), 't': p.get('team')}
-            for pid, p in players.items()
+            for pid, p in final_data['players'].items()
             if p.get('position') in FANTASY_POSITIONS
         }
         index_file = os.path.join(DATA_DIR, 'player_index.json')
