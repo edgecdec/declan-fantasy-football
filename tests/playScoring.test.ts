@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  StatLine, addStats, derivedBonusStats, normalisePlayStats, scorePlayForPlayer, scoreStatLine,
+  StatLine, addStats, derivedBonusStats, displayPoints, isNonPlayStat, normalisePlayStats,
+  scorePlayForPlayer, scoreStatLine,
 } from '@/services/plays/playScoring';
 
 /** Half-PPR with a first-down bonus and yardage milestones — the real shape of a league. */
@@ -89,18 +90,59 @@ test('scorePlayForPlayer separates base points from bonus points', () => {
   const s = scorePlayForPlayer(
     { rec: 1, rec_yd: 12, rec_fd: 1 }, { rec_yd: 95 }, 'TE', SCORING,
   );
-  assert.equal(s.base, 0.5 + 1.2);
+  assert.ok(Math.abs(s.base - (0.5 + 1.2)) < 1e-9);
   // first down 0.5 + TE reception 0.5 + crossing 100 receiving yards 3 + combined 100 -> 2
-  assert.equal(s.bonus, 0.5 + 0.5 + 3 + 2);
-  assert.equal(s.total, Math.round((s.base + s.bonus) * 100) / 100);
+  assert.ok(Math.abs(s.bonus - (0.5 + 0.5 + 3 + 2)) < 1e-9);
+  assert.equal(s.total, s.base + s.bonus, 'total is the exact sum, unrounded');
   assert.equal(s.bonusStats.bonus_rec_yd_100, 1);
 });
 
-test('points are rounded to two decimals, because floats drift over a game', () => {
-  const s = scorePlayForPlayer({ pass_yd: 27 }, {}, 'QB', SCORING);
-  assert.equal(s.total, 1.08);
-  // 0.04 x 27 is 1.0800000000000003 unrounded; summed across 40 attempts that is visible.
-  assert.equal(String(s.total).length <= 4, true);
+test('points are NOT rounded per play, because the error accumulates', () => {
+  // A league pricing yards at 0.125 produces three decimals on most plays. Rounding each play
+  // put one running back 0.08 above his official total over a single week, and every player in
+  // that league off by a multiple of 0.02. Sleeper computes from season totals, so we have to
+  // accumulate exactly.
+  const fractional = { rush_yd: 0.125, rec_yd: 0.125 };
+  const play = scorePlayForPlayer({ rush_yd: 7 }, {}, 'RB', fractional);
+  assert.equal(play.total, 0.875, 'the exact value survives, not 0.88');
+
+  // Summing ten such plays exactly matches scoring the total at once; rounding each would not.
+  let exact = 0;
+  for (let i = 0; i < 10; i++) exact += scorePlayForPlayer({ rush_yd: 7 }, {}, 'RB', fractional).total;
+  assert.ok(Math.abs(exact - 8.75) < 1e-9, `accumulated ${exact}, expected 8.75`);
+  let rounded = 0;
+  for (let i = 0; i < 10; i++) rounded += Math.round(0.875 * 100) / 100;
+  assert.notEqual(rounded, 8.75, 'per-play rounding really does drift — that was the bug');
+
+  assert.equal(displayPoints(0.875), '0.88', 'rounding belongs at the display edge');
+});
+
+test('defensive and IDP stats are ignored when scoring a play', () => {
+  // The play feed both under-reports real defensive events AND credits IDP stats to offensive
+  // players — a quarterback showed idp_ff: 2 against an official 0. In an IDP league that was
+  // worth 6 points on one player. Defence has to come from the stats feed instead.
+  const idpLeague = { ...SCORING, idp_ff: 3, idp_tkl_solo: 2, sack: 1, int: 2, def_td: 6 };
+  const bogus = scorePlayForPlayer({ idp_ff: 2, idp_tkl_solo: 2, sack: 1 }, {}, 'QB', idpLeague);
+  assert.equal(bogus.total, 0, 'none of it may score from a play');
+
+  // The same line IS scored when it comes from the authoritative stats feed.
+  assert.equal(scoreStatLine({ idp_ff: 2, sack: 1 }, idpLeague, false), 3 * 2 + 1);
+  assert.equal(scoreStatLine({ idp_ff: 2, sack: 1 }, idpLeague, true), 0);
+});
+
+test('the non-play exclusion covers whole families, not a fixed list', () => {
+  // A new idp_/def_ key appearing upstream must not silently start scoring from plays.
+  for (const k of ['idp_anything', 'def_new_thing', 'tkl_whatever', 'pts_allow_0', 'yds_allow_0_100']) {
+    assert.ok(isNonPlayStat(k), `${k} should be excluded`);
+  }
+  for (const k of ['rec', 'rec_yd', 'rush_td', 'pass_yd', 'bonus_fd_rb', 'xpm', 'fgm']) {
+    assert.ok(!isNonPlayStat(k), `${k} must still score from plays`);
+  }
+});
+
+test('offensive scoring is unaffected by the exclusion', () => {
+  const s = scorePlayForPlayer({ rec: 1, rec_yd: 27, rec_td: 1 }, {}, 'WR', SCORING);
+  assert.equal(s.base, 0.5 + 2.7 + 6);
 });
 
 test('a negative play scores negative, and a turnover is not softened', () => {
