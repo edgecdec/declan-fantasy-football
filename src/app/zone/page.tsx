@@ -28,6 +28,22 @@ import type { FeedEntry } from '@/services/plays/playFeed';
 /** Matches the poller's cadence; refreshing faster only re-renders the same plays. */
 const REFRESH_MS = 30_000;
 
+/** Sleeper's longest regular season. Bounds a hand-typed ?week= without a network call. */
+const MAX_WEEK = 18;
+
+/**
+ * A week from the URL, so a feed is shareable and a past week is reachable.
+ *
+ * The dropdown only offers weeks up to the current one, which is right during a season but
+ * makes a finished week unreachable — including the ones worth replaying to check the
+ * scoring. An explicit ?week= overrides that and is added to the options.
+ */
+function weekFromUrl(): number | null {
+  if (typeof window === 'undefined') return null;
+  const raw = Number(new URLSearchParams(window.location.search).get('week'));
+  return Number.isInteger(raw) && raw >= 1 && raw <= MAX_WEEK ? raw : null;
+}
+
 type FeedResponse = {
   ok: boolean;
   error?: string;
@@ -71,9 +87,12 @@ export default function ZonePage() {
     let cancelled = false;
     getNflStateOrFallback().then(state => {
       if (cancelled) return;
+      const requested = weekFromUrl();
+      const options = Array.from({ length: Math.max(1, state.week) }, (_, i) => i + 1);
+      if (requested && !options.includes(requested)) options.push(requested);
       setSeason(String(state.season));
-      setWeek(state.week);
-      setWeeks(Array.from({ length: Math.max(1, state.week) }, (_, i) => i + 1));
+      setWeek(requested ?? state.week);
+      setWeeks(options.sort((a, b) => a - b));
     });
     return () => { cancelled = true; };
   }, []);
