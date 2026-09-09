@@ -10,12 +10,21 @@ import fs from 'fs';
  * `git clean`, so an ignored file here survives every deploy.
  */
 /**
- * Resolved lazily, and overridable via BETTING_DB_PATH, so a test can point at a scratch
- * file. Read at call time rather than at module load because the compiled test sets the
- * variable after the import has already been evaluated.
+ * Resolved lazily so a test can point at a scratch file, and read at call time rather than at
+ * module load because the compiled test sets the variable after the import is evaluated.
+ *
+ * BETTING_DB_DIR gives each PROCESS its own database. `node --test` runs each test file in its
+ * own process against the same file otherwise, and SQLite refuses concurrent writers — three
+ * files touching the ledger was enough to fail with SQLITE_BUSY. Per-process also stops one
+ * file's seeded rows from being visible to another's assertions, which is the subtler half of
+ * the same problem.
  */
 function dbPath(): string {
-  return process.env.BETTING_DB_PATH || path.join(process.cwd(), 'data', 'betting.db');
+  if (process.env.BETTING_DB_PATH) return process.env.BETTING_DB_PATH;
+  if (process.env.BETTING_DB_DIR) {
+    return path.join(process.env.BETTING_DB_DIR, `test-${process.pid}.db`);
+  }
+  return path.join(process.cwd(), 'data', 'betting.db');
 }
 
 let db: Database.Database | undefined;

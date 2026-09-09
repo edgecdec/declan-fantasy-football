@@ -63,11 +63,41 @@ export type BetRow = {
   final_b: number | null;
 };
 
+/** One unsettled bet, marked to the current line. See src/lib/betting/valuation.ts. */
+export type OpenPositionRow = {
+  wagerId: string;
+  marketId: string;
+  leagueId: string;
+  season: string;
+  week: number;
+  matchupId: number;
+  side: 'a' | 'b';
+  pick: string;
+  against: string;
+  stakeCents: number;
+  toWinCents: number;
+  price: number;
+  winProbability: number;
+  breakEvenProbability: number;
+  valueCents: number;
+  unrealisedCents: number;
+  pricedAt: string;
+  placedAt: string;
+};
+
 export type BetSummary = {
   openStakeCents: number;
   settledStakeCents: number;
   settledReturnCents: number;
   realisedPnlCents: number;
+  /** Expected return of every open bet at the current odds. */
+  liveValueCents: number;
+  /** balance + liveValue: what the account is worth right now, not just what has settled. */
+  equityCents: number;
+  /** liveValue - openStake: how the open book is doing, in expectation. */
+  unrealisedPnlCents: number;
+  /** The stalest line behind those figures, so the UI can admit to being behind. */
+  pricedAt: string | null;
 };
 
 type BettingAuthState = {
@@ -76,6 +106,7 @@ type BettingAuthState = {
   leagues: BettingLeagueRef[];
   ledger: LedgerRow[];
   bets: BetRow[];
+  openPositions: OpenPositionRow[];
   summary: BetSummary;
   loading: boolean;
   error: string | null;
@@ -102,6 +133,10 @@ const EMPTY_SUMMARY: BetSummary = {
   settledStakeCents: 0,
   settledReturnCents: 0,
   realisedPnlCents: 0,
+  liveValueCents: 0,
+  equityCents: 0,
+  unrealisedPnlCents: 0,
+  pricedAt: null,
 };
 
 function readSessionHint(): BettingUser | null {
@@ -133,6 +168,7 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
   const [leagues, setLeagues] = React.useState<BettingLeagueRef[]>([]);
   const [ledger, setLedger] = React.useState<LedgerRow[]>([]);
   const [bets, setBets] = React.useState<BetRow[]>([]);
+  const [openPositions, setOpenPositions] = React.useState<OpenPositionRow[]>([]);
   const [summary, setSummary] = React.useState<BetSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -155,6 +191,7 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
         setLeagues([]);
         setLedger([]);
         setBets([]);
+        setOpenPositions([]);
         setSummary(EMPTY_SUMMARY);
         writeSessionHint(null);
         return;
@@ -165,11 +202,18 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
       setLeagues(data.leagues ?? []);
       setLedger(data.ledger ?? []);
       setBets(data.bets ?? []);
+      setOpenPositions(data.openPositions ?? []);
       setSummary({
         openStakeCents: data.openStakeCents ?? 0,
         settledStakeCents: data.settledStakeCents ?? 0,
         settledReturnCents: data.settledReturnCents ?? 0,
         realisedPnlCents: data.realisedPnlCents ?? 0,
+        liveValueCents: data.liveValueCents ?? 0,
+        // Falls back to the plain balance rather than to zero: with nothing open they are the
+        // same number, and defaulting to zero would flash "$0.00 live worth" on an old payload.
+        equityCents: data.equityCents ?? data.balanceCents ?? 0,
+        unrealisedPnlCents: data.unrealisedPnlCents ?? 0,
+        pricedAt: data.pricedAt ?? null,
       });
       writeSessionHint(data.user ?? null);
     } catch {
@@ -212,8 +256,8 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const value = React.useMemo(
-    () => ({ user, balanceCents, leagues, ledger, bets, summary, loading, error, login, logout, refresh }),
-    [user, balanceCents, leagues, ledger, bets, summary, loading, error, login, logout, refresh],
+    () => ({ user, balanceCents, leagues, ledger, bets, openPositions, summary, loading, error, login, logout, refresh }),
+    [user, balanceCents, leagues, ledger, bets, openPositions, summary, loading, error, login, logout, refresh],
   );
 
   return <BettingAuthContext.Provider value={value}>{children}</BettingAuthContext.Provider>;

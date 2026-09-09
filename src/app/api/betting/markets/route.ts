@@ -4,6 +4,7 @@ import { accountCanBetInLeague, findBettingLeague } from '@/lib/betting/leagues'
 import { findAccountById } from '@/lib/betting/accounts';
 import { priceLeagueWeek } from '@/lib/betting/pricing';
 import { openExposureCents } from '@/lib/betting/wagers';
+import { valueOpenPositions } from '@/lib/betting/valuation';
 import { NEGATIVE_OPEN_EXPOSURE_CAP_CENTS } from '@/lib/betting/constants';
 import { getDb } from '@/lib/db';
 import { settleQuietly } from '@/lib/betting/settlement';
@@ -58,6 +59,10 @@ export async function GET(request: Request) {
     )
     .all(account.id, leagueId, cfg.season, week) as unknown[];
 
+  // Valued AFTER priceLeagueWeek above, so these are marked to the line this response
+  // carries rather than to whatever it was on the previous load.
+  const valuation = valueOpenPositions(account.id, account.balance_cents);
+
   return NextResponse.json({
     ok: true,
     week,
@@ -66,6 +71,12 @@ export async function GET(request: Request) {
     mySleeperUserId: account.sleeper_user_id,
     balanceCents: account.balance_cents,
     openExposureCents: openExposureCents(account.id),
+    // Account-wide, not week-scoped: it is the answer to "what am I worth", and money riding
+    // on another league still counts toward that.
+    liveValueCents: valuation.liveValueCents,
+    equityCents: valuation.equityCents,
+    unrealisedPnlCents: valuation.unrealisedPnlCents,
+    openPositions: valuation.positions,
     negativeExposureCapCents: NEGATIVE_OPEN_EXPOSURE_CAP_CENTS,
     markets,
     myWagers,

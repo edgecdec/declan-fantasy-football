@@ -9,10 +9,10 @@ import {
 } from '@/lib/plays/playStore';
 
 /**
- * The scratch database comes from run-tests.mjs, which sets BETTING_DB_PATH for the whole
- * run. It cannot be set from inside this file: the store resolves the path on its first
- * call, and a top-level `await import` to delay that makes tsc emit a module Node then
- * refuses to load as CommonJS.
+ * The scratch database comes from run-tests.mjs, which sets BETTING_DB_DIR for the whole run
+ * and so gives this file its own database. It cannot be set from inside this file: the store
+ * resolves the path on its first call, and a top-level `await import` to delay that makes tsc
+ * emit a module Node then refuses to load as CommonJS.
  */
 
 const play = (id: string, sequence: number, extra: Record<string, unknown> = {}) => ({

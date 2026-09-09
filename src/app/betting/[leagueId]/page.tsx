@@ -15,6 +15,19 @@ import LeagueStandings from '@/components/betting/LeagueStandings';
 import SeasonOdds from '@/components/betting/SeasonOdds';
 import { MARKET_CLOSE_MINUTES, HOUSE_VIG, profitForStake } from '@/services/betting/liveOdds';
 import { formatCents, CENTS_PER_DOLLAR } from '@/lib/betting/constants';
+import type { OpenPosition } from '@/lib/betting/valuation';
+
+/**
+ * Why a live bet is shown with a value rather than just a stake.
+ *
+ * The stake left the balance at placement, so a balance alone reads as though the money had
+ * evaporated. This is the other half: what the position is worth at the current line. It is an
+ * expectation and not a cash-out — and a fresh bet is worth slightly less than its stake,
+ * because the price paid carried the house edge.
+ */
+const LIVE_VALUE_HINT =
+  'Expected value at the current odds, not a cash-out. A new bet is worth slightly less than '
+  + 'its stake because the price included the house edge.';
 import { useBettingAuth } from '@/context/BettingAuthContext';
 
 /** Live scores move every few minutes; matches the matchup cache TTL. */
@@ -65,6 +78,11 @@ type MarketsPayload = {
   mySleeperUserId: string;
   balanceCents: number;
   openExposureCents: number;
+  /** Account-wide, marked to the current odds. See src/lib/betting/valuation.ts. */
+  liveValueCents: number;
+  equityCents: number;
+  unrealisedPnlCents: number;
+  openPositions: OpenPosition[];
   negativeExposureCapCents: number;
   markets: Market[];
   myWagers: MyWager[];
@@ -386,6 +404,27 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
             <Typography variant="caption" color="text.secondary" component="div">At risk</Typography>
             <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{formatCents(data.openExposureCents)}</Typography>
           </Box>
+          {data.openPositions.length > 0 && (
+            <Tooltip title={LIVE_VALUE_HINT} arrow>
+              <Stack direction="row" spacing={3}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" component="div">Worth now</Typography>
+                  <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+                    {formatCents(data.liveValueCents)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" component="div">Live worth</Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ lineHeight: 1.2, color: data.unrealisedPnlCents >= 0 ? 'success.main' : 'error.main' }}
+                  >
+                    {formatCents(data.equityCents)}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Tooltip>
+          )}
           {negative && (
             <Tooltip title={`Your balance is below zero, so total unsettled stake is capped at ${formatCents(data.negativeExposureCapCents)}.`}>
               <Chip size="small" color="warning" variant="outlined"
@@ -437,12 +476,20 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
                 <TableRow>
                   <TableCell>Matchup</TableCell><TableCell>Side</TableCell>
                   <TableCell align="right">Stake</TableCell><TableCell align="right">Price</TableCell>
-                  <TableCell align="right">To win</TableCell><TableCell>Status</TableCell>
+                  <TableCell align="right">To win</TableCell>
+                  <Tooltip title="Our current probability that this side wins." arrow>
+                    <TableCell align="right">Win now</TableCell>
+                  </Tooltip>
+                  <Tooltip title={LIVE_VALUE_HINT} arrow>
+                    <TableCell align="right">Worth now</TableCell>
+                  </Tooltip>
+                  <TableCell>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data.myWagers.map(w => {
                   const m = data.markets.find(x => x.id === w.market_id);
+                  const pos = data.openPositions.find(p => p.wagerId === w.id);
                   return (
                     <TableRow key={w.id}>
                       <TableCell>{w.matchup_id}</TableCell>
@@ -450,6 +497,26 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
                       <TableCell align="right">{formatCents(w.stake_cents)}</TableCell>
                       <TableCell align="right">{formatOdds(w.price)}</TableCell>
                       <TableCell align="right">{formatCents(w.to_win_cents)}</TableCell>
+                      <TableCell align="right">
+                        {pos ? `${(pos.winProbability * 100).toFixed(0)}%` : '\u2014'}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 600,
+                          color: !pos
+                            ? 'text.secondary'
+                            : pos.unrealisedCents > 0 ? 'success.main'
+                            : pos.unrealisedCents < 0 ? 'error.main' : 'text.secondary',
+                        }}
+                      >
+                        {pos ? formatCents(pos.valueCents) : '\u2014'}
+                        {pos && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.1 }}>
+                            {pos.unrealisedCents > 0 ? '+' : ''}{formatCents(pos.unrealisedCents)}
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell>{w.status}</TableCell>
                     </TableRow>
                   );

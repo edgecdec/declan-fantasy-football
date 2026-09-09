@@ -8,8 +8,22 @@ import {
 import { BETTING_LEAGUES } from '@/lib/betting/leagues';
 import { getDb } from '@/lib/db';
 import { settleQuietly } from '@/lib/betting/settlement';
+import { priceLeagueWeek } from '@/lib/betting/pricing';
+import { valueOpenPositions, weeksWithOpenPositions } from '@/lib/betting/valuation';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * How stale a line may be before the dashboard re-prices it.
+ *
+ * Re-pricing costs an ESPN call plus three Sleeper calls per league week, so it is not done on
+ * every load — but a "live" figure computed off a ten-minute-old line is not live. 45s is under
+ * the page's own refresh cadence, so a viewer sitting on the dashboard sees the number move.
+ */
+const REPRICE_AFTER_SECONDS = 45;
+
+/** Bounds the work when an account somehow has open bets across many weeks. */
+const MAX_WEEKS_TO_REPRICE = 4;
 
 /** GET — the signed-in account, its balance, its ledger, and where it may bet. */
 export async function GET(request: Request) {
@@ -26,6 +40,24 @@ export async function GET(request: Request) {
   if (!account) {
     return NextResponse.json({ ok: false, error: 'Account no longer exists.' }, { status: 401 });
   }
+
+  /*
+   * Refresh the lines behind any open bet before valuing them.
+   *
+   * Only the weeks this account actually has money on, so the cost is proportional to their
+   * exposure rather than to the size of the league. Stale-only and capped, because the point is
+   * a live number, not a fresh call for its own sake — and a pricing failure must not take the
+   * dashboard down, so each one is swallowed and the previous line is used instead.
+   */
+  const stale = weeksWithOpenPositions(account.id)
+    .filter(w => {
+      const age = (Date.now() - Date.parse(`${w.pricedAt.replace(' ', 'T')}Z`)) / 1000;
+      return !Number.isFinite(age) || age >= REPRICE_AFTER_SECONDS;
+    })
+    .slice(0, MAX_WEEKS_TO_REPRICE);
+  await Promise.all(
+    stale.map(w => priceLeagueWeek(w.leagueId, w.week).catch(() => undefined)),
+  );
 
   const leagueRows = getDb()
     .prepare('SELECT league_id, season FROM account_leagues WHERE account_id = ?')
@@ -61,9 +93,16 @@ export async function GET(request: Request) {
     )
     .all(account.id) as Record<string, unknown>[];
 
-  const openStakeCents = bets
-    .filter(b => b.status === 'open')
-    .reduce((sum, b) => sum + (b.stake_cents as number), 0);
+  /*
+   * What the open book is worth at the current odds.
+   *
+   * The balance alone reads as though a staked dollar has evaporated, because it left the
+   * balance at placement and does not come back until settlement. This is the other half of the
+   * picture: see src/lib/betting/valuation.ts for why it uses the fair probability rather than
+   * the priced one, and why a fresh bet is worth slightly less than its stake.
+   */
+  const valuation = valueOpenPositions(account.id, account.balance_cents);
+  const openStakeCents = valuation.openStakeCents;
 
   // Realised P&L only. An open bet has no result yet, and counting its stake as a
   // loss would show everyone deep in the red the moment they bet.
@@ -96,6 +135,11 @@ export async function GET(request: Request) {
     leagues,
     bets,
     openStakeCents,
+    liveValueCents: valuation.liveValueCents,
+    equityCents: valuation.equityCents,
+    unrealisedPnlCents: valuation.unrealisedPnlCents,
+    openPositions: valuation.positions,
+    pricedAt: valuation.oldestPricedAt,
     settledStakeCents: settledStake,
     settledReturnCents: settledReturn,
     realisedPnlCents: settledReturn - settledStake,

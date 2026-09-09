@@ -4,14 +4,33 @@ import * as React from 'react';
 import {
   Container, Box, Paper, Typography, TextField, Button, Alert,
   LinearProgress, Table, TableBody, TableCell, TableHead, TableRow,
-  TableContainer, Divider, Chip, Accordion, AccordionSummary, AccordionDetails,
+  TableContainer, Divider, Chip, Tooltip, Accordion, AccordionSummary, AccordionDetails,
 } from '@mui/material';
 import Link from 'next/link';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PageHeader from '@/components/common/PageHeader';
-import { useBettingAuth, BetRow } from '@/context/BettingAuthContext';
+import DataTable, { Column } from '@/components/common/DataTable';
+import { useBettingAuth, BetRow, OpenPositionRow } from '@/context/BettingAuthContext';
 import { formatCents, LEDGER_REASON_LABELS } from '@/lib/betting/constants';
+
+/**
+ * Why an open bet's P&L is shown at all, and why it can start negative.
+ *
+ * An unsettled bet has no result, but it does have a value: the expected payout at the current
+ * line. Reporting nothing until settlement is what made the balance read as though staked money
+ * had evaporated. Reporting the stake as a loss would be worse.
+ *
+ * The consequence that looks wrong and is not: because the price paid carried the house edge, a
+ * bet is worth slightly less than its stake the moment it is struck. That gap is the vig, and
+ * this copy exists so nobody has to guess at it.
+ */
+/** How often the dashboard re-reads its own valuation while bets are open. */
+const LIVE_REFRESH_MS = 30_000;
+
+const LIVE_VALUE_HINT =
+  'Expected value at the current odds, not a cash-out — there is nobody to sell to. '
+  + 'A new bet is worth slightly less than its stake because the price included the house edge.';
 
 function SignInPanel() {
   const { login, error } = useBettingAuth();
@@ -99,81 +118,159 @@ function betPnlCents(b: BetRow): number | null {
   return null;
 }
 
-function BetHistory({ bets }: { bets: BetRow[] }) {
-  if (bets.length === 0) {
+type HistoryRow = BetRow & {
+  /** Present only while the bet is unsettled. */
+  position?: OpenPositionRow;
+  pick: string;
+  against: string;
+  /** Signed money, realised for a settled bet and expected for an open one. */
+  pnlCents: number | null;
+  /** Score line, or null before the week finishes. */
+  scoreLabel: string | null;
+};
+
+function buildHistoryRows(bets: BetRow[], positions: OpenPositionRow[]): HistoryRow[] {
+  const byWager = new Map(positions.map(p => [p.wagerId, p]));
+  return bets.map(b => {
+    const pickedA = b.side === 'a';
+    const position = byWager.get(b.id);
+    const myScore = pickedA ? b.final_a : b.final_b;
+    const theirScore = pickedA ? b.final_b : b.final_a;
+    return {
+      ...b,
+      position,
+      pick: (pickedA ? b.name_a : b.name_b) ?? `Roster ${pickedA ? b.roster_a : b.roster_b}`,
+      against: (pickedA ? b.name_b : b.name_a) ?? `Roster ${pickedA ? b.roster_b : b.roster_a}`,
+      // An open bet's number is its unrealised move; a settled one's is what actually happened.
+      pnlCents: position ? position.unrealisedCents : betPnlCents(b),
+      scoreLabel:
+        myScore != null && theirScore != null
+          ? `${myScore.toFixed(1)}\u2013${theirScore.toFixed(1)}`
+          : null,
+    };
+  });
+}
+
+function pnlColor(pnl: number | null): string {
+  if (pnl == null || pnl === 0) return 'text.secondary';
+  return pnl > 0 ? 'success.main' : 'error.main';
+}
+
+function signedCents(cents: number): string {
+  return `${cents > 0 ? '+' : ''}${formatCents(cents)}`;
+}
+
+function BetHistory({ bets, positions }: { bets: BetRow[]; positions: OpenPositionRow[] }) {
+  const rows = React.useMemo(() => buildHistoryRows(bets, positions), [bets, positions]);
+
+  const columns: Column<HistoryRow>[] = [
+    { id: 'week', label: 'Wk', numeric: true },
+    {
+      id: 'pick', label: 'Your pick',
+      render: r => <Box component="span" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{r.pick}</Box>,
+    },
+    {
+      id: 'against', label: 'Against',
+      render: r => <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{r.against}</Box>,
+    },
+    {
+      id: 'price', label: 'Odds', numeric: true, align: 'right',
+      render: r => (r.price > 0 ? `+${r.price}` : String(r.price)),
+    },
+    {
+      id: 'stake_cents', label: 'Stake', numeric: true, align: 'right',
+      render: r => formatCents(r.stake_cents),
+    },
+    {
+      id: 'winNow', label: 'Win now', numeric: true, align: 'right',
+      tooltip: 'Our current probability that this side wins. Blank once the bet has settled.',
+      // A render-only column needs sortValue or the comparator reads undefined for every row
+      // and the sort silently does nothing.
+      sortValue: r => r.position?.winProbability ?? -1,
+      render: r =>
+        r.position ? `${(r.position.winProbability * 100).toFixed(0)}%` : '\u2014',
+    },
+    {
+      id: 'scoreLabel', label: 'Score', align: 'right',
+      sortValue: r => r.scoreLabel ?? '',
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+          {r.scoreLabel ?? '\u2014'}
+        </Box>
+      ),
+    },
+    {
+      id: 'status', label: 'Result',
+      render: r => {
+        const chip = RESULT_CHIP[r.status] ?? { label: r.status, color: 'default' as const };
+        return <Chip label={chip.label} color={chip.color} size="small" variant="outlined" />;
+      },
+    },
+    {
+      id: 'pnlCents', label: 'P&L', numeric: true, align: 'right',
+      tooltip: `Realised once settled. While a bet is live this is its unrealised move. ${LIVE_VALUE_HINT}`,
+      render: r => (
+        <Box component="span" sx={{ fontWeight: 600, color: pnlColor(r.pnlCents) }}>
+          {r.pnlCents == null ? '\u2014' : signedCents(r.pnlCents)}
+          {r.position && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.1 }}>
+              worth {formatCents(r.position.valueCents)}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+  ];
+
+  if (rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
         No bets yet. Open a league above to see this week&apos;s lines.
       </Typography>
     );
   }
+
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Wk</TableCell>
-            <TableCell>Your pick</TableCell>
-            <TableCell>Against</TableCell>
-            <TableCell align="right">Odds</TableCell>
-            <TableCell align="right">Stake</TableCell>
-            <TableCell align="right">Score</TableCell>
-            <TableCell>Result</TableCell>
-            <TableCell align="right">P&amp;L</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {bets.map(b => {
-            const pickedA = b.side === 'a';
-            const pick = (pickedA ? b.name_a : b.name_b) ?? `Roster ${pickedA ? b.roster_a : b.roster_b}`;
-            const against = (pickedA ? b.name_b : b.name_a) ?? `Roster ${pickedA ? b.roster_b : b.roster_a}`;
-            const pnl = betPnlCents(b);
-            const chip = RESULT_CHIP[b.status] ?? { label: b.status, color: 'default' as const };
-            const myScore = pickedA ? b.final_a : b.final_b;
-            const theirScore = pickedA ? b.final_b : b.final_a;
-            return (
-              <TableRow key={b.id}>
-                <TableCell>{b.week}</TableCell>
-                <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{pick}</TableCell>
-                <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{against}</TableCell>
-                <TableCell align="right">{b.price > 0 ? `+${b.price}` : b.price}</TableCell>
-                <TableCell align="right">{formatCents(b.stake_cents)}</TableCell>
-                <TableCell align="right" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                  {myScore != null && theirScore != null
-                    ? `${myScore.toFixed(1)}–${theirScore.toFixed(1)}`
-                    : '—'}
-                </TableCell>
-                <TableCell>
-                  <Chip label={chip.label} color={chip.color} size="small" variant="outlined" />
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{
-                    fontWeight: 600,
-                    color: pnl == null ? 'text.secondary' : pnl > 0 ? 'success.main' : pnl < 0 ? 'error.main' : 'text.secondary',
-                  }}
-                >
-                  {pnl == null
-                    ? `to win ${formatCents(b.to_win_cents)}`
-                    : `${pnl > 0 ? '+' : ''}${formatCents(pnl)}`}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <DataTable
+      data={rows}
+      columns={columns}
+      keyField="id"
+      defaultSortBy="placed_at"
+      defaultSortOrder="desc"
+      rowsPerPageOptions={[10, 25, 50]}
+      defaultRowsPerPage={10}
+    />
   );
 }
 
 function Dashboard() {
-  const { user, balanceCents, leagues, ledger, bets, summary, logout } = useBettingAuth();
-  const negative = balanceCents < 0;
+  const { user, balanceCents, leagues, ledger, bets, openPositions, summary, logout, refresh } =
+    useBettingAuth();
 
   const settled = bets.filter(b => b.status === 'won' || b.status === 'lost');
   const won = settled.filter(b => b.status === 'won').length;
   const hitRate = settled.length > 0 ? (won / settled.length) * 100 : null;
   const pnl = summary.realisedPnlCents;
+
+  /*
+   * With money on the table, the headline is what the account is WORTH, not what has settled.
+   *
+   * A balance alone is misleading mid-slate: the stake left it at placement, so betting $500 of
+   * $1,000 on a side that is now 90% to win reads as $500. With nothing open the two figures are
+   * identical, so the balance is the headline and there is no second number to explain.
+   */
+  const hasOpen = openPositions.length > 0;
+  const headlineCents = hasOpen ? summary.equityCents : balanceCents;
+  const negative = headlineCents < 0;
+  const unrealised = summary.unrealisedPnlCents;
+
+  // Keep the live figures moving while a slate is on. The valuation is only as fresh as the
+  // last time the lines behind it were priced, and /api/betting/me re-prices a stale week.
+  React.useEffect(() => {
+    if (!hasOpen) return;
+    const id = setInterval(() => { void refresh(); }, LIVE_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [hasOpen, refresh]);
 
   return (
     <Box>
@@ -186,11 +283,20 @@ function Dashboard() {
               Betting as <strong>{user?.displayName}</strong>
             </Typography>
             <Typography variant="h3" sx={{ mt: 0.5, color: negative ? 'error.main' : 'success.main' }}>
-              {formatCents(balanceCents)}
+              {formatCents(headlineCents)}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Declan Dollars {negative && '— you are in the hole'}
-            </Typography>
+            {hasOpen ? (
+              <Typography variant="caption" color="text.secondary">
+                Live worth — {formatCents(balanceCents)} settled plus{' '}
+                {formatCents(summary.liveValueCents)} riding on {openPositions.length} open bet
+                {openPositions.length === 1 ? '' : 's'}
+                {negative && ' — you are in the hole'}
+              </Typography>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Declan Dollars {negative && '— you are in the hole'}
+              </Typography>
+            )}
           </Box>
           <Button variant="outlined" size="small" onClick={logout}>Sign Out</Button>
         </Box>
@@ -198,15 +304,38 @@ function Dashboard() {
         <Divider sx={{ my: 2 }} />
 
         <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <Stat label="Settled balance" value={formatCents(balanceCents)} />
+          <Tooltip title={LIVE_VALUE_HINT} arrow>
+            <Box sx={{ display: 'flex', gap: 4 }}>
+              <Stat label="At risk now" value={formatCents(summary.openStakeCents)} />
+              <Stat
+                label="Worth now"
+                value={hasOpen ? formatCents(summary.liveValueCents) : '—'}
+                color={hasOpen ? pnlColor(unrealised) : undefined}
+              />
+              <Stat
+                label="Unrealised"
+                value={hasOpen ? signedCents(unrealised) : '—'}
+                color={hasOpen ? pnlColor(unrealised) : undefined}
+              />
+            </Box>
+          </Tooltip>
           <Stat
             label="Realised P&L"
-            value={`${pnl > 0 ? '+' : ''}${formatCents(pnl)}`}
+            value={signedCents(pnl)}
             color={pnl > 0 ? 'success.main' : pnl < 0 ? 'error.main' : undefined}
           />
-          <Stat label="At risk now" value={formatCents(summary.openStakeCents)} />
           <Stat label="Record" value={settled.length > 0 ? `${won}–${settled.length - won}` : '—'} />
           <Stat label="Hit rate" value={hitRate == null ? '—' : `${hitRate.toFixed(0)}%`} />
         </Box>
+
+        {hasOpen && summary.pricedAt && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            {/* The oldest line, not the newest: the total is only as fresh as its stalest input. */}
+            Odds last priced {new Date(`${summary.pricedAt.replace(' ', 'T')}Z`).toLocaleTimeString()}
+            {' · refreshing every '}{LIVE_REFRESH_MS / 1000}s
+          </Typography>
+        )}
 
         {leagues.length > 0 && (
           <>
@@ -232,9 +361,10 @@ function Dashboard() {
       <Paper sx={{ p: 2.5, mb: 2 }}>
         <Typography variant="h6" gutterBottom>Your bets</Typography>
         <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1.5 }}>
-          Bets settle automatically once every NFL game in the week is final.
+          Bets settle automatically once every NFL game in the week is final. A live bet shows
+          what it is worth at the current odds, not a result.
         </Typography>
-        <BetHistory bets={bets} />
+        <BetHistory bets={bets} positions={openPositions} />
       </Paper>
 
       {/* Secondary, and collapsed: the ledger is the audit trail, not the thing you

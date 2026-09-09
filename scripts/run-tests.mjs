@@ -13,7 +13,7 @@
  * is the whole reason this file exists.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -64,17 +64,22 @@ if (tests.length === 0) {
 
 console.log(`run-tests: ${tests.length} test file(s)\n`);
 
-// Point the SQLite store at a scratch file for the whole run. Set here rather than inside
-// a test because it has to be true before any module resolves it, and because a test that
-// forgot to set it would silently read and write the real data/betting.db — which holds
+// Point the SQLite store at a scratch DIRECTORY for the whole run. Set here rather than
+// inside a test because it has to be true before any module resolves it, and because a test
+// that forgot to set it would silently read and write the real data/betting.db — which holds
 // balances people care about.
-const scratchDb = path.join(OUT, 'test.db');
+//
+// A directory rather than a single file so each test file's process gets its own database.
+// `node --test` runs files in parallel, SQLite refuses concurrent writers, and three files
+// touching the ledger was enough to fail with SQLITE_BUSY.
+const scratchDbDir = path.join(OUT, 'db');
+mkdirSync(scratchDbDir, { recursive: true });
 
 try {
   execFileSync(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, BETTING_DB_PATH: scratchDb },
+    env: { ...process.env, BETTING_DB_DIR: scratchDbDir },
   });
 } catch {
   process.exit(1);
