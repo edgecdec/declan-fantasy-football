@@ -31,17 +31,28 @@ const REFRESH_MS = 30_000;
 /** Sleeper's longest regular season. Bounds a hand-typed ?week= without a network call. */
 const MAX_WEEK = 18;
 
+/** Sleeper's first season. Bounds a hand-typed ?season= without a network call. */
+const FIRST_SEASON = 2017;
+
 /**
- * A week from the URL, so a feed is shareable and a past week is reachable.
+ * Season and week from the URL, so a feed is shareable and a past week is reachable.
  *
- * The dropdown only offers weeks up to the current one, which is right during a season but
- * makes a finished week unreachable — including the ones worth replaying to check the
- * scoring. An explicit ?week= overrides that and is added to the options.
+ * The controls only offer the current season and the weeks up to now, which is right during
+ * a slate but makes a finished week unreachable — including the ones worth replaying to
+ * check that the per-league scoring is right. Explicit params override both and are added to
+ * the options rather than replacing them.
  */
-function weekFromUrl(): number | null {
-  if (typeof window === 'undefined') return null;
-  const raw = Number(new URLSearchParams(window.location.search).get('week'));
-  return Number.isInteger(raw) && raw >= 1 && raw <= MAX_WEEK ? raw : null;
+function fromUrl(): { season: string | null; week: number | null } {
+  if (typeof window === 'undefined') return { season: null, week: null };
+  const params = new URLSearchParams(window.location.search);
+  const week = Number(params.get('week'));
+  const season = Number(params.get('season'));
+  const thisYear = new Date().getFullYear();
+  return {
+    season: Number.isInteger(season) && season >= FIRST_SEASON && season <= thisYear
+      ? String(season) : null,
+    week: Number.isInteger(week) && week >= 1 && week <= MAX_WEEK ? week : null,
+  };
 }
 
 type FeedResponse = {
@@ -87,11 +98,16 @@ export default function ZonePage() {
     let cancelled = false;
     getNflStateOrFallback().then(state => {
       if (cancelled) return;
-      const requested = weekFromUrl();
-      const options = Array.from({ length: Math.max(1, state.week) }, (_, i) => i + 1);
-      if (requested && !options.includes(requested)) options.push(requested);
-      setSeason(String(state.season));
-      setWeek(requested ?? state.week);
+      const requested = fromUrl();
+      // A past season is complete, so every week of it is offerable.
+      const isPastSeason = requested.season != null && requested.season !== String(state.season);
+      const options = Array.from(
+        { length: isPastSeason ? MAX_WEEK : Math.max(1, state.week) },
+        (_, i) => i + 1,
+      );
+      if (requested.week && !options.includes(requested.week)) options.push(requested.week);
+      setSeason(requested.season ?? String(state.season));
+      setWeek(requested.week ?? (isPastSeason ? 1 : state.week));
       setWeeks(options.sort((a, b) => a - b));
     });
     return () => { cancelled = true; };
@@ -168,6 +184,11 @@ export default function ZonePage() {
 
         {data?.ok && (
           <Box sx={{ display: 'flex', gap: 3, mt: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <Stat
+              label="Showing"
+              value={`${data.season} wk ${data.week}`}
+              hint="Season and week this feed covers. Overridable with ?season= and ?week=."
+            />
             <Stat label="Leagues" value={String(data.leagues?.length ?? 0)} />
             <Stat
               label="Plays captured"
