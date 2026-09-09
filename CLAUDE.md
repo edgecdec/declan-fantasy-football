@@ -111,6 +111,33 @@ Verify with `npm run verify:plays -- <season> <week> --user <name> [--players <g
 fetches plays once and re-scores every league that user is in. Test more than one league: a
 single-league check reported 100% while five real bugs were hiding in the other seventeen.
 
+## Live play capture (The Zone) — operational
+
+Capture is a **VPS cron**, not part of the app's request path, because a play not stored while
+the game is on cannot be fetched back afterwards. Nothing about it lives in this repo, so it is
+recorded here:
+
+| Piece | Where |
+|---|---|
+| Cron | `* * * * *` (root crontab) → `/usr/local/bin/poll_fantasy_plays.sh` |
+| Script log | `/var/log/fantasy_plays_poll.log` — **written only when something happened**; silence between slates is correct |
+| Endpoint | `POST /api/plays/poll`, shared-secret auth via `x-poll-secret` or `?secret=` |
+| Secret | `POLL_SECRET` if set, else the existing `WEBHOOK_SECRET` — so no new env var was needed |
+| Health | `GET /api/plays/poll?season=&week=` (same secret) → play count, **observed latency**, last poll, cooldown |
+| Backfill a week | `POST /api/plays/poll?season=2025&week=14` — reconcile-only, idempotent |
+
+`latencySeconds` is the number that says whether capture is working. A play count alone looks
+identical whether plays arrived seconds or an hour after the snap, so check the latency, not the
+count. It is null when every stored play is old (a backfill), by design.
+
+**Don't deploy during a slate if it can wait.** The build swaps atomically and the cron keeps
+firing, so a deploy is survivable — but a failed one is not, and the plays missed while pm2 is
+restart-looping are gone.
+
+The nightly ledger backup **drops `nfl_plays` from the copy** (`/usr/local/bin/backup_betting_db.sh`).
+Plays are re-fetchable from Sleeper wholesale; a ledger row is not. Keeping them would be ~65MB a
+season × 14 nights retained.
+
 ## Verification
 
 `npm run typecheck` is **mandatory** and is not covered by the build. `next.config.ts` sets
