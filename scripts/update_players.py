@@ -130,8 +130,17 @@ if __name__ == "__main__":
         # (This line previously said `players.items()`, which is only a parameter name
         # inside process_data and does not exist here -- it raised NameError on every
         # run and broke the daily job for three days.)
+        # 'n' (display name) is included because the live play feed has to say WHO
+        # scored, and a play carries only Sleeper's player_id. Without a name here the
+        # server would have to parse the 22MB file to caption a play. Team defences
+        # carry no full_name, hence the first/last fallback.
+        def _display_name(p):
+            return p.get('full_name') or ' '.join(
+                x for x in (p.get('first_name'), p.get('last_name')) if x
+            ) or None
+
         index = {
-            pid: {'p': p.get('position'), 't': p.get('team')}
+            pid: {'p': p.get('position'), 't': p.get('team'), 'n': _display_name(p)}
             for pid, p in final_data['players'].items()
             if p.get('position') in FANTASY_POSITIONS
         }

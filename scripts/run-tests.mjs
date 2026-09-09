@@ -63,10 +63,18 @@ if (tests.length === 0) {
 }
 
 console.log(`run-tests: ${tests.length} test file(s)\n`);
+
+// Point the SQLite store at a scratch file for the whole run. Set here rather than inside
+// a test because it has to be true before any module resolves it, and because a test that
+// forgot to set it would silently read and write the real data/betting.db — which holds
+// balances people care about.
+const scratchDb = path.join(OUT, 'test.db');
+
 try {
   execFileSync(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
     cwd: ROOT,
     stdio: 'inherit',
+    env: { ...process.env, BETTING_DB_PATH: scratchDb },
   });
 } catch {
   process.exit(1);

@@ -9,14 +9,22 @@ import fs from 'fs';
  * the `data/*.db*` rules — deploy_webhook.sh uses `git reset --hard` and never
  * `git clean`, so an ignored file here survives every deploy.
  */
-const DB_PATH = path.join(process.cwd(), 'data', 'betting.db');
+/**
+ * Resolved lazily, and overridable via BETTING_DB_PATH, so a test can point at a scratch
+ * file. Read at call time rather than at module load because the compiled test sets the
+ * variable after the import has already been evaluated.
+ */
+function dbPath(): string {
+  return process.env.BETTING_DB_PATH || path.join(process.cwd(), 'data', 'betting.db');
+}
 
 let db: Database.Database | undefined;
 
 export function getDb(): Database.Database {
   if (!db) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    db = new Database(DB_PATH);
+    const file = dbPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    db = new Database(file);
     // WAL keeps readers from blocking on the writer, and makes a pm2 restart
     // mid-write safe rather than leaving a half-applied transaction.
     db.pragma('journal_mode = WAL');
@@ -113,6 +121,37 @@ function initDb(database: Database.Database): void {
       placed_at TEXT NOT NULL DEFAULT (datetime('now')),
       settled_at TEXT
     );
+
+    /*
+     * Raw NFL plays as captured from Sleeper's GraphQL feed.
+     *
+     * Stored raw — metadata and stats as JSON, never pre-scored — because the same play has to
+     * be re-scored in every league's own settings, and a league can change its scoring. Baking
+     * points in at capture time would make the store useless the moment a setting moved.
+     *
+     * first_seen_at is our own observation time, not Sleeper's. The gap between it and
+     * play_time is the live latency of the feed, which is the one thing that cannot be measured
+     * after the fact -- so it is recorded on the way in. (No backticks in here: this whole block
+     * lives inside a JS template literal and a backtick would end it.)
+     */
+    CREATE TABLE IF NOT EXISTS nfl_plays (
+      play_id TEXT PRIMARY KEY,
+      game_id TEXT NOT NULL,
+      season TEXT NOT NULL,
+      week INTEGER NOT NULL,
+      -- Sleeper's ordering key within a game.
+      sequence INTEGER,
+      -- Sleeper's epoch-ms timestamp for the play itself.
+      play_time INTEGER,
+      metadata TEXT NOT NULL,
+      play_stats TEXT NOT NULL,
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_plays_week ON nfl_plays(season, week, sequence);
+    CREATE INDEX IF NOT EXISTS idx_plays_game ON nfl_plays(game_id, sequence);
+    CREATE INDEX IF NOT EXISTS idx_plays_seen ON nfl_plays(first_seen_at);
 
     CREATE INDEX IF NOT EXISTS idx_ledger_account ON ledger(account_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_setup_tokens_account ON setup_tokens(account_id);

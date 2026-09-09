@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/db';
+import { readMeta, writeMeta } from '@/lib/meta';
 import { settleFinishedMarkets, MarketRow } from '@/lib/betting/wagers';
 
 /**
@@ -46,22 +47,6 @@ export type SweepResult = {
   paidCents: number;
   skipped: string[];
 };
-
-function readMeta(key: string): string | undefined {
-  const row = getDb().prepare('SELECT value FROM meta WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined;
-  return row?.value;
-}
-
-function writeMeta(key: string, value: string): void {
-  getDb()
-    .prepare(
-      `INSERT INTO meta (key, value, updated_at) VALUES (?, ?, datetime('now'))
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
-    )
-    .run(key, value);
-}
 
 /**
  * True when every NFL game in that week is final.
