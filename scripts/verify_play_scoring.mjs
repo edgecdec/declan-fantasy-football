@@ -8,11 +8,20 @@
  *
  *   node scripts/verify_play_scoring.mjs [season] [week] [leagueId]
  *   node scripts/verify_play_scoring.mjs [season] [week] --user <sleeperName>
+ *   ... --players <gitRef>   use the player database as of that commit
  *
  * The --user form reconciles against EVERY league that user is in. Plays are fetched once and
  * re-scored per league, which is both the cheap way to do it and a direct exercise of the
  * production design: plays are global NFL events with no league context, so league count costs
  * nothing.
+ *
+ * `--players <gitRef>` matters for historical checks. `data/sleeper_players.json` holds TODAY'S
+ * positions, but Sleeper computed a past season's stats using the positions of the time, and 115
+ * fantasy-position players changed between February and September 2026 alone — Connor Heyward went
+ * TE to RB, which is why his 2025 stats carry `bonus_fd_te` while the current database calls him a
+ * running back. Reconciling an old season against current positions therefore mis-scores every
+ * per-position bonus for those players. Live scoring is unaffected: the current position is the
+ * correct one for a game happening now.
  *
  * Exits non-zero if any offensive player disagrees by more than a cent. Team defences are
  * reported separately and are EXPECTED to disagree — the play feed is offence-only.
@@ -77,7 +86,17 @@ const [official, playData] = await Promise.all([
   gql(`{plays(sport:"nfl",season:"${season}",season_type:"regular",week:${week}){
         sequence metadata play_stats{player_id stats}}}`),
 ]);
-const players = JSON.parse(readFileSync(path.join(ROOT, 'data/sleeper_players.json'), 'utf8')).players;
+/*
+ * Positions as of a chosen commit, for historical accuracy. Read from git rather than the working
+ * tree so no snapshot files need keeping around.
+ */
+const playersRefIdx = process.argv.indexOf('--players');
+const playersRef = playersRefIdx > -1 ? process.argv[playersRefIdx + 1] : null;
+const playersJson = playersRef
+  ? execFileSync('git', ['show', `${playersRef}:data/sleeper_players.json`], { cwd: ROOT, maxBuffer: 128 * 1024 * 1024 }).toString()
+  : readFileSync(path.join(ROOT, 'data/sleeper_players.json'), 'utf8');
+if (playersRef) console.log(`using player positions as of ${playersRef}`);
+const players = JSON.parse(playersJson).players;
 const plays = playData.plays.slice().sort((a, b) => a.sequence - b.sequence);
 console.log(`plays fetched once: ${plays.length}\n`);
 

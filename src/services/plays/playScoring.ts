@@ -39,10 +39,17 @@
  * About 0.4% of player-weeks disagree with Sleeper's official stats by a point or two, and every
  * remaining case is an inconsistency inside Sleeper's own data rather than something derivable:
  *
- *  - Position disagreement. Sleeper's player database lists Connor Heyward as `position: RB` with
- *    `fantasy_positions: ['RB']`, while its stats engine awards him `bonus_fd_te`. Nothing
- *    available to us predicts that, and it is worth at most the difference between the two
- *    bonus rates. Taysom Hill has the same QB/TE ambiguity.
+ *  - POSITION VINTAGE, which turned out to be the interesting one and is NOT a live problem.
+ *    `data/sleeper_players.json` holds today's positions, but Sleeper scored a past season using
+ *    the positions of the time — and 115 fantasy-position players changed between February and
+ *    September 2026 alone. Connor Heyward went TE to RB, which is exactly why his 2025 stats
+ *    carry `bonus_fd_te` while the current database calls him a running back. It is not a
+ *    multi-position problem: his `fantasy_positions` is `['RB']` today and was `['TE']` then, and
+ *    none of the disagreeing players has more than one fantasy position.
+ *
+ *    So per-position bonuses need the position AS OF the games being scored. Live that is simply
+ *    the current position, so the product is unaffected; historical replay needs a contemporary
+ *    snapshot, which `npm run verify:plays -- --players <gitRef>` supplies from git history.
  *  - The feed occasionally emits a negative count, e.g. `fum: -1` where official says 0.
  *  - `pass_int_td` is credited to the intercepted quarterback in the feed but not officially.
  *  - `st_ff` (special-teams forced fumble) is absent from the feed.

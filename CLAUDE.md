@@ -95,10 +95,21 @@ Measured by replaying complete weeks against Sleeper's official stats (`npm run 
   points must come from the stats feed, which they would anyway since `pts_allow_*` and
   `yds_allow_*` are game-level brackets.
 
-Two things the feed leaves to us, both handled in `playScoring.ts`: league **bonuses** (only
-reported as game-level aggregates, so derived from primitives — and milestones must fire on the
-crossing play, not every play thereafter), and **two-point conversions** (the feed says
-`conv_cmp`/`conv_pass_att`, the settings price `pass_2pt`).
+Things the feed leaves to us, all handled in `playScoring.ts`: league **bonuses** (only reported
+as game-level aggregates, so derived from primitives — and milestones must fire on the crossing
+play, not every play thereafter), **two-point conversions** (`conv_cmp`/`conv_pass_att` vs the
+priced `pass_2pt`), and **return touchdowns** (sometimes carry `st_td`, sometimes not — fill the
+gap, never add).
+
+**Player positions are a moving target.** `data/sleeper_players.json` holds TODAY's positions; 115
+fantasy-position players changed between Feb and Sep 2026. Per-position bonuses therefore need the
+position as of the games being scored — live that is the current one, but historical replay needs a
+contemporary snapshot, which the verifier can read from git via `--players <gitRef>`. Reconciling an
+old season against current positions silently mis-scores those players.
+
+Verify with `npm run verify:plays -- <season> <week> --user <name> [--players <gitRef>]`, which
+fetches plays once and re-scores every league that user is in. Test more than one league: a
+single-league check reported 100% while five real bugs were hiding in the other seventeen.
 
 ## Verification
 
