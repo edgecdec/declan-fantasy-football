@@ -228,6 +228,20 @@ export default function ZonePage() {
         {entries.map(entry => <PlayCard key={entry.playId} entry={entry} />)}
       </Box>
 
+      {/*
+        * Said plainly rather than left to be discovered. Sleeper's play feed is offence-only
+        * — one full week carried a single sack and no interceptions league-wide — so team
+        * defences genuinely cannot appear here, and a reader who does not know that would
+        * reasonably conclude the feed is broken.
+        */}
+      {(data?.entries?.length ?? 0) > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+          Team defences do not appear: Sleeper&apos;s play feed carries offence only, so DEF
+          points come from the periodic stats feed instead. Everything else — QB, RB, WR, TE,
+          K — reconciles to the cent against Sleeper&apos;s official totals.
+        </Typography>
+      )}
+
       {data?.fetchedAt && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
           Updated {new Date(data.fetchedAt).toLocaleTimeString()} · refreshes every {REFRESH_MS / 1000}s
