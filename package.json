@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production node server.js",
     "lint": "eslint",
     "test": "node scripts/run-tests.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:plays": "node scripts/verify_play_scoring.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

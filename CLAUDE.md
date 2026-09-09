@@ -64,6 +64,42 @@ Anything defined only against an opponent — win probability, and the weighted
 as unavailable rather than as zero. Zero claims the player does not matter; a dash says the
 number is not defined.
 
+## Sleeper's undocumented GraphQL API
+
+`api.sleeper.app/graphql` is what Sleeper's own app uses. Introspection is open (snake_case —
+`query_type`, not `queryType`). It is **undocumented**, so anything built on it needs a fallback
+to the public REST endpoints; treat a schema change as a matter of when, not if.
+
+The useful field is `plays(sport, season, season_type, week | game_id | date)`:
+
+| Query shape | Returns | Size |
+|---|---|---|
+| `week:` | ALL plays for the week, uncapped | ~3 MB, 2.8s |
+| `game_id:` / `date:` | the **20 most recent** plays only | 0.02 MB, 0.2s |
+
+`cache-control: max-age=0, private, must-revalidate` — no CDN cache, unlike the REST endpoints
+which sit behind 30–60s. This is the live path.
+
+**Poll per-game, never per-league.** Plays are global NFL events with no league context, so one
+fetch serves every league and every user. Per-game is 13 calls/min against a documented 1000/min
+limit (1.3%); per-league-per-game would be 234/min for a single user and gets us IP-blocked at
+three. For the same reason the poller must be **server-side** — browser polling multiplies by
+every open tab. Dedupe by `play_id`: at 60s polling, ~19 of the 20 returned plays are repeats.
+
+### What the play feed does and does not contain
+Measured by replaying complete weeks against Sleeper's official stats (`npm run verify:plays`):
+
+- **QB/RB/WR/TE/K: exact to the cent**, 100% of players, verified across 3 week/league combinations
+- **Team DEF: not derivable from plays at all.** The feed is offence-only — one week carried 1
+  sack and 0 interceptions league-wide while a single defence officially had 4 and 2. Defensive
+  points must come from the stats feed, which they would anyway since `pts_allow_*` and
+  `yds_allow_*` are game-level brackets.
+
+Two things the feed leaves to us, both handled in `playScoring.ts`: league **bonuses** (only
+reported as game-level aggregates, so derived from primitives — and milestones must fire on the
+crossing play, not every play thereafter), and **two-point conversions** (the feed says
+`conv_cmp`/`conv_pass_att`, the settings price `pass_2pt`).
+
 ## Verification
 
 `npm run typecheck` is **mandatory** and is not covered by the build. `next.config.ts` sets
