@@ -652,7 +652,10 @@ export default function WeekPage() {
             <PlayFeed username={username} season={season} week={week} />
           )}
 
-          {data.skipped.length > 0 && (
+          {/* Not on the Zone tab: those leagues are skipped for MATCHUP pricing, but the play
+              feed covers every league, so listing them there would claim something is missing
+              that is not. */}
+          {tab !== 2 && data.skipped.length > 0 && (
             <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
               <Typography variant="caption" color="text.secondary" component="div">
                 Not shown ({data.skipped.length}) — listed rather than hidden, so a league missing

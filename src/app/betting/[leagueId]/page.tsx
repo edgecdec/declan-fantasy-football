@@ -393,7 +393,9 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
 
       {/* Single headline numbers, so stat tiles rather than a chart. */}
       <Paper variant="outlined" sx={{ px: 1.5, py: 1, mb: 1.5 }}>
-        <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap" useFlexGap>
+        {/* Top-aligned: the Live worth tile carries a caption underneath, and centring the row
+            would then lift its label out of line with the others. */}
+        <Stack direction="row" spacing={3} alignItems="flex-start" flexWrap="wrap" useFlexGap>
           <Box>
             <Typography variant="caption" color="text.secondary" component="div">Balance</Typography>
             <Typography variant="h6" color={negative ? 'error.main' : 'success.main'} sx={{ lineHeight: 1.2 }}>
@@ -408,18 +410,26 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
             <Tooltip title={LIVE_VALUE_HINT} arrow>
               <Stack direction="row" spacing={3}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" component="div">Worth now</Typography>
+                  <Typography variant="caption" color="text.secondary" component="div">Open value</Typography>
                   <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
                     {formatCents(data.liveValueCents)}
                   </Typography>
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" component="div">Live worth</Typography>
+                  {/* Coloured by its OWN sign, not by the unrealised delta: a $1,440 total shown
+                      in red because the open book is down $22 reads as a loss. */}
                   <Typography
                     variant="h6"
-                    sx={{ lineHeight: 1.2, color: data.unrealisedPnlCents >= 0 ? 'success.main' : 'error.main' }}
+                    sx={{ lineHeight: 1.2, color: data.equityCents < 0 ? 'error.main' : 'success.main' }}
                   >
                     {formatCents(data.equityCents)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: data.unrealisedPnlCents >= 0 ? 'success.main' : 'error.main' }}
+                  >
+                    {data.unrealisedPnlCents > 0 ? '+' : ''}{formatCents(data.unrealisedPnlCents)} live
                   </Typography>
                 </Box>
               </Stack>
@@ -432,7 +442,7 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
             </Tooltip>
           )}
           <Box sx={{ flexGrow: 1 }} />
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ alignSelf: 'center' }}>
             <Typography variant="caption" color="text.secondary">
               {updatedAt && `${updatedAt.toLocaleTimeString()} · ${POLL_INTERVAL_MS / 1000}s`}
             </Typography>

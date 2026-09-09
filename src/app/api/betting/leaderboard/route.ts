@@ -5,8 +5,19 @@ import { accountCanBetInLeague, findBettingLeague } from '@/lib/betting/leagues'
 import { START_BALANCE_CENTS } from '@/lib/betting/constants';
 import { getDb } from '@/lib/db';
 import { settleQuietly } from '@/lib/betting/settlement';
+import { priceLeagueWeek } from '@/lib/betting/pricing';
+import {
+  lineIsStale,
+  valueOpenPositionsForAccounts,
+  weeksWithOpenPositionsInLeague,
+} from '@/lib/betting/valuation';
 
 export const dynamic = 'force-dynamic';
+
+/** Matches the dashboard, so the two surfaces never disagree about what "live" means. */
+const REPRICE_AFTER_SECONDS = 45;
+/** Bounds the work if a league somehow has open bets across many weeks. */
+const MAX_WEEKS_TO_REPRICE = 4;
 
 /**
  * Standings across the league: who is up, who is down, and what is still live.
@@ -82,18 +93,41 @@ export async function GET(request: Request) {
        FROM accounts a
        JOIN account_leagues al ON al.account_id = a.id
        WHERE al.league_id = ?
-       ORDER BY a.balance_cents DESC, a.display_name ASC`,
+       ORDER BY a.display_name ASC`,
     )
     .all(leagueId) as Row[];
 
+  /*
+   * Refresh the lines behind everyone's open bets, then value them.
+   *
+   * A standings table values every member's positions, not just the viewer's, so it has to
+   * refresh every line behind them. Stale-only, capped, and each failure swallowed: a pricing
+   * hiccup should cost freshness, not the standings.
+   */
+  const stale = weeksWithOpenPositionsInLeague(leagueId)
+    .filter(w => lineIsStale(w.pricedAt, REPRICE_AFTER_SECONDS))
+    .slice(0, MAX_WEEKS_TO_REPRICE);
+  await Promise.all(stale.map(w => priceLeagueWeek(w.leagueId, w.week).catch(() => undefined)));
+
+  const valuations = valueOpenPositionsForAccounts(
+    rows.map(r => ({ id: r.account_id, balanceCents: r.balance_cents })),
+  );
+
   const standings = rows.map(r => {
     const net = r.returns - r.settled_staked;
+    const v = valuations.get(r.account_id);
     return {
     accountId: r.account_id,
     displayName: r.display_name,
     isMe: r.account_id === account.id,
     claimed: r.claimed === 1,
     balanceCents: r.balance_cents,
+    // What the account is worth right now: settled balance plus the expected return of every
+    // open bet at the current line. This is what the table ranks on — a balance alone ranks
+    // whoever has bet least highest mid-slate, since a stake leaves the balance at placement.
+    liveValueCents: v?.liveValueCents ?? 0,
+    equityCents: v?.equityCents ?? r.balance_cents,
+    unrealisedPnlCents: v?.unrealisedPnlCents ?? 0,
     openStakeCents: r.open_stake,
     openCount: r.open_count,
     settledCount: r.settled_count,
@@ -109,24 +143,55 @@ export async function GET(request: Request) {
     };
   });
 
-  // Every open position in the league, so people can see who backed whom.
-  const openPositions = db
+  // Every open position in the league, so people can see who backed whom — and how it is going.
+  const openRows = db
     .prepare(
-      `SELECT a.display_name AS bettor, w.side, w.stake_cents, w.price, w.to_win_cents,
-              m.matchup_id, m.week
+      `SELECT w.id AS wager_id, a.display_name AS bettor, w.side, w.stake_cents, w.price,
+              w.to_win_cents, m.matchup_id, m.week, m.name_a, m.name_b
        FROM wagers w
        JOIN accounts a ON a.id = w.account_id
        JOIN markets m ON m.id = w.market_id
        WHERE m.league_id = ? AND w.status = 'open'
        ORDER BY w.stake_cents DESC`,
     )
-    .all(leagueId) as unknown[];
+    .all(leagueId) as {
+      wager_id: string; bettor: string; side: string; stake_cents: number; price: number;
+      to_win_cents: number; matchup_id: number; week: number;
+      name_a: string | null; name_b: string | null;
+    }[];
+
+  // Reuse the per-account valuations rather than recomputing: same numbers by construction, so
+  // a position can never be worth one thing in the standings row and another in this list.
+  const positionByWager = new Map(
+    [...valuations.values()].flatMap(v => v.positions.map(p => [p.wagerId, p] as const)),
+  );
+
+  const openPositions = openRows.map(r => {
+    const p = positionByWager.get(r.wager_id);
+    return {
+      bettor: r.bettor,
+      side: r.side,
+      pick: (r.side === 'a' ? r.name_a : r.name_b) ?? r.side.toUpperCase(),
+      stakeCents: r.stake_cents,
+      price: r.price,
+      toWinCents: r.to_win_cents,
+      matchupId: r.matchup_id,
+      week: r.week,
+      winProbability: p?.winProbability ?? null,
+      valueCents: p?.valueCents ?? null,
+      unrealisedCents: p?.unrealisedCents ?? null,
+    };
+  });
 
   return NextResponse.json({
     ok: true,
     league: { leagueId, season: cfg.season, label: cfg.label },
     startBalanceCents: START_BALANCE_CENTS,
-    standings,
+    // Ranked on live worth rather than balance. Ties broken by name so the order is stable
+    // between refreshes instead of shuffling.
+    standings: standings.sort(
+      (x, y) => y.equityCents - x.equityCents || x.displayName.localeCompare(y.displayName),
+    ),
     openPositions,
   });
 }

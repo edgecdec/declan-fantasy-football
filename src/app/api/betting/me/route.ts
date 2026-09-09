@@ -9,7 +9,7 @@ import { BETTING_LEAGUES } from '@/lib/betting/leagues';
 import { getDb } from '@/lib/db';
 import { settleQuietly } from '@/lib/betting/settlement';
 import { priceLeagueWeek } from '@/lib/betting/pricing';
-import { valueOpenPositions, weeksWithOpenPositions } from '@/lib/betting/valuation';
+import { lineIsStale, valueOpenPositions, weeksWithOpenPositions } from '@/lib/betting/valuation';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,10 +50,7 @@ export async function GET(request: Request) {
    * dashboard down, so each one is swallowed and the previous line is used instead.
    */
   const stale = weeksWithOpenPositions(account.id)
-    .filter(w => {
-      const age = (Date.now() - Date.parse(`${w.pricedAt.replace(' ', 'T')}Z`)) / 1000;
-      return !Number.isFinite(age) || age >= REPRICE_AFTER_SECONDS;
-    })
+    .filter(w => lineIsStale(w.pricedAt, REPRICE_AFTER_SECONDS))
     .slice(0, MAX_WEEKS_TO_REPRICE);
   await Promise.all(
     stale.map(w => priceLeagueWeek(w.leagueId, w.week).catch(() => undefined)),

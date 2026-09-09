@@ -308,10 +308,12 @@ function Dashboard() {
           <Tooltip title={LIVE_VALUE_HINT} arrow>
             <Box sx={{ display: 'flex', gap: 4 }}>
               <Stat label="At risk now" value={formatCents(summary.openStakeCents)} />
+              {/* Plain ink: this is an amount, not a change. Colouring a $377 asset red
+                  because the position is down $22 says the wrong thing — the sign lives on
+                  the unrealised figure beside it. */}
               <Stat
-                label="Worth now"
+                label="Open value"
                 value={hasOpen ? formatCents(summary.liveValueCents) : '—'}
-                color={hasOpen ? pnlColor(unrealised) : undefined}
               />
               <Stat
                 label="Unrealised"

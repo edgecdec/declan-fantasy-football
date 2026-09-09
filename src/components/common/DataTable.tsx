@@ -77,7 +77,15 @@ function Row<T>({
       <TableRow
         hover
         onClick={() => renderDetailPanel && setOpen(!open)}
-        sx={{ cursor: renderDetailPanel ? 'pointer' : 'default', '& > *': { borderBottom: 'unset' } }}
+        sx={{
+          cursor: renderDetailPanel ? 'pointer' : 'default',
+          // Only strip the separator when a detail panel follows, so the row and its panel read
+          // as one block. Applied unconditionally it removed the separator from every table on
+          // the site -- and INCONSISTENTLY: `unset` on the border-bottom shorthand has the same
+          // specificity as MuiTableCell's own rule, so which one won depended on Emotion's
+          // style-injection order, leaving a stray rule under one or two columns per row.
+          ...(renderDetailPanel ? { '& > *': { borderBottom: 'none' } } : {}),
+        }}
       >
         {renderDetailPanel && (
           <TableCell width={50}>

@@ -100,6 +100,7 @@ export function breakEvenProbability(stakeCents: number, toWinCents: number): nu
 
 type Row = {
   wager_id: string;
+  account_id: string;
   market_id: string;
   league_id: string;
   season: string;
@@ -133,53 +134,48 @@ function probabilityFor(row: Row): number {
   return side === 'a' ? row.prob_a : 1 - row.prob_a;
 }
 
-/** Marks every unsettled bet on an account to the latest priced line. */
-export function valueOpenPositions(accountId: string, balanceCents: number): AccountValuation {
-  const rows = getDb()
-    .prepare(
-      `SELECT w.id AS wager_id, w.market_id, w.side, w.stake_cents, w.to_win_cents, w.price,
-              w.placed_at,
-              m.league_id, m.season, m.week, m.matchup_id, m.prob_a, m.winner,
-              m.name_a, m.name_b, m.roster_a, m.roster_b, m.priced_at
-       FROM wagers w JOIN markets m ON m.id = w.market_id
-       WHERE w.account_id = ? AND w.status = 'open'
-       ORDER BY w.placed_at DESC`,
-    )
-    .all(accountId) as Row[];
+/** The columns every valuation needs, so the two entry points cannot drift apart. */
+const OPEN_POSITION_SELECT = `
+  SELECT w.id AS wager_id, w.account_id, w.market_id, w.side, w.stake_cents, w.to_win_cents,
+         w.price, w.placed_at,
+         m.league_id, m.season, m.week, m.matchup_id, m.prob_a, m.winner,
+         m.name_a, m.name_b, m.roster_a, m.roster_b, m.priced_at
+  FROM wagers w JOIN markets m ON m.id = w.market_id
+  WHERE w.status = 'open'`;
 
-  const positions: OpenPosition[] = rows.map(row => {
-    const side = row.side === 'a' ? 'a' : 'b';
-    // A push refunds the stake, so the position is worth exactly what was staked.
-    const isPush = row.winner === 'push';
-    const winProbability = probabilityFor(row);
-    const valueCents = isPush
-      ? row.stake_cents
-      : positionValueCents(row.stake_cents, row.to_win_cents, winProbability);
-    return {
-      wagerId: row.wager_id,
-      marketId: row.market_id,
-      leagueId: row.league_id,
-      season: row.season,
-      week: row.week,
-      matchupId: row.matchup_id,
-      side,
-      pick: (side === 'a' ? row.name_a : row.name_b) ?? `Roster ${side === 'a' ? row.roster_a : row.roster_b}`,
-      against: (side === 'a' ? row.name_b : row.name_a) ?? `Roster ${side === 'a' ? row.roster_b : row.roster_a}`,
-      stakeCents: row.stake_cents,
-      toWinCents: row.to_win_cents,
-      price: row.price,
-      winProbability,
-      breakEvenProbability: breakEvenProbability(row.stake_cents, row.to_win_cents),
-      valueCents,
-      unrealisedCents: valueCents - row.stake_cents,
-      pricedAt: row.priced_at,
-      placedAt: row.placed_at,
-    };
-  });
+function toPosition(row: Row): OpenPosition {
+  const side = row.side === 'a' ? 'a' : 'b';
+  // A push refunds the stake, so the position is worth exactly what was staked.
+  const isPush = row.winner === 'push';
+  const winProbability = probabilityFor(row);
+  const valueCents = isPush
+    ? row.stake_cents
+    : positionValueCents(row.stake_cents, row.to_win_cents, winProbability);
+  return {
+    wagerId: row.wager_id,
+    marketId: row.market_id,
+    leagueId: row.league_id,
+    season: row.season,
+    week: row.week,
+    matchupId: row.matchup_id,
+    side,
+    pick: (side === 'a' ? row.name_a : row.name_b) ?? `Roster ${side === 'a' ? row.roster_a : row.roster_b}`,
+    against: (side === 'a' ? row.name_b : row.name_a) ?? `Roster ${side === 'a' ? row.roster_b : row.roster_a}`,
+    stakeCents: row.stake_cents,
+    toWinCents: row.to_win_cents,
+    price: row.price,
+    winProbability,
+    breakEvenProbability: breakEvenProbability(row.stake_cents, row.to_win_cents),
+    valueCents,
+    unrealisedCents: valueCents - row.stake_cents,
+    pricedAt: row.priced_at,
+    placedAt: row.placed_at,
+  };
+}
 
+function summarise(balanceCents: number, positions: OpenPosition[]): AccountValuation {
   const openStakeCents = positions.reduce((s, p) => s + p.stakeCents, 0);
   const liveValueCents = positions.reduce((s, p) => s + p.valueCents, 0);
-
   return {
     balanceCents,
     openStakeCents,
@@ -195,6 +191,44 @@ export function valueOpenPositions(accountId: string, balanceCents: number): Acc
   };
 }
 
+/** Marks every unsettled bet on an account to the latest priced line. */
+export function valueOpenPositions(accountId: string, balanceCents: number): AccountValuation {
+  const rows = getDb()
+    .prepare(`${OPEN_POSITION_SELECT} AND w.account_id = ? ORDER BY w.placed_at DESC`)
+    .all(accountId) as Row[];
+  return summarise(balanceCents, rows.map(toPosition));
+}
+
+/**
+ * The same valuation for many accounts at once, for a standings table.
+ *
+ * One query rather than one per account, and deliberately NOT scoped to a league: the balance a
+ * standings table shows is the account's whole balance, so netting it against only one league's
+ * open bets would produce a "worth" that reconciles with nothing.
+ */
+export function valueOpenPositionsForAccounts(
+  accounts: { id: string; balanceCents: number }[],
+): Map<string, AccountValuation> {
+  const out = new Map<string, AccountValuation>();
+  if (accounts.length === 0) return out;
+
+  const placeholders = accounts.map(() => '?').join(',');
+  const rows = getDb()
+    .prepare(`${OPEN_POSITION_SELECT} AND w.account_id IN (${placeholders}) ORDER BY w.placed_at DESC`)
+    .all(...accounts.map(a => a.id)) as Row[];
+
+  const byAccount = new Map<string, OpenPosition[]>();
+  for (const row of rows) {
+    const list = byAccount.get(row.account_id);
+    if (list) list.push(toPosition(row));
+    else byAccount.set(row.account_id, [toPosition(row)]);
+  }
+  for (const a of accounts) {
+    out.set(a.id, summarise(a.balanceCents, byAccount.get(a.id) ?? []));
+  }
+  return out;
+}
+
 /** The distinct league weeks an account has money riding on, for a targeted re-price. */
 export function weeksWithOpenPositions(
   accountId: string,
@@ -208,4 +242,36 @@ export function weeksWithOpenPositions(
        GROUP BY m.league_id, m.season, m.week`,
     )
     .all(accountId) as { leagueId: string; season: string; week: number; pricedAt: string }[];
+}
+
+/**
+ * The distinct league weeks ANY member of a league has money riding on.
+ *
+ * The standings equivalent of weeksWithOpenPositions: a standings table values everybody's
+ * positions, so it has to refresh every line behind them, not just the viewer's.
+ */
+export function weeksWithOpenPositionsInLeague(
+  leagueId: string,
+): { leagueId: string; season: string; week: number; pricedAt: string }[] {
+  return getDb()
+    .prepare(
+      `SELECT m.league_id AS leagueId, m.season AS season, m.week AS week,
+              MIN(m.priced_at) AS pricedAt
+       FROM wagers w JOIN markets m ON m.id = w.market_id
+       WHERE w.status = 'open' AND m.league_id = ?
+       GROUP BY m.league_id, m.season, m.week`,
+    )
+    .all(leagueId) as { leagueId: string; season: string; week: number; pricedAt: string }[];
+}
+
+/**
+ * Whether a line is stale enough to be worth re-pricing.
+ *
+ * Shared so the dashboard and the standings cannot disagree about what "live" means, and so the
+ * unparseable case is handled once — an unreadable timestamp counts as stale, which costs a call
+ * rather than silently serving an unknown-age number as current.
+ */
+export function lineIsStale(pricedAt: string, maxAgeSeconds: number): boolean {
+  const age = (Date.now() - Date.parse(`${pricedAt.replace(' ', 'T')}Z`)) / 1000;
+  return !Number.isFinite(age) || age >= maxAgeSeconds;
 }

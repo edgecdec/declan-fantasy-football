@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { getDb } from '@/lib/db';
 import {
   breakEvenProbability,
+  lineIsStale,
   positionValueCents,
   valueOpenPositions,
+  valueOpenPositionsForAccounts,
   weeksWithOpenPositions,
 } from '@/lib/betting/valuation';
 import { priceSides } from '@/services/betting/liveOdds';
@@ -23,13 +25,13 @@ import { profitForStake } from '@/services/betting/liveOdds';
 const ACCOUNT = 'acct-valuation-test';
 let seq = 0;
 
-function seedAccount() {
+function seedAccount(id = ACCOUNT, balance = 100_000) {
   getDb()
     .prepare(
       `INSERT OR REPLACE INTO accounts (id, sleeper_user_id, username, display_name, balance_cents)
        VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(ACCOUNT, 'sleeper-val', 'valuation-test', 'Valuation Test', 100_000);
+    .run(id, `sleeper-${id}`, `user-${id}`, `User ${id}`, balance);
 }
 
 /** One market plus one open wager on it, returning the ids. */
@@ -41,6 +43,7 @@ function seedBet(opts: {
   winner?: string | null;
   pricedAt?: string;
   week?: number;
+  accountId?: string;
 }) {
   const db = getDb();
   seq += 1;
@@ -59,14 +62,14 @@ function seedBet(opts: {
   db.prepare(
     `INSERT INTO wagers (id, account_id, market_id, side, stake_cents, price, to_win_cents, status, placed_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'open', datetime('now'))`,
-  ).run(wagerId, ACCOUNT, marketId, opts.side, opts.stakeCents, opts.price,
+  ).run(wagerId, opts.accountId ?? ACCOUNT, marketId, opts.side, opts.stakeCents, opts.price,
         profitForStake(opts.stakeCents, opts.price));
   return { marketId, wagerId };
 }
 
 function clearBets() {
   const db = getDb();
-  db.prepare('DELETE FROM wagers WHERE account_id = ?').run(ACCOUNT);
+  db.prepare("DELETE FROM wagers WHERE account_id LIKE 'acct-valuation%'").run();
   db.prepare("DELETE FROM markets WHERE league_id = 'L1'").run();
 }
 
@@ -196,6 +199,54 @@ test('the weeks needing a re-price are the distinct league weeks with money on t
   assert.deepEqual(weeks.map(w => w.week), [3, 4]);
   // The oldest price in the week, so a week is re-priced if ANY of its lines is stale.
   assert.equal(weeks[0].pricedAt, '2026-09-09 09:00:00');
+});
+
+test('many accounts are valued in one pass, and identically to one at a time', () => {
+  const other = 'acct-valuation-other';
+  seedAccount();
+  seedAccount(other, 50_000);
+  clearBets();
+  seedBet({ probA: 0.8, side: 'a', stakeCents: 10_000, price: -110 });
+  seedBet({ probA: 0.2, side: 'a', stakeCents: 30_000, price: 300, accountId: other });
+
+  const batch = valueOpenPositionsForAccounts([
+    { id: ACCOUNT, balanceCents: 100_000 },
+    { id: other, balanceCents: 50_000 },
+  ]);
+
+  // The batch path exists for the standings table; it must not be a second, subtly different
+  // valuation. Compare it against the single-account path rather than against hand-computed
+  // figures, so the two can never drift.
+  for (const [id, balance] of [[ACCOUNT, 100_000], [other, 50_000]] as const) {
+    assert.deepEqual(batch.get(id), valueOpenPositions(id, balance));
+  }
+  assert.equal(batch.get(other)!.openStakeCents, 30_000);
+});
+
+test('an account with nothing open is still present, worth exactly its balance', () => {
+  const idle = 'acct-valuation-idle';
+  seedAccount(idle, 77_000);
+  clearBets();
+
+  const batch = valueOpenPositionsForAccounts([{ id: idle, balanceCents: 77_000 }]);
+  const v = batch.get(idle);
+  // Omitting a bet-less account would drop them off the standings entirely rather than ranking
+  // them on their balance.
+  assert.ok(v);
+  assert.equal(v.equityCents, 77_000);
+  assert.equal(v.positions.length, 0);
+});
+
+test('valuing no accounts is empty, not a malformed IN () query', () => {
+  assert.equal(valueOpenPositionsForAccounts([]).size, 0);
+});
+
+test('an unreadable price timestamp counts as stale', () => {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  assert.equal(lineIsStale(now, 45), false);
+  assert.equal(lineIsStale('2020-01-01 00:00:00', 45), true);
+  // Costs one pricing call rather than silently serving an unknown-age number as current.
+  assert.equal(lineIsStale('not a date', 45), true);
 });
 
 test.after(() => clearBets());
