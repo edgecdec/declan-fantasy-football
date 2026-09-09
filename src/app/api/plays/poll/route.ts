@@ -43,7 +43,13 @@ export async function POST(request: Request) {
 
   // `force` is honoured for the debounce but never for the rate-limit cooldown.
   const result = await pollLivePlays(params.get('force') === '1');
-  return NextResponse.json({ ok: true, ...result });
+  // Latency comes back on the POST too, so the cron's log line says whether capture is
+  // keeping up rather than only that it ran. Without it the log shows a healthy-looking
+  // play count whether the plays arrived seconds or an hour after the snap.
+  const latencySeconds = result.season && result.week
+    ? observedLatencySeconds(result.season, result.week)
+    : null;
+  return NextResponse.json({ ok: true, latencySeconds, ...result });
 }
 
 /**
