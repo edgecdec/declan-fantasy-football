@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Pages that were folded into a tab on another page. Kept as redirects rather than deleted so
+ * a link someone already has does not 404.
+ */
 const POSITIONAL_REDIRECTS: Record<string, string> = {
   '/performance/positional': '/skill?tab=efficiency',
   '/performance/positional/history': '/skill?tab=historical',
+  '/zone': '/week',
 };
 
 export function middleware(request: NextRequest) {

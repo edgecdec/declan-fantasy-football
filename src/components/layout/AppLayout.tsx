@@ -39,7 +39,6 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball'; // Brand icon
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import StadiumIcon from '@mui/icons-material/Stadium'; // This Week
-import BoltIcon from '@mui/icons-material/Bolt'; // The Zone
 import PaidIcon from '@mui/icons-material/Paid'; // Declan Dollars
 import { useUser } from '@/context/UserContext';
 import { useBettingAuth } from '@/context/BettingAuthContext';
@@ -49,7 +48,6 @@ const drawerWidth = 240;
 const MENU_ITEMS = [
   { text: 'Home', href: '/', icon: <HomeIcon /> },
   { text: 'This Week', href: '/week', icon: <StadiumIcon /> },
-  { text: 'The Zone', href: '/zone', icon: <BoltIcon /> },
   { text: 'Draft Assistant', href: '/draft-assistant', icon: <ListAltIcon /> },
   { text: 'Luck Analyzer', href: '/expected-wins', icon: <TrendingUpIcon /> },
   { text: 'Manager Skill', href: '/skill', icon: <BarChartIcon /> },

@@ -113,6 +113,11 @@ single-league check reported 100% while five real bugs were hiding in the other 
 
 ## Live play capture (The Zone) — operational
 
+The Zone is a **tab on `/week`**, not a page of its own — `/zone` is a middleware redirect kept
+only so existing links do not 404. The feed component (`src/components/plays/PlayFeed.tsx`) takes
+its season and week from the page rather than owning pickers, so the tab cannot disagree with the
+header about which week it is showing.
+
 Capture is a **VPS cron**, not part of the app's request path, because a play not stored while
 the game is on cannot be fetched back afterwards. Nothing about it lives in this repo, so it is
 recorded here:

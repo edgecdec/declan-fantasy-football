@@ -14,6 +14,7 @@ import NetLeaguesBar from '@/components/week/NetLeaguesBar';
 import MatchupScoreboard from '@/components/week/MatchupScoreboard';
 import WinRatingScale from '@/components/week/WinRatingScale';
 import RatingBreakdown from '@/components/week/RatingBreakdown';
+import PlayFeed from '@/components/plays/PlayFeed';
 import { rateWinProbability } from '@/services/week/winRating';
 import useRememberedUsername from '@/hooks/useRememberedUsername';
 import { useUser } from '@/context/UserContext';
@@ -640,9 +641,16 @@ export default function WeekPage() {
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
             <Tab label={`Matchups (${data.matchups.length})`} />
             <Tab label={`Rooting interest (${data.rooting.length})`} />
+            <Tab label="The Zone" />
           </Tabs>
 
-          {tab === 0 ? <MatchupsView data={data} /> : <RootingView rows={data.rooting} />}
+          {tab === 0 && <MatchupsView data={data} />}
+          {tab === 1 && <RootingView rows={data.rooting} />}
+          {/* Takes the week from this page rather than owning a picker, so the tab can never
+              disagree with the header about which week it is showing. */}
+          {tab === 2 && week != null && (
+            <PlayFeed username={username} season={season} week={week} />
+          )}
 
           {data.skipped.length > 0 && (
             <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
