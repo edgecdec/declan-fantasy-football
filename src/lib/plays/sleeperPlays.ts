@@ -104,9 +104,9 @@ export async function fetchWeekPlays(
  * Statuses that mean a game is under way.
  *
  * Matched loosely on purpose: the exact vocabulary is undocumented (`pre_game` and `complete` are
- * confirmed, `in_game` is inferred), so anything that is clearly neither pending nor finished is
- * treated as live. Polling a game that turns out to be over costs one cheap call; missing one that
- * is actually live loses plays we cannot get back.
+ * confirmed by observation, `in_game` is inferred), so anything that is clearly neither pending
+ * nor finished is treated as live. Polling a game that turns out to be over costs one cheap call;
+ * missing one that is actually live loses plays we cannot get back.
  */
 export function isGameLive(status: string): boolean {
   const s = (status ?? '').toLowerCase();
@@ -115,4 +115,29 @@ export function isGameLive(status: string): boolean {
   if (s.includes('complete') || s.includes('final') || s.includes('post')) return false;
   if (s.includes('cancel') || s.includes('postpone')) return false;
   return true;
+}
+
+/** Games run long. Past this much after kickoff, treat a game as over whatever the clock says. */
+const MAX_GAME_MINUTES = 260;
+
+/**
+ * A second, independent reason to believe a game is on: the clock, not the label.
+ *
+ * `isGameLive` reads Sleeper's status string, and that string is undocumented — only `pre_game`
+ * and `complete` have actually been observed. If a live game reported something this classifier
+ * happened to read as pending, capture would report "no live games" and quietly bank nothing for
+ * the whole slate, which is the one failure that cannot be repaired afterwards.
+ *
+ * So kickoff time is a fallback: past kickoff, not yet flagged complete, and inside a plausible
+ * game length. Deliberately redundant with the status check rather than a replacement for it —
+ * either one being right is enough.
+ */
+export function looksUnderway(game: SleeperScore, now = Date.now()): boolean {
+  const status = (game.status ?? '').toLowerCase();
+  if (status.includes('complete') || status.includes('final')) return false;
+  if (status.includes('cancel') || status.includes('postpone')) return false;
+  const start = game.start_time;
+  if (typeof start !== 'number' || !Number.isFinite(start)) return false;
+  const minutesSinceKickoff = (now - start) / 60_000;
+  return minutesSinceKickoff >= 0 && minutesSinceKickoff <= MAX_GAME_MINUTES;
 }

@@ -4,6 +4,7 @@ import {
   fetchScores,
   fetchWeekPlays,
   isGameLive,
+  looksUnderway,
 } from '@/lib/plays/sleeperPlays';
 import { insertNewPlays, playCount } from '@/lib/plays/playStore';
 import { metaAgeSeconds, readMeta, writeMeta } from '@/lib/meta';
@@ -168,7 +169,9 @@ export async function pollLivePlays(force = false): Promise<PollResult> {
     return { ...EMPTY, season, week, errors: [String(e)] };
   }
 
-  const live = scores.filter(g => isGameLive(g.status));
+  // Either signal is enough. The status string is undocumented, so relying on it alone risks a
+  // whole slate captured as nothing; kickoff time is the independent check.
+  const live = scores.filter(g => isGameLive(g.status) || looksUnderway(g));
   if (live.length === 0) {
     return { ...EMPTY, reason: 'no_live_games', season, week };
   }
