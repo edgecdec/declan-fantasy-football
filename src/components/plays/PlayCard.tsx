@@ -45,6 +45,17 @@ function signedPoints(points: number): string {
   return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}`;
 }
 
+/**
+ * The period, as a reader says it: "Q3", but "OT" rather than "QOT".
+ *
+ * Sleeper's `quarter_name` is not always a number — overtime comes through as "OT", which a
+ * blind `Q${...}` renders as "QOT". Anything non-numeric is used verbatim.
+ */
+function periodLabel(quarter: string, clock: string | null): string {
+  const period = /^\d+$/.test(quarter) ? `Q${quarter}` : quarter;
+  return clock ? `${period} ${clock}` : period;
+}
+
 function ImpactChip({ impact }: { impact: LeagueImpact }) {
   const color = pointsColor(impact);
   return (
@@ -138,7 +149,7 @@ export default function PlayCard({ entry }: { entry: FeedEntry }) {
         {entry.quarter && (
           <Chip
             size="small"
-            label={`Q${entry.quarter}${entry.clock ? ` ${entry.clock}` : ''}`}
+            label={periodLabel(entry.quarter, entry.clock)}
             sx={{ height: 18, fontSize: '0.68rem' }}
           />
         )}
