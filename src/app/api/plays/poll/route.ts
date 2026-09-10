@@ -8,9 +8,11 @@ export const dynamic = 'force-dynamic';
 /**
  * The capture endpoint, driven by cron on the VPS.
  *
- * Separate from the feed on purpose: capture must keep running whether or not anyone is
- * looking, because a play not stored while the game is on cannot be recovered afterwards.
- * The feed is a read over what capture already banked.
+ * Separate from the feed on purpose: capture must keep running whether or not anyone is looking.
+ * Not because plays are irreplaceable — the `week:` query returns a finished week in full, which
+ * is what the season/week backfill below uses — but because serving the feed straight from Sleeper
+ * would be a 3 MB fetch per pageview against a page that refreshes every 30s. Capture is the cache
+ * that makes the read cheap; the feed is a read over what it already banked.
  *
  * Shared-secret auth rather than a session. The caller is a cron job with no cookie jar,
  * and the action is idempotent — the worst a valid call can do is bank plays we already

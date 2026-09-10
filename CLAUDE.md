@@ -118,9 +118,8 @@ only so existing links do not 404. The feed component (`src/components/plays/Pla
 its season and week from the page rather than owning pickers, so the tab cannot disagree with the
 header about which week it is showing.
 
-Capture is a **VPS cron**, not part of the app's request path, because a play not stored while
-the game is on cannot be fetched back afterwards. Nothing about it lives in this repo, so it is
-recorded here:
+Capture is a **VPS cron**, not part of the app's request path. Nothing about it lives in this repo,
+so it is recorded here:
 
 | Piece | Where |
 |---|---|
@@ -130,6 +129,34 @@ recorded here:
 | Secret | `POLL_SECRET` if set, else the existing `WEBHOOK_SECRET` — so no new env var was needed |
 | Health | `GET /api/plays/poll?season=&week=` (same secret) → play count, **observed latency**, last poll, cooldown |
 | Backfill a week | `POST /api/plays/poll?season=2025&week=14` — reconcile-only, idempotent |
+
+### The stored plays are a CACHE, not an archive
+
+An earlier version of this file said a play not stored while the game is on cannot be fetched back.
+**That is false**, and it was steering design decisions. The `week:` query returns every play of a
+week, uncapped, for a finished game as readily as a live one — that is exactly how `POST
+/api/plays/poll?season=&week=` backfills, and 2025 week 14 was reconstructed from nothing that way.
+
+Two things storage genuinely buys, and it is worth being clear which is which:
+
+1. **It decouples pageviews from Sleeper.** Without it, every feed load is a 3 MB / 2.8s fetch, and
+   the page auto-refreshes every 30s. A handful of viewers is then straight into the rate limiting
+   the whole design exists to avoid. This is the real reason.
+2. **`first_seen_at`** — the live latency of the feed. That one genuinely cannot be measured after
+   the fact, which is why an amendment rewrites `metadata`/`play_stats` but never that column.
+
+What follows from it being a cache:
+
+- **A missed poll is recoverable.** The 15-minute reconcile, or a later backfill, fills the gap.
+  Low latency during a slate is still the goal, but a gap is not fatal — earlier notes overstated
+  this.
+- **Plays are safe to prune.** Old weeks are re-fetchable on demand, which is also why the nightly
+  ledger backup drops the table. Current cost: 2,808 plays = 2.34 MB of JSON, ~40 MB for a full
+  season. Not yet worth pruning; if the disk gets tight, keeping two weeks hot is the move.
+- **Corrections matter more than immutability.** Sleeper amends plays in place, keeping the
+  `play_id` — a reception moved from G.Holani to B.Russell hours after the snap in the 2026 opener.
+  The reconcile pass rewrites amended rows for that reason; a store that only ever inserted would
+  hold the wrong attribution forever.
 
 `latencySeconds` is the number that says whether capture is working. A play count alone looks
 identical whether plays arrived seconds or an hour after the snap, so check the latency, not the
