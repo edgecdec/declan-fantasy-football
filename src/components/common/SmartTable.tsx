@@ -34,6 +34,15 @@ interface SmartTableProps<T> {
   enableGlobalSearch?: boolean;
   renderDetailPanel?: (row: T) => React.ReactNode;
   noDataMessage?: string;
+  /**
+   * Extra controls for the filter bar, placed alongside the search box and the column filters.
+   *
+   * For a filter that is not a column: "only players whose game is live" is a property of the
+   * row, not a value in a cell, so it has no column to hang a dropdown off. Putting it here
+   * rather than above the table keeps every control that narrows the list in one row, which is
+   * the whole point of the bar.
+   */
+  toolbarExtra?: React.ReactNode;
 }
 
 // --- Helper Functions ---
@@ -56,7 +65,8 @@ export default function SmartTable<T>({
   rowsPerPageOptions,
   enableGlobalSearch = true,
   renderDetailPanel,
-  noDataMessage
+  noDataMessage,
+  toolbarExtra,
 }: SmartTableProps<T>) {
   // State
   const [globalFilter, setGlobalFilter] = React.useState('');
@@ -146,6 +156,8 @@ export default function SmartTable<T>({
               sx={{ width: { xs: '100%', sm: 200 } }}
             />
           )}
+
+          {toolbarExtra}
 
           {/* Column Filters */}
           {columns.map(col => {

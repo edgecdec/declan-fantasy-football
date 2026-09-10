@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import {
-  Alert, Box, Button, Chip, Container, Divider, LinearProgress, MenuItem, Paper, Select,
-  Tab, Tabs, Tooltip, Typography,
+  Alert, Box, Button, Chip, Container, Divider, FormControlLabel, LinearProgress, MenuItem,
+  Paper, Select, Switch, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import MuiLink from '@mui/material/Link';
 import DataTable, { Column } from '@/components/common/DataTable';
@@ -395,6 +395,18 @@ function RootingDetail({ row }: { row: RootingRow }) {
 }
 
 function RootingView({ rows }: { rows: RootingRow[] }) {
+  /*
+   * Live-only is a row property, not a cell value, so it has no column to hang a dropdown off —
+   * it goes in the table's own filter bar via toolbarExtra, keeping every control that narrows
+   * the list in one place. Off by default: the full list is what the page is for.
+   */
+  const [liveOnly, setLiveOnly] = React.useState(false);
+  const liveCount = rows.filter(r => r.gameState === 'in').length;
+  const visible = React.useMemo(
+    () => (liveOnly ? rows.filter(r => r.gameState === 'in') : rows),
+    [rows, liveOnly],
+  );
+
   if (rows.length === 0) {
     return (
       <Alert severity="info">
@@ -402,6 +414,8 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
       </Alert>
     );
   }
+  // Scaled against the WHOLE list, not the filtered one, so a bar does not change length when a
+  // filter is applied and the comparison between rows stays honest.
   const maxNet = Math.max(1, ...rows.map(r => Math.abs(r.netLeagues)));
 
   const columns: SmartColumn<RootingRow>[] = [
@@ -419,6 +433,18 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
       render: r => (
         r.position
           ? <PositionTag label={r.position} size="0.75rem" />
+          : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+      ),
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      // SmartTable derives the options from the data, so the dropdown lists exactly the teams
+      // someone in your lineups actually plays for.
+      filterVariant: 'multi-select',
+      render: r => (
+        r.team
+          ? <Box component="span" sx={{ whiteSpace: 'nowrap' }}>{r.team}</Box>
           : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
       ),
     },
@@ -495,7 +521,7 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
   return (
     <>
       <SmartTable
-        data={rows}
+        data={visible}
         columns={columns}
         keyField={r => r.playerId}
         renderDetailPanel={r => <RootingDetail row={r} />}
@@ -503,7 +529,30 @@ function RootingView({ rows }: { rows: RootingRow[] }) {
         defaultSortOrder="desc"
         defaultRowsPerPage={25}
         rowsPerPageOptions={[25, 50, 100]}
-        noDataMessage="Nobody left to root for."
+        noDataMessage={
+          liveOnly ? 'Nobody you have a stake in is on the field right now.' : 'Nobody left to root for.'
+        }
+        toolbarExtra={
+          <Tooltip
+            title={
+              liveCount === 0
+                ? 'No games are in progress right now.'
+                : `${liveCount} of these players are on the field right now.`
+            }
+            arrow
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={liveOnly}
+                  onChange={e => setLiveOnly(e.target.checked)}
+                  disabled={liveCount === 0}
+                />
+              }
+              label={`Live only${liveCount > 0 ? ` (${liveCount})` : ''}`}
+            />
+          </Tooltip>
+        }
       />
       <Alert severity="info" sx={{ mt: 1 }}>
         <strong>Net +/− counts leagues; wins-at-stake weights them.</strong> They can disagree,

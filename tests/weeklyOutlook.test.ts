@@ -4,6 +4,7 @@ import {
   LeagueWeekOutlook, LineupOnlyLeague, buildRootingRows, remainingProjection, winSensitivity,
 } from '@/services/week/weeklyOutlook';
 import { SideDistribution } from '@/services/betting/liveOdds';
+import type { NflGamesResponse } from '@/app/api/betting/nfl-games/route';
 
 const dist = (mean: number, variance: number): SideDistribution =>
   ({ mean, variance, banked: 0, remaining: mean });
@@ -219,4 +220,76 @@ test('the same league is never listed twice for one player', () => {
   const x = rows.find(r => r.playerId === 'x')!;
   assert.equal(x.forLeagues.length, 1);
   assert.equal(x.netLeagues, 1);
+});
+
+/**
+ * Team and live state on a rooting row.
+ *
+ * Both exist to filter the list: a team multi-select and a "live only" toggle. A row spans many
+ * leagues but a player has exactly ONE NFL game, so both must be single values read from the
+ * scoreboard rather than from any one league's starter entry.
+ */
+const scoreboard = (state: 'pre' | 'in' | 'post'): NflGamesResponse => ({
+  ok: true,
+  week: 1,
+  games: [{
+    id: 'g1', name: 'KC @ BUF', state, detail: '', period: state === 'pre' ? 0 : 2,
+    clock: '7:00', remainingMinutes: state === 'post' ? 0 : 38, teams: ['KC', 'BUF'],
+  }],
+  teamToGame: { KC: 'g1', BUF: 'g1' },
+  fetchedAt: new Date().toISOString(),
+});
+
+/**
+ * A team defence is used as the subject on purpose.
+ *
+ * Its Sleeper id IS the team code, so it maps to a game without depending on the player database
+ * — and unlike a skill player it can never be traded, so this cannot start failing the next time
+ * the daily player update runs. An earlier version of this test used a made-up id, which had no
+ * team, so every assertion passed vacuously against a permanent 'unknown'.
+ */
+test('game state comes from the scoreboard, one value per player', () => {
+  const d = () => dist(120, 400);
+  for (const state of ['pre', 'in', 'post'] as const) {
+    const rows = buildRootingRows(
+      [league('L', d(), d(), [starter('KC', 12)], [])],
+      scoreboard(state),
+    );
+    const kc = rows.find(r => r.playerId === 'KC');
+    assert.ok(kc, `no row for KC at state ${state}`);
+    assert.equal(kc.gameState, state, `state ${state}`);
+    assert.equal(kc.team, 'KC');
+    assert.equal(kc.gameId, 'g1');
+  }
+});
+
+test('a player whose team has no game is unknown, not live', () => {
+  // A bye week, or a team the scoreboard did not return. The live-only filter must exclude it.
+  const d = () => dist(120, 400);
+  const rows = buildRootingRows(
+    [league('L', d(), d(), [starter('MIN', 12)], [])],
+    scoreboard('in'),
+  );
+  const min = rows.find(r => r.playerId === 'MIN')!;
+  assert.equal(min.gameState, 'unknown');
+  assert.equal(min.gameId, undefined);
+  // The team is still known, so the team filter still lists it.
+  assert.equal(min.team, 'MIN');
+});
+
+test('game state is unknown without a scoreboard, and never silently live', () => {
+  // A missing scoreboard must not make a "live only" filter show everybody: 'unknown' excludes.
+  const d = () => dist(120, 400);
+  const rows = buildRootingRows([league('L', d(), d(), [starter('x', 12)], [])], null);
+  assert.equal(rows[0].gameState, 'unknown');
+  assert.equal(rows.filter(r => r.gameState === 'in').length, 0);
+});
+
+test('every rooting row exposes a team field for the filter to read', () => {
+  // Unknown players resolve to null rather than being omitted, so the multi-select derives its
+  // options from real teams and a row without one is still listed.
+  const d = () => dist(120, 400);
+  const rows = buildRootingRows([league('L', d(), d(), [starter('x', 12)], [])], null);
+  assert.ok(rows.length > 0);
+  for (const r of rows) assert.ok(r.team === null || typeof r.team === 'string');
 });

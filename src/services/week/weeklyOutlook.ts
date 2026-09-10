@@ -64,6 +64,16 @@ export type RootingRow = {
   position: string | null;
   /** ESPN game id, so rows can be grouped by NFL game. */
   gameId?: string;
+  /** Sleeper's NFL team code, for filtering the list down to a game you are watching. */
+  team: string | null;
+  /**
+   * Where this player's NFL game stands.
+   *
+   * One value per row even though a row spans leagues, because a player has exactly one game.
+   * Read off the same team-to-game map as `gameId` rather than from any league's starter entry,
+   * so it cannot disagree with itself when a player starts in eight leagues.
+   */
+  gameState: 'pre' | 'in' | 'post' | 'unknown';
   /** Projected points still to come where this player starts FOR me. */
   forPoints: number;
   /** ...and where he starts AGAINST me. */
@@ -311,6 +321,9 @@ export function buildRootingRows(
       name: playerName(playerId),
       position,
       gameId: undefined,
+      // From the player database, so it is present whether or not the scoreboard loaded.
+      team: PLAYERS[playerId]?.team ?? null,
+      gameState: 'unknown',
       forPoints: 0,
       againstPoints: 0,
       netSwing: 0,
@@ -381,6 +394,8 @@ export function buildRootingRows(
     for (const r of byPlayer.values()) {
       const team = espnTeamOf(r.playerId);
       r.gameId = team ? games.teamToGame[team] : undefined;
+      const game = r.gameId ? games.games.find(g => g.id === r.gameId) : undefined;
+      r.gameState = game ? game.state : 'unknown';
     }
   }
 

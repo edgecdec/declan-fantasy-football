@@ -37,9 +37,10 @@ def main() -> int:
     ap.add_argument(
         '--pre', action='append', default=[],
         help='Step run on every page before shooting: fill=<value> types into the first '
-             'combobox, click=<name> clicks a button by its accessible name, check=<label> '
-             'flips a switch or checkbox by its label. Repeatable, applied in order — this is '
-             'what gets past a page that needs a username first.')
+             'combobox, click=<name> clicks a button by its accessible name, tab=<name> '
+             'selects a tab, check=<label> flips a switch or checkbox by its label. Repeatable '
+             'and applied IN ORDER, which matters: a control inside a tab needs the tab '
+             'selected first.')
     ap.add_argument('--width', type=int, default=1500)
     ap.add_argument('--height', type=int, default=1100)
     ap.add_argument('--settle', type=int, default=SETTLE_MS)
@@ -74,6 +75,8 @@ def main() -> int:
                     page.keyboard.press('Enter')
                 elif verb == 'click':
                     page.get_by_role('button', name=value).click()
+                elif verb == 'tab':
+                    page.get_by_role('tab', name=value).click()
                 elif verb == 'check':
                     # A MUI Switch is a checkbox, not a button, so it needs its own step.
                     page.get_by_label(value).click()
