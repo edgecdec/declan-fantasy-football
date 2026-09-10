@@ -70,8 +70,19 @@ export type FeedEntry = {
   playType: string | null;
   isScoringPlay: boolean;
   players: FeedPlayer[];
-  /** True when at least one player on it is in the viewer's starting lineup. */
-  touchesYou: boolean;
+  /**
+   * Whether one of YOUR starters is involved, and whether one of your opponents' is.
+   *
+   * Both, rather than a single "does this concern me" flag: every play in this feed already
+   * concerns the viewer — the roster maps only ever contain their players and their opponents' —
+   * so a combined flag was true for every entry and could not discriminate anything. Which SIDE
+   * a play helped is the distinction worth drawing.
+   *
+   * Both can be true at once: a quarterback of yours throwing to your opponent's receiver is one
+   * play that cuts both ways, and that is exactly the case worth seeing.
+   */
+  yourStarter: boolean;
+  theirStarter: boolean;
 };
 
 /** Where a player sits in one league. */
@@ -194,9 +205,8 @@ export function buildPlayFeed(
       playType: context.playType,
       isScoringPlay: context.isScoringPlay,
       players: feedPlayers,
-      touchesYou: feedPlayers.some(p =>
-        p.impacts.some(i => i.isStarter && (i.side === 'for' || i.side === 'against')),
-      ),
+      yourStarter: feedPlayers.some(p => p.impacts.some(i => i.isStarter && i.side === 'for')),
+      theirStarter: feedPlayers.some(p => p.impacts.some(i => i.isStarter && i.side === 'against')),
     });
   }
 

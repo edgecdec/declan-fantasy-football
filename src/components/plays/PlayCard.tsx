@@ -139,10 +139,16 @@ export default function PlayCard({ entry }: { entry: FeedEntry }) {
       variant="outlined"
       sx={{
         p: 1.25,
-        // A play that moves your lineup is the reason you are looking; everything else is
-        // context. A left border rather than a fill, so the page does not stripe.
+        /*
+         * Accented when one of YOUR starters is involved, not merely when the play concerns you.
+         *
+         * Every play in this feed concerns you — it only ever contains your players and your
+         * opponents' — so accenting on that accented everything and said nothing. Marking your
+         * own side gives the for/against read at a glance down a long list, which is the thing
+         * a scan is actually for. A left border rather than a fill, so the page does not stripe.
+         */
         borderLeft: '3px solid',
-        borderLeftColor: entry.touchesYou ? 'primary.main' : 'divider',
+        borderLeftColor: entry.yourStarter ? MARKET_SIDE_COLORS.a : 'divider',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5, flexWrap: 'wrap' }}>

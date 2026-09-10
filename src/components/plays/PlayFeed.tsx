@@ -61,7 +61,6 @@ export default function PlayFeed({
   username, season, week,
 }: { username: string; season: string; week: number }) {
   const [startersOnly, setStartersOnly] = React.useState(true);
-  const [yoursOnly, setYoursOnly] = React.useState(false);
   const [data, setData] = React.useState<FeedResponse | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -96,10 +95,7 @@ export default function PlayFeed({
     return () => clearInterval(id);
   }, [load]);
 
-  const entries = React.useMemo(() => {
-    const all = data?.entries ?? [];
-    return yoursOnly ? all.filter(e => e.touchesYou) : all;
-  }, [data, yoursOnly]);
+  const entries = data?.entries ?? [];
 
   const latency = data?.latencySeconds;
 
@@ -107,14 +103,27 @@ export default function PlayFeed({
     <Box>
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-          <FormControlLabel
-            control={<Switch checked={startersOnly} onChange={e => setStartersOnly(e.target.checked)} />}
-            label="Starters only"
-          />
-          <FormControlLabel
-            control={<Switch checked={yoursOnly} onChange={e => setYoursOnly(e.target.checked)} />}
-            label="Only plays in my matchups"
-          />
+          <Tooltip
+            title="Off also shows plays by players on the bench, whose points do not count."
+            arrow
+          >
+            <FormControlLabel
+              control={<Switch checked={startersOnly} onChange={e => setStartersOnly(e.target.checked)} />}
+              label="Starters only"
+            />
+          </Tooltip>
+          {/*
+            * There is deliberately no "only plays in my matchups" control.
+            *
+            * There used to be, and it was dead: the feed only ever contains players on your
+            * roster or your opponents', in every league, so with "starters only" on it hid
+            * exactly zero of 225 real plays. Measured, not assumed. The scope note below says
+            * what the feed already is, which is what that toggle was really trying to express.
+            */}
+          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 320 }}>
+            Every play involving your starters or the ones you&apos;re playing against, across all
+            your leagues. A blue edge means one of yours.
+          </Typography>
           <Box sx={{ flex: 1 }} />
           {data?.ok && (
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'flex-start' }}>

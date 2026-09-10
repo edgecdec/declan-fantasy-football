@@ -158,15 +158,33 @@ test('bench players are flagged, not hidden', () => {
   const benched = league('b', { rush_yd: 0.1 }, { '1': { side: 'for', isStarter: false } });
   const [entry] = buildPlayFeed([play('a', 1, { '1': { rush_yd: 50 } })], [benched], PLAYERS);
   assert.equal(entry.players[0].impacts[0].isStarter, false);
-  // Nothing in the viewer's lineup moved, so the play does not "touch" them.
-  assert.equal(entry.touchesYou, false);
+  // Nothing in the viewer's lineup moved, so neither side's flag is set.
+  assert.equal(entry.yourStarter, false);
+  assert.equal(entry.theirStarter, false);
 });
 
-test('touchesYou is true when a starter on either side is involved', () => {
+test('the side flags distinguish your starters from your opponents', () => {
+  // The distinction a single "concerns me" flag could not draw: every play in this feed involves
+  // the viewer's roster or their opponent's, so a combined flag was true for all of them.
   const [mine] = buildPlayFeed([play('a', 1, { '1': { rush_yd: 50 } })], [PPR], PLAYERS);
-  assert.equal(mine.touchesYou, true);
+  assert.equal(mine.yourStarter, true);
+  assert.equal(mine.theirStarter, false);
+
   const [theirs] = buildPlayFeed([play('a', 1, { '1': { rush_yd: 50 } })], [STANDARD], PLAYERS);
-  assert.equal(theirs.touchesYou, true);
+  assert.equal(theirs.yourStarter, false);
+  assert.equal(theirs.theirStarter, true);
+});
+
+test('a play can cut both ways at once', () => {
+  // Your quarterback throwing to your opponent's receiver, in two different leagues. Both flags
+  // must set — collapsing this to one side would misreport the play worth seeing most.
+  const bothWays = buildPlayFeed(
+    [play('a', 1, { '1': { rush_yd: 50 } })],
+    [PPR, STANDARD],
+    PLAYERS,
+  );
+  assert.equal(bothWays[0].yourStarter, true);
+  assert.equal(bothWays[0].theirStarter, true);
 });
 
 test('defensive keys the play feed cannot be trusted for are not captioned', () => {
