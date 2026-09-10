@@ -34,6 +34,7 @@ import { SleeperService, SleeperLeague } from '@/services/sleeper/sleeperService
 import playerData from '../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
+import { starterSlotLabel } from '@/services/stats/lineupSlots';
 import useSeason from '@/hooks/useSeason';
 import { safeLocalSet } from '@/services/common/cacheService';
 
@@ -182,15 +183,42 @@ export default function RosterMedicPage() {
 
         // C. Starters
         if (roster.starters) {
+          const emptyCount = roster.starters.filter(pid => pid === '0').length;
+          /*
+           * A lineup nobody has touched collapses to ONE issue instead of ten identical ones.
+           *
+           * Ten criticals from one league would bury the single genuinely actionable empty slot in
+           * another. Pre-draft rosters never reach here — isZeroPointRoster already skips a roster
+           * with no players and no points — so this is the case of a drafted team whose owner has
+           * not set a lineup at all.
+           */
+          const wholeLineupUnset = emptyCount > 1 && emptyCount === roster.starters.length;
+          if (wholeLineupUnset) {
+            issues.push({
+              id: `start-unset-${league.league_id}`,
+              leagueId: league.league_id,
+              leagueName: league.name,
+              leagueAvatar: league.avatar || '',
+              type: 'critical',
+              message: `Lineup not set — none of the ${emptyCount} starting slots are filled.`
+            });
+          }
+
           roster.starters.forEach((pid, index) => {
             if (pid === '0') {
+               if (wholeLineupUnset) return; // already reported once, above
+               // Name the slot. "Empty starter slot detected!" told you a lineup was broken but
+               // not where, so fixing it meant opening the league and comparing by eye.
+               const slot = starterSlotLabel(league.roster_positions, index);
                issues.push({
                  id: `start-empty-${league.league_id}-${index}`,
                  leagueId: league.league_id,
                  leagueName: league.name,
                  leagueAvatar: league.avatar || '',
                  type: 'critical',
-                 message: `Empty starter slot detected!`
+                 message: slot
+                   ? `Empty ${slot} slot — nothing is set to start there.`
+                   : 'Empty starter slot — the league does not report which one.'
                });
             } else {
                const pInfo = allPlayers[pid];

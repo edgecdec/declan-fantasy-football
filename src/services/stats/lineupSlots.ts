@@ -33,3 +33,60 @@ export const SLOT_PRIORITY: string[] = [
   'DL', 'LB', 'DB',
   'REC_FLEX', 'FLEX', 'SUPER_FLEX', 'IDP_FLEX',
 ];
+
+/**
+ * How a roster slot is written for a reader.
+ *
+ * Sleeper's own names are machine-shaped — `SUPER_FLEX`, `REC_FLEX` — and showing them raw makes a
+ * message like "Empty SUPER_FLEX slot" read as a bug. Anything not listed falls back to swapping
+ * underscores for spaces, so a slot type Sleeper adds later degrades to something legible rather
+ * than to `undefined`.
+ */
+const SLOT_LABELS: Record<string, string> = {
+  QB: 'QB',
+  RB: 'RB',
+  WR: 'WR',
+  TE: 'TE',
+  K: 'K',
+  DEF: 'DEF',
+  FLEX: 'FLEX',
+  REC_FLEX: 'REC FLEX',
+  WRRB_FLEX: 'WR/RB FLEX',
+  SUPER_FLEX: 'SUPERFLEX',
+  IDP_FLEX: 'IDP FLEX',
+  DL: 'DL',
+  LB: 'LB',
+  DB: 'DB',
+};
+
+export function slotLabel(slot: string): string {
+  return SLOT_LABELS[slot] ?? slot.replace(/_/g, ' ');
+}
+
+/**
+ * The scoring slots of a roster, in the order Sleeper reports starters in.
+ *
+ * This alignment is the whole point: a roster's `starters` and `starters_points` arrays are
+ * positionally aligned to the NON-BENCH entries of `roster_positions`, so index 3 of `starters` is
+ * whatever slot index 3 of this list names. Filtering bench slots out is therefore not cosmetic —
+ * without it every label after the first bench entry would name the wrong slot.
+ */
+export function startingSlots(rosterPositions: string[] | null | undefined): string[] {
+  return (rosterPositions ?? []).filter(slot => !BENCH_SLOTS.has(slot));
+}
+
+/**
+ * The label for the starter at `index`, or null when the roster shape cannot explain it.
+ *
+ * Null rather than a guess: a league whose `roster_positions` is missing or shorter than its
+ * starters array would otherwise get a confidently wrong slot name, which is worse than saying
+ * nothing.
+ */
+export function starterSlotLabel(
+  rosterPositions: string[] | null | undefined,
+  index: number,
+): string | null {
+  const slots = startingSlots(rosterPositions);
+  const slot = slots[index];
+  return slot ? slotLabel(slot) : null;
+}
