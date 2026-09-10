@@ -65,6 +65,8 @@ function ImpactChip({ impact }: { impact: LeagueImpact }) {
         `${impact.leagueName} — ${
           impact.side === 'for' ? 'your team' : impact.side === 'against' ? 'your opponent' : 'another team'
         }${impact.isStarter ? '' : ', on the bench (does not count)'}`
+        + `. ${signedPoints(impact.points)} on this play, ${impact.totalPoints.toFixed(2)} for the week`
+        + ' in this league after it.'
       }
     >
       <Box
@@ -73,11 +75,28 @@ function ImpactChip({ impact }: { impact: LeagueImpact }) {
           px: 0.75, py: 0.25, borderRadius: 1,
           border: '1px solid', borderColor: 'divider',
           opacity: impact.isStarter ? 1 : 0.55,
-          maxWidth: 220,
+          maxWidth: 260,
         }}
       >
         <Typography variant="caption" sx={{ fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
           {signedPoints(impact.points)}
+        </Typography>
+        {/*
+          * The running total for the week, in THIS league.
+          *
+          * Per league rather than one figure per player, because the same yards are worth
+          * different amounts in each one — a single number would be wrong almost everywhere. Set
+          * in secondary ink so the play's own points stay the thing the eye lands on: the total is
+          * the context, not the news.
+          */}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {/* A separator, so "-1.00 16.78" cannot be read as one number. Colour already
+              distinguishes them, but not at a glance down a long list. */}
+          &middot;&nbsp;{impact.totalPoints.toFixed(2)}
         </Typography>
         {/* Rule: every league mention links to the league. */}
         <MuiLink

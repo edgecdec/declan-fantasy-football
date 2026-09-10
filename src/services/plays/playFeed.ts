@@ -36,6 +36,19 @@ export type LeagueImpact = {
   leagueName: string;
   /** Unrounded points this play was worth in this league. */
   points: number;
+  /**
+   * The player's total for the week in this league, THROUGH this play.
+   *
+   * As of the play rather than as of now, which is what a feed wants: the newest entry shows the
+   * current total, and an older one reads "he was on 14.30 after that catch" instead of silently
+   * restating a number from later in the game.
+   *
+   * Accumulated by summing the per-play scores, which is legitimate here rather than an
+   * approximation: reconciling 53,200 player-scores against Sleeper's official totals is exactly
+   * what established that the sum matches to the cent, provided nothing is rounded on the way.
+   * It therefore excludes what the play feed cannot be trusted for — team defence and IDP.
+   */
+  totalPoints: number;
   /** Whose fantasy team the player is on, from the viewer's perspective. */
   side: 'for' | 'against' | 'other';
   rosterId: number;
@@ -144,10 +157,13 @@ export function buildPlayFeed(
   options: FeedOptions = {},
 ): FeedEntry[] {
   const { limit = 50, startersOnly = false, minPeakPoints = 0 } = options;
-  // Running totals per player, needed for the milestone bonuses. Kept per league because a
+  // Running stat totals per player, needed for the milestone bonuses. Kept per league because a
   // league's scoring settings decide nothing about the totals, but its roster decides
   // whether we bother — and it is simpler to be correct than to share and special-case.
   const totals = new Map<string, StatLine>();
+  // Running POINTS per player per league, since the same yards are worth different amounts in
+  // each one. Keyed on both, because a single per-player figure would be wrong in most leagues.
+  const runningPoints = new Map<string, number>();
   const entries: FeedEntry[] = [];
 
   const ordered = [...plays].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
@@ -183,11 +199,17 @@ export function buildPlayFeed(
         // bench-only play clear the threshold and then arrive with nothing in it.
         if (startersOnly && !spot.isStarter) continue;
         const scored = scorePlayForPlayer(rawStats ?? {}, before, position, league.scoring, context);
+        // Accumulated for EVERY play, including the scoreless ones skipped below: a running total
+        // that only counted the plays worth showing would drift from the real one.
+        const key = `${playerId}|${league.leagueId}`;
+        const runningTotal = (runningPoints.get(key) ?? 0) + scored.total;
+        runningPoints.set(key, runningTotal);
         if (Math.abs(scored.total) < POINTS_EPSILON) continue;
         impacts.push({
           leagueId: league.leagueId,
           leagueName: league.leagueName,
           points: scored.total,
+          totalPoints: runningTotal,
           side: spot.side,
           rosterId: spot.rosterId,
           ownerName: spot.ownerName,

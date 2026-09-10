@@ -281,3 +281,72 @@ test('startersOnly strips bench impacts but keeps the starting ones', () => {
   const starters = buildPlayFeed(plays, [mixed], PLAYERS, { startersOnly: true });
   assert.deepEqual(starters[0].players.map(p => p.playerId), ['1']);
 });
+
+/**
+ * The running weekly total shown beside each play.
+ *
+ * Per league, because the same yards are worth different amounts in each one, and as of the play
+ * rather than as of now — a feed entry should read "he was on 14.30 after that catch", not quietly
+ * restate a number from later in the game.
+ */
+test('the total accumulates across plays, per league', () => {
+  const plays = [
+    play('a', 1, { '1': { rec: 1, rec_yd: 10 } }),
+    play('b', 2, { '1': { rec: 1, rec_yd: 20 } }),
+  ];
+  const entries = buildPlayFeed(plays, [PPR, STANDARD], PLAYERS);
+  const byPlay = new Map(entries.map(e => [e.playId, e.players[0].impacts]));
+
+  const pprOf = (id: string) => byPlay.get(id)!.find(i => i.leagueId === 'ppr')!;
+  const stdOf = (id: string) => byPlay.get(id)!.find(i => i.leagueId === 'std')!;
+
+  // PPR: 1 + 1.0 = 2.0, then 1 + 2.0 = 3.0 on top -> 5.0.
+  assert.equal(pprOf('a').totalPoints, 2);
+  assert.equal(pprOf('b').totalPoints, 5);
+  // Standard scores yards only: 1.0 then 3.0.
+  assert.equal(stdOf('a').totalPoints, 1);
+  assert.equal(stdOf('b').totalPoints, 3);
+});
+
+test('the total is as of the play, not as of the end', () => {
+  const plays = [
+    play('a', 1, { '1': { rec: 1, rec_yd: 10 } }),
+    play('b', 2, { '1': { rec: 1, rec_yd: 10 } }),
+  ];
+  const entries = buildPlayFeed(plays, [PPR], PLAYERS);
+  // Newest first, so the first entry carries the later, larger total.
+  assert.equal(entries[0].playId, 'b');
+  assert.ok(entries[0].players[0].impacts[0].totalPoints > entries[1].players[0].impacts[0].totalPoints);
+});
+
+test('scoreless plays still advance the total, even though they are not shown', () => {
+  // A running total that only counted the plays worth displaying would drift from the real one.
+  const plays = [
+    play('a', 1, { '1': { rush_yd: 10 } }),
+    play('scoreless', 2, { '1': { rush_att: 1, rush_yd: 0 } }),
+    play('c', 3, { '1': { rush_yd: 10 } }),
+  ];
+  const entries = buildPlayFeed(plays, [PPR], PLAYERS);
+  assert.ok(!entries.some(e => e.playId === 'scoreless'));
+  const last = entries.find(e => e.playId === 'c')!;
+  assert.ok(Math.abs(last.players[0].impacts[0].totalPoints - 2) < 1e-9);
+});
+
+test('the total includes bonuses on the play that earned them', () => {
+  const bonusLeague = league('bonus', { rush_yd: 0.1, bonus_rush_yd_100: 5 }, { '1': { side: 'for' } });
+  const plays = [
+    play('a', 1, { '1': { rush_yd: 60 } }),
+    play('b', 2, { '1': { rush_yd: 45 } }),
+  ];
+  const entries = buildPlayFeed(plays, [bonusLeague], PLAYERS);
+  const crossing = entries.find(e => e.playId === 'b')!;
+  // 105 yards = 10.5, plus the 5-point milestone.
+  assert.ok(Math.abs(crossing.players[0].impacts[0].totalPoints - 15.5) < 1e-9);
+});
+
+test('a bench player carries a total too, so promoting him is an informed choice', () => {
+  const benched = league('b', { rec: 1, rec_yd: 0.1 }, { '1': { side: 'for', isStarter: false } });
+  const plays = [play('a', 1, { '1': { rec: 1, rec_yd: 30 } })];
+  const [entry] = buildPlayFeed(plays, [benched], PLAYERS);
+  assert.equal(entry.players[0].impacts[0].totalPoints, 4);
+});
