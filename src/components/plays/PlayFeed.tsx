@@ -29,6 +29,9 @@ const REFRESH_MS = 30_000;
 /** Enough to cover a full slate's worth of scoring plays without shipping a whole week. */
 const FEED_LIMIT = 120;
 
+/** Kept in step with BIG_PLAY_POINTS in the feed route, purely for the label. */
+const BIG_PLAY_POINTS = 2;
+
 type FeedResponse = {
   ok: boolean;
   error?: string;
@@ -61,6 +64,9 @@ export default function PlayFeed({
   username, season, week,
 }: { username: string; season: string; week: number }) {
   const [startersOnly, setStartersOnly] = React.useState(true);
+  // Off by default: the full feed is the thing, and a filter that hides most of it should be a
+  // choice rather than the state you arrive in.
+  const [bigPlaysOnly, setBigPlaysOnly] = React.useState(false);
   const [data, setData] = React.useState<FeedResponse | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -72,6 +78,7 @@ export default function PlayFeed({
       const params = new URLSearchParams({
         username, season, week: String(week), limit: String(FEED_LIMIT),
         ...(startersOnly ? { startersOnly: '1' } : {}),
+        ...(bigPlaysOnly ? { bigPlaysOnly: '1' } : {}),
       });
       const res = await fetch(`/api/plays/feed?${params}`);
       const body: FeedResponse = await res.json();
@@ -87,7 +94,7 @@ export default function PlayFeed({
     } finally {
       setLoading(false);
     }
-  }, [username, season, week, startersOnly]);
+  }, [username, season, week, startersOnly, bigPlaysOnly]);
 
   React.useEffect(() => { void load(); }, [load]);
   React.useEffect(() => {
@@ -110,6 +117,18 @@ export default function PlayFeed({
             <FormControlLabel
               control={<Switch checked={startersOnly} onChange={e => setStartersOnly(e.target.checked)} />}
               label="Starters only"
+            />
+          </Tooltip>
+          <Tooltip
+            title={
+              `Only plays worth ${BIG_PLAY_POINTS}+ points to someone, in some league. Measured on `
+              + 'the largest swing either way, so a fumble or an interception counts as a big play.'
+            }
+            arrow
+          >
+            <FormControlLabel
+              control={<Switch checked={bigPlaysOnly} onChange={e => setBigPlaysOnly(e.target.checked)} />}
+              label="Big plays only"
             />
           </Tooltip>
           {/*
@@ -160,7 +179,9 @@ export default function PlayFeed({
         <Alert severity="info">
           {(data.playsStored ?? 0) === 0
             ? 'No plays captured for this week yet. The feed fills in once games kick off.'
-            : 'No plays yet involving anyone in your lineups this week.'}
+            : bigPlaysOnly
+              ? `No plays worth ${BIG_PLAY_POINTS}+ points yet. Turn off "big plays only" to see everything.`
+              : 'No plays yet involving anyone in your lineups this week.'}
         </Alert>
       )}
 

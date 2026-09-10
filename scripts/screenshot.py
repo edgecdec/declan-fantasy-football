@@ -37,8 +37,9 @@ def main() -> int:
     ap.add_argument(
         '--pre', action='append', default=[],
         help='Step run on every page before shooting: fill=<value> types into the first '
-             'combobox, click=<name> clicks a button by its accessible name. Repeatable, '
-             'applied in order — this is what gets past a page that needs a username first.')
+             'combobox, click=<name> clicks a button by its accessible name, check=<label> '
+             'flips a switch or checkbox by its label. Repeatable, applied in order — this is '
+             'what gets past a page that needs a username first.')
     ap.add_argument('--width', type=int, default=1500)
     ap.add_argument('--height', type=int, default=1100)
     ap.add_argument('--settle', type=int, default=SETTLE_MS)
@@ -73,6 +74,9 @@ def main() -> int:
                     page.keyboard.press('Enter')
                 elif verb == 'click':
                     page.get_by_role('button', name=value).click()
+                elif verb == 'check':
+                    # A MUI Switch is a checkbox, not a button, so it needs its own step.
+                    page.get_by_label(value).click()
                 else:
                     raise SystemExit(f'unknown --pre step: {step}')
                 page.wait_for_timeout(1500)

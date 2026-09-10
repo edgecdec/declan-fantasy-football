@@ -23,6 +23,15 @@ const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 300;
 
 /**
+ * What counts as a big play.
+ *
+ * Two points is about a twenty-yard gain in a typical league, or any touchdown, reception bonus
+ * or turnover — low enough to keep the drive-defining plays and high enough to drop the two-yard
+ * runs that make up most of a feed.
+ */
+const BIG_PLAY_POINTS = 2;
+
+/**
  * How long a built feed is reused.
  *
  * Building one replays every play of the week and scores each one in up to twenty leagues —
@@ -48,6 +57,7 @@ export async function GET(request: Request) {
   const week = Number(params.get('week'));
   const limit = Math.min(MAX_LIMIT, Number(params.get('limit')) || DEFAULT_LIMIT);
   const startersOnly = params.get('startersOnly') === '1';
+  const bigPlaysOnly = params.get('bigPlaysOnly') === '1';
 
   if (!username || !season || !Number.isFinite(week) || week <= 0) {
     return NextResponse.json(
@@ -59,7 +69,7 @@ export async function GET(request: Request) {
   // Not awaited: the feed must render from stored plays whether or not this sweep succeeds.
   void pollQuietly();
 
-  const cacheKey = `${username}|${season}|${week}|${limit}|${startersOnly}`;
+  const cacheKey = `${username}|${season}|${week}|${limit}|${startersOnly}|${bigPlaysOnly}`;
   const stored = playCount(season, week);
   const cached = feedCache.get(cacheKey);
   // Invalidated by a new play as well as by age, so a touchdown is never held back by the
@@ -75,18 +85,14 @@ export async function GET(request: Request) {
 
   const { leagues, failed } = await buildLeagueContexts(userId, season, week);
   const plays = playsForWeek(season, week);
-  let entries = buildPlayFeed(plays, leagues, PLAYERS, limit);
-
-  if (startersOnly) {
-    entries = entries
-      .map(e => ({
-        ...e,
-        players: e.players
-          .map(p => ({ ...p, impacts: p.impacts.filter(i => i.isStarter) }))
-          .filter(p => p.impacts.length > 0),
-      }))
-      .filter(e => e.players.length > 0);
-  }
+  // Filtering happens inside buildPlayFeed, not here: `limit` has to apply to what survives, or
+  // asking for big plays only would return the big plays within the last 120 rather than the
+  // last 120 big plays.
+  const entries = buildPlayFeed(plays, leagues, PLAYERS, {
+    limit,
+    startersOnly,
+    minPeakPoints: bigPlaysOnly ? BIG_PLAY_POINTS : 0,
+  });
 
   const body = {
     ok: true,

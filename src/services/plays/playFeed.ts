@@ -106,6 +106,21 @@ export type PlayerMeta = { n?: string | null; p?: string | null; t?: string | nu
 /** Points below this are treated as no gain, so a 0.00 row never appears. */
 const POINTS_EPSILON = 0.005;
 
+export type FeedOptions = {
+  /** How many entries to return, applied AFTER scoring and filtering. */
+  limit?: number;
+  /** Drop bench impacts, whose points do not count this week. */
+  startersOnly?: boolean;
+  /**
+   * Only plays where some player gained at least this much, in some league.
+   *
+   * Measured on the LARGEST ABSOLUTE gain across leagues, so a lost fumble or an interception
+   * counts as a big play. Those are the ones you most want to see, and treating them as small
+   * because the number is negative would hide exactly the wrong half.
+   */
+  minPeakPoints?: number;
+};
+
 function formatClock(metadata: Record<string, unknown>): string | null {
   const m = metadata.time_remaining_minutes;
   const s = metadata.time_remaining_seconds;
@@ -126,8 +141,9 @@ export function buildPlayFeed(
   plays: StoredPlay[],
   leagues: FeedLeague[],
   players: Record<string, PlayerMeta>,
-  limit = 50,
+  options: FeedOptions = {},
 ): FeedEntry[] {
+  const { limit = 50, startersOnly = false, minPeakPoints = 0 } = options;
   // Running totals per player, needed for the milestone bonuses. Kept per league because a
   // league's scoring settings decide nothing about the totals, but its roster decides
   // whether we bother — and it is simpler to be correct than to share and special-case.
@@ -162,6 +178,10 @@ export function buildPlayFeed(
       for (const league of leagues) {
         const spot = league.roster.get(playerId);
         if (!spot) continue;
+        // Bench impacts are dropped HERE rather than after the fact, so the big-play threshold
+        // is measured against what the reader will actually see. Filtering afterwards let a
+        // bench-only play clear the threshold and then arrive with nothing in it.
+        if (startersOnly && !spot.isStarter) continue;
         const scored = scorePlayForPlayer(rawStats ?? {}, before, position, league.scoring, context);
         if (Math.abs(scored.total) < POINTS_EPSILON) continue;
         impacts.push({
@@ -177,6 +197,7 @@ export function buildPlayFeed(
       }
 
       if (impacts.length === 0) continue;
+      if (peak < minPeakPoints) continue;
       feedPlayers.push({
         playerId,
         name: meta.n ?? `Player ${playerId}`,

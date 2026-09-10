@@ -99,7 +99,7 @@ test('trimming the feed does not change the points on the plays that survive', (
     play('c', 3, { '1': { rush_yd: 20 } }),
   ];
   const full = buildPlayFeed(plays, [bonusLeague], PLAYERS);
-  const trimmed = buildPlayFeed(plays, [bonusLeague], PLAYERS, 1);
+  const trimmed = buildPlayFeed(plays, [bonusLeague], PLAYERS, { limit: 1 });
 
   assert.equal(trimmed.length, 1);
   assert.equal(trimmed[0].playId, 'c');
@@ -215,4 +215,69 @@ test('describeStats says what happened, not how much it was worth', () => {
   assert.equal(describeStats({ rush_att: 1, rush_yd: 4, rush_td: 1 }), '1 rush, 4 yd · rush TD');
   assert.equal(describeStats({ pass_att: 1 }), 'incomplete');
   assert.equal(describeStats({}), '');
+});
+
+/**
+ * The big-play filter.
+ *
+ * The threshold has to be measured against what the reader will SEE, which is why the starters
+ * filter runs inside the builder rather than over its output: a bench-only play could otherwise
+ * clear the threshold and then arrive with every impact stripped out of it.
+ */
+test('the big-play filter keeps plays worth the threshold to someone', () => {
+  const plays = [
+    play('small', 1, { '1': { rush_yd: 5 } }),   // 0.5 in PPR
+    play('big', 2, { '1': { rec: 1, rec_yd: 30 } }), // 4.0
+  ];
+  const all = buildPlayFeed(plays, [PPR], PLAYERS);
+  assert.deepEqual(all.map(e => e.playId), ['big', 'small']);
+
+  const big = buildPlayFeed(plays, [PPR], PLAYERS, { minPeakPoints: 2 });
+  assert.deepEqual(big.map(e => e.playId), ['big']);
+});
+
+test('a big NEGATIVE play counts as a big play', () => {
+  // An interception is exactly what you want surfaced; treating it as small because the number is
+  // negative would hide the wrong half of the feed.
+  const picksCost = league('int', { pass_int: -2, rush_yd: 0.1 }, { '1': { side: 'for' } });
+  const plays = [play('pick', 1, { '1': { pass_int: 1 } })];
+  const big = buildPlayFeed(plays, [picksCost], PLAYERS, { minPeakPoints: 2 });
+  assert.deepEqual(big.map(e => e.playId), ['pick']);
+  assert.equal(big[0].players[0].impacts[0].points, -2);
+});
+
+test('the threshold is met if ANY league clears it, not every league', () => {
+  // The same catch is 4.0 in PPR and 1.0 in a standard league. It is a big play to the reader.
+  const plays = [play('a', 1, { '1': { rec: 1, rec_yd: 10 } })];
+  const big = buildPlayFeed(plays, [PPR, STANDARD], PLAYERS, { minPeakPoints: 2 });
+  assert.equal(big.length, 1);
+  assert.equal(big[0].players[0].impacts.length, 2);
+});
+
+test('the threshold is measured after bench impacts are dropped', () => {
+  // A bench player having a huge play must not pull a starters-only feed entry through empty.
+  const benchStar = league('b', { rec: 1, rec_yd: 0.1 }, {
+    '1': { side: 'for', isStarter: false },
+  });
+  const plays = [play('a', 1, { '1': { rec: 1, rec_yd: 40 } })];
+  assert.equal(buildPlayFeed(plays, [benchStar], PLAYERS, { minPeakPoints: 2 }).length, 1);
+  assert.equal(
+    buildPlayFeed(plays, [benchStar], PLAYERS, { minPeakPoints: 2, startersOnly: true }).length,
+    0,
+  );
+});
+
+test('startersOnly strips bench impacts but keeps the starting ones', () => {
+  const mixed: FeedLeague = {
+    leagueId: 'm', leagueName: 'Mixed', scoring: { rush_yd: 0.1 },
+    roster: new Map([
+      ['1', { rosterId: 1, ownerName: 'me', isStarter: true, side: 'for' as const }],
+      ['2', { rosterId: 1, ownerName: 'me', isStarter: false, side: 'for' as const }],
+    ]),
+  };
+  const plays = [play('a', 1, { '1': { rush_yd: 50 }, '2': { rush_yd: 50 } })];
+  assert.equal(buildPlayFeed(plays, [mixed], PLAYERS).length, 1);
+  assert.equal(buildPlayFeed(plays, [mixed], PLAYERS)[0].players.length, 2);
+  const starters = buildPlayFeed(plays, [mixed], PLAYERS, { startersOnly: true });
+  assert.deepEqual(starters[0].players.map(p => p.playerId), ['1']);
 });
