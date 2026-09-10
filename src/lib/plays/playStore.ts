@@ -47,42 +47,83 @@ function toStored(r: Row): StoredPlay {
   };
 }
 
+export type IngestResult = {
+  /** Plays never seen before. This is what a feed may announce. */
+  fresh: StoredPlay[];
+  /** Plays already stored whose stats or description Sleeper has since AMENDED. */
+  corrected: number;
+};
+
 /**
- * Inserts plays not seen before, returning only those.
+ * Banks plays, inserting the new ones and amending the ones Sleeper has revised.
  *
- * The returned list is what a feed should announce; everything else is a repeat. At a 60s poll
- * against a 20-play window roughly nineteen of twenty plays are already known, so this dedupe is
- * what makes polling a small fixed window viable instead of refetching a whole week.
+ * `fresh` is what a feed should announce; everything else is a repeat. At a 60s poll against a
+ * 20-play window roughly nineteen of twenty plays are already known, so this dedupe is what makes
+ * polling a small fixed window viable instead of refetching a whole week.
  *
- * An already-stored play is left ALONE rather than updated: its first_seen_at is a measurement of
- * when we observed it and must not drift. Stat corrections are handled by reconciling against the
- * authoritative stats feed, not by rewriting history here.
+ * CORRECTIONS. A play is not immutable upstream: Sleeper amends attribution in place, keeping the
+ * same play_id. A real one from the 2026 opener — "Catch made by G.Holani for 7 yards" became
+ * "Catch made by B.Russell for 7 yards", moving a reception and a first down between two players.
+ * An earlier version of this function skipped anything already stored, which meant holding the
+ * first version of that play forever: Holani kept 7 receiving yards he never had, and his running
+ * total stayed wrong for the rest of the week.
+ *
+ * So metadata and play_stats are refreshed when they differ. `first_seen_at` is deliberately NOT
+ * touched — it measures when WE saw the play, the live-latency figure is computed from it, and
+ * re-stamping it would drive that measurement to zero. `updated_at` records the amendment instead.
+ *
+ * A correction is counted rather than returned in `fresh`, because it is not news: re-announcing a
+ * play whose description merely changed would replay a touchdown that already happened. The next
+ * feed build reads the amended rows and every running total self-heals.
  */
 export function insertNewPlays(
   season: string,
   week: number,
   gameId: string,
   plays: RawPlay[],
-): StoredPlay[] {
+): IngestResult {
   const db = getDb();
-  const exists = db.prepare('SELECT 1 FROM nfl_plays WHERE play_id = ?');
+  const existing = db.prepare(
+    'SELECT metadata, play_stats FROM nfl_plays WHERE play_id = ?',
+  );
   const insert = db.prepare(
     `INSERT INTO nfl_plays (play_id, game_id, season, week, sequence, play_time, metadata, play_stats)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  const amend = db.prepare(
+    `UPDATE nfl_plays SET metadata = ?, play_stats = ?, updated_at = datetime('now')
+     WHERE play_id = ?`,
+  );
 
-  const run = db.transaction(() => {
+  const run = db.transaction((): IngestResult => {
     const fresh: StoredPlay[] = [];
+    let corrected = 0;
     for (const p of plays) {
       if (!p.play_id) continue;
-      if (exists.get(p.play_id)) continue;
       const stats = (p.play_stats ?? [])
         .filter(s => s?.player_id)
         .map(s => ({ player_id: s.player_id, stats: s.stats ?? {} }));
+      const metadataJson = JSON.stringify(p.metadata ?? {});
+      const statsJson = JSON.stringify(stats);
+
+      const prior = existing.get(p.play_id) as
+        | { metadata: string; play_stats: string }
+        | undefined;
+
+      if (prior) {
+        // Compared on the serialised form, which is what is stored, so a re-poll returning an
+        // identical play writes nothing at all.
+        if (prior.metadata !== metadataJson || prior.play_stats !== statsJson) {
+          amend.run(metadataJson, statsJson, p.play_id);
+          corrected++;
+        }
+        continue;
+      }
+
       insert.run(
         p.play_id, p.game_id ?? gameId, season, week,
         p.sequence ?? null, p.time ?? null,
-        JSON.stringify(p.metadata ?? {}), JSON.stringify(stats),
+        metadataJson, statsJson,
       );
       fresh.push({
         playId: p.play_id, gameId: p.game_id ?? gameId, season, week,
@@ -91,7 +132,7 @@ export function insertNewPlays(
         firstSeenAt: new Date().toISOString(),
       });
     }
-    return fresh;
+    return { fresh, corrected };
   });
 
   return run();

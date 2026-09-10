@@ -62,12 +62,21 @@ export type PollResult = {
   week?: number;
   liveGames: string[];
   newPlays: number;
+  /**
+   * Plays Sleeper amended after we banked them, so our copy was rewritten.
+   *
+   * Reported because it is the only visible sign that an attribution moved — a reattributed catch
+   * silently changes two players' totals, and a count in the log is what makes that traceable.
+   */
+  corrections: number;
   /** True when this sweep included a full-week reconcile. */
   reconciled: boolean;
   errors: string[];
 };
 
-const EMPTY: PollResult = { ran: false, liveGames: [], newPlays: 0, reconciled: false, errors: [] };
+const EMPTY: PollResult = {
+  ran: false, liveGames: [], newPlays: 0, corrections: 0, reconciled: false, errors: [],
+};
 
 type NflState = { season: string; week: number; season_type: string };
 
@@ -112,13 +121,13 @@ export async function reconcileWeek(
   season: string,
   week: number,
   seasonType = 'regular',
-): Promise<{ newPlays: number; error?: string }> {
+): Promise<{ newPlays: number; corrections: number; error?: string }> {
   let all;
   try {
     all = await fetchWeekPlays(season, week, seasonType);
   } catch (e) {
     if (e instanceof SleeperGraphqlError && e.rateLimited) enterCooldown();
-    return { newPlays: 0, error: String(e) };
+    return { newPlays: 0, corrections: 0, error: String(e) };
   }
 
   // Grouped by game so each play is stored against the game it belongs to even though one
@@ -132,10 +141,15 @@ export async function reconcileWeek(
   }
 
   let newPlays = 0;
+  let corrections = 0;
   for (const [gameId, plays] of byGame) {
-    newPlays += insertNewPlays(season, week, gameId, plays).length;
+    const banked = insertNewPlays(season, week, gameId, plays);
+    newPlays += banked.fresh.length;
+    corrections += banked.corrected;
   }
-  return { newPlays };
+  // This is the pass that catches an amendment: it re-reads the authoritative current version of
+  // every play in the week, so a reattribution made hours after the snap still lands.
+  return { newPlays, corrections };
 }
 
 /**
@@ -177,10 +191,15 @@ export async function pollLivePlays(force = false): Promise<PollResult> {
   }
 
   let newPlays = 0;
+  // Plays Sleeper has AMENDED since we banked them — a reattributed catch, a filled-in tackler.
+  // Counted separately from new plays because a correction is not news to announce.
+  let corrections = 0;
   for (const game of live) {
     try {
       const plays = await fetchGamePlays(season, week, game.game_id, seasonType);
-      newPlays += insertNewPlays(season, week, game.game_id, plays).length;
+      const banked = insertNewPlays(season, week, game.game_id, plays);
+      newPlays += banked.fresh.length;
+      corrections += banked.corrected;
     } catch (e) {
       if (e instanceof SleeperGraphqlError && e.rateLimited) {
         // Stop the sweep entirely rather than working through the remaining games: the
@@ -188,7 +207,7 @@ export async function pollLivePlays(force = false): Promise<PollResult> {
         enterCooldown();
         return {
           ran: true, reason: 'rate_limited', season, week,
-          liveGames: live.map(g => g.game_id), newPlays, reconciled: false,
+          liveGames: live.map(g => g.game_id), newPlays, corrections, reconciled: false,
           errors: [...errors, 'rate limited mid-sweep'],
         };
       }
@@ -205,6 +224,7 @@ export async function pollLivePlays(force = false): Promise<PollResult> {
   if (neverBackfilled || backfillAge >= BACKFILL_INTERVAL_SECONDS) {
     const outcome = await reconcileWeek(season, week, seasonType);
     newPlays += outcome.newPlays;
+    corrections += outcome.corrections;
     if (outcome.error) errors.push(`backfill: ${outcome.error}`);
     else {
       writeMeta(BACKFILL_META, new Date().toISOString());
@@ -215,7 +235,7 @@ export async function pollLivePlays(force = false): Promise<PollResult> {
   return {
     ran: true, season, week,
     liveGames: live.map(g => g.game_id),
-    newPlays, reconciled, errors,
+    newPlays, corrections, reconciled, errors,
   };
 }
 

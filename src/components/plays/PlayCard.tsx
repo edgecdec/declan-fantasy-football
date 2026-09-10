@@ -85,18 +85,26 @@ function ImpactChip({ impact }: { impact: LeagueImpact }) {
           * The running total for the week, in THIS league.
           *
           * Per league rather than one figure per player, because the same yards are worth
-          * different amounts in each one — a single number would be wrong almost everywhere. Set
-          * in secondary ink so the play's own points stay the thing the eye lands on: the total is
-          * the context, not the news.
+          * different amounts in each one — a single number would be wrong almost everywhere.
+          *
+          * The visual hierarchy here needed a second attempt. First version set the total in
+          * secondary ink with a middot before it, which put it at exactly the same size, weight
+          * and colour as the league name immediately after — so "17.38 Amazon Superflex Redraft"
+          * read as one label and the total was invisible in practice. An arrow now says "and now
+          * he is on", and the number takes primary ink so the chip reads bright-dim-bright: play
+          * points, arrow, total, then the dimmer league.
           */}
+        <Box
+          component="span"
+          sx={{ color: 'text.disabled', fontSize: '0.68rem', lineHeight: 1, px: 0.1 }}
+        >
+          &rarr;
+        </Box>
         <Typography
           variant="caption"
-          color="text.secondary"
-          sx={{ fontVariantNumeric: 'tabular-nums' }}
+          sx={{ fontWeight: 700, color: 'text.primary', fontVariantNumeric: 'tabular-nums' }}
         >
-          {/* A separator, so "-1.00 16.78" cannot be read as one number. Colour already
-              distinguishes them, but not at a glance down a long list. */}
-          &middot;&nbsp;{impact.totalPoints.toFixed(2)}
+          {impact.totalPoints.toFixed(2)}
         </Typography>
         {/* Rule: every league mention links to the league. */}
         <MuiLink

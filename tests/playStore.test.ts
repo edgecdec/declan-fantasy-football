@@ -27,20 +27,23 @@ const play = (id: string, sequence: number, extra: Record<string, unknown> = {})
 
 test('a repeated play is banked once and reported once', () => {
   const first = insertNewPlays('2026', 1, 'G1', [play('a', 1), play('b', 2)]);
-  assert.equal(first.length, 2);
+  assert.equal(first.fresh.length, 2);
+  assert.equal(first.corrected, 0);
 
   // This is the case that makes a 20-play polling window viable: at a 60s cadence almost
   // everything in the window has already been seen, and only genuinely new plays may be
   // announced. Returning repeats would replay the same touchdown every minute.
   const second = insertNewPlays('2026', 1, 'G1', [play('a', 1), play('b', 2), play('c', 3)]);
-  assert.deepEqual(second.map(p => p.playId), ['c']);
+  assert.deepEqual(second.fresh.map(p => p.playId), ['c']);
+  // An identical re-poll must write nothing at all, not count as a correction.
+  assert.equal(second.corrected, 0);
   assert.equal(playCount('2026', 1), 3);
 });
 
 test('a play without an id is skipped rather than stored empty', () => {
   const before = playCount('2026', 1);
   const fresh = insertNewPlays('2026', 1, 'G1', [{ play_id: '' } as never]);
-  assert.equal(fresh.length, 0);
+  assert.equal(fresh.fresh.length, 0);
   assert.equal(playCount('2026', 1), before);
 });
 
@@ -99,4 +102,68 @@ test('a play timestamped in a backfill is excluded from the latency figure', () 
   ]);
   const latency = observedLatencySeconds('2026', 51);
   assert.ok(latency !== null && latency < 60, `latency was ${latency}`);
+});
+
+/**
+ * Amendments. A play is not immutable upstream.
+ *
+ * Sleeper reattributes in place, keeping the same play_id: in the 2026 opener "Catch made by
+ * G.Holani for 7 yards" became "Catch made by B.Russell for 7 yards", moving a reception and a
+ * first down between two players. Skipping anything already stored meant holding the first
+ * version forever, so Holani kept seven receiving yards he never had.
+ */
+test('an amended play is rewritten, and reported as a correction not as news', () => {
+  const original = {
+    play_id: 'amend-1', game_id: 'G7', sequence: 10, time: Date.now(),
+    metadata: { description: 'Catch made by G.Holani for 7 yards.' },
+    play_stats: [{ player_id: '12048', stats: { rec: 1, rec_yd: 7 } }],
+  };
+  const first = insertNewPlays('2026', 3, 'G7', [original]);
+  assert.equal(first.fresh.length, 1);
+
+  const amended = {
+    ...original,
+    metadata: { description: 'Catch made by B.Russell for 7 yards.' },
+    play_stats: [{ player_id: '11280', stats: { rec: 1, rec_yd: 7 } }],
+  };
+  const second = insertNewPlays('2026', 3, 'G7', [amended]);
+  // Not news: re-announcing it would replay a play that already happened.
+  assert.equal(second.fresh.length, 0);
+  assert.equal(second.corrected, 1);
+  // And it must not duplicate the row.
+  assert.equal(playCount('2026', 3), 1);
+
+  const stored = playsForWeek('2026', 3)[0];
+  assert.equal(stored.playStats[0].player_id, '11280');
+  assert.match(String(stored.metadata.description), /B\.Russell/);
+});
+
+test('an amendment does not disturb first_seen_at, which the latency figure depends on', () => {
+  const base = {
+    play_id: 'amend-2', game_id: 'G8', sequence: 1, time: Date.now(),
+    metadata: { description: 'first' }, play_stats: [],
+  };
+  insertNewPlays('2026', 4, 'G8', [base]);
+  const before = playsForWeek('2026', 4)[0].firstSeenAt;
+
+  insertNewPlays('2026', 4, 'G8', [{ ...base, metadata: { description: 'second' } }]);
+  const after = playsForWeek('2026', 4)[0];
+  // Re-stamping it would drive the observed live latency toward zero and make a badly lagging
+  // feed look instant.
+  assert.equal(after.firstSeenAt, before);
+  assert.equal(after.metadata.description, 'second');
+});
+
+test('a stats-only amendment is caught, not just a description change', () => {
+  const base = {
+    play_id: 'amend-3', game_id: 'G9', sequence: 1, time: Date.now(),
+    metadata: { description: 'same words' },
+    play_stats: [{ player_id: 'P', stats: { rush_yd: 4 } }],
+  };
+  insertNewPlays('2026', 5, 'G9', [base]);
+  const result = insertNewPlays('2026', 5, 'G9', [{
+    ...base, play_stats: [{ player_id: 'P', stats: { rush_yd: 9 } }],
+  }]);
+  assert.equal(result.corrected, 1);
+  assert.equal(playsForWeek('2026', 5)[0].playStats[0].stats.rush_yd, 9);
 });
