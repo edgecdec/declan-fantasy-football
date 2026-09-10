@@ -93,6 +93,17 @@ export type PlayerGameState = 'pre' | 'in' | 'post' | 'unknown';
 /** One starter's contribution to a side's score. */
 export type StarterInput = {
   /**
+   * Signed points to add to the EXPECTED REMAINING total rather than to the banked score.
+   *
+   * For a correction to what is still to come, where the points already on the board are right
+   * as they stand. A defence's points-allowed bracket is the case: Sleeper really has credited
+   * those points and the manager really does hold them this second, so the live score must match
+   * Sleeper exactly — what is wrong is the assumption they will still be there at the whistle.
+   * Folding this into `actualPoints` instead made our scoreboard disagree with Sleeper's, which
+   * looks like a bug in the scoreboard rather than a claim about the future.
+   */
+  meanAdjustment?: number;
+  /**
    * Variance to add as-is, NOT scaled by the time remaining.
    *
    * For an uncertainty that is already expressed relative to the rest of the game — a defence's
@@ -296,6 +307,9 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
 
   for (const s of starters) {
     banked += s.actualPoints;
+    // Applied before the early exits below, so a correction can never be silently dropped by a
+    // game state or a clock that happens to skip the remaining-points block.
+    remaining += s.meanAdjustment ?? 0;
 
     if (s.gameState === 'post') continue; // settled, no upside and no variance
 

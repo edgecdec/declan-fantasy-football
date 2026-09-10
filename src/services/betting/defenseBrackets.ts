@@ -287,3 +287,88 @@ export function defenseBracketAdjustment(input: DefenseBracketInput): BracketAdj
 
   return { credited, expected, variance, correction: expected - credited };
 }
+
+/** What a candidate builder needs to hand over to get a defence corrected. */
+export type DefenceCandidate = {
+  playerId: string;
+  position: string | null;
+  gameState: 'pre' | 'in' | 'post' | 'unknown';
+  remainingMinutes: number;
+};
+
+export type DefenceCorrection = {
+  /** Signed points against the expected REMAINING total, never against the banked score. */
+  meanAdjustment: number;
+  /** Bracket points to remove from the full-game projection, so it is not counted twice. */
+  projectedBracket: number;
+  /** Variance of the bracket, already conditioned on the time left. */
+  variance: number;
+  /** For explaining the number in the UI. */
+  note: {
+    playerId: string;
+    ptsAllow: number;
+    ydsAllow: number;
+    credited: number;
+    expected: number;
+  };
+};
+
+/**
+ * The bracket correction for one lineup candidate, or null when none applies.
+ *
+ * Shared because there are two candidate builders — the betting pricing and the This Week
+ * outlook — that were near-duplicates of each other. Correcting only one would leave the two
+ * pages disagreeing about the same defence, which is worse than both being wrong the same way.
+ *
+ * Returns null unless the game is IN PROGRESS, and that gate matters in both directions:
+ *
+ *  - before kickoff Sleeper has credited nothing, so subtracting the bracket would remove points
+ *    that were never there. The full projection already contains an expected bracket and is right.
+ *  - once final the credited bracket IS the bracket, and a correction would move a settled score.
+ */
+export function defenceCorrection(
+  candidate: DefenceCandidate,
+  scoring: Record<string, number>,
+  liveStats: Record<string, number> | undefined,
+  rawProjection: Record<string, number> | undefined,
+): DefenceCorrection | null {
+  if (candidate.position !== 'DEF') return null;
+  if (candidate.gameState !== 'in') return null;
+  if (!pricesBrackets(PTS_ALLOW_BRACKETS, scoring) && !pricesBrackets(YDS_ALLOW_BRACKETS, scoring)) {
+    return null;
+  }
+
+  // Sleeper omits a stat key at zero, so a missing value means none allowed rather than unknown
+  // — confirmed live at 0-0, where pts_allow was absent from the feed entirely.
+  const ptsAllow = liveStats?.pts_allow ?? 0;
+  const ydsAllow = liveStats?.yds_allow ?? 0;
+
+  const adjustment = defenseBracketAdjustment({
+    scoring,
+    currentPtsAllow: ptsAllow,
+    currentYdsAllow: ydsAllow,
+    projectedPtsAllow: rawProjection?.pts_allow ?? null,
+    projectedYdsAllow: rawProjection?.yds_allow ?? null,
+    minutesRemaining: candidate.remainingMinutes,
+  });
+
+  // Sleeper's projection sets the bracket flag it expects (`pts_allow_21_27: 1`) and the
+  // projection scorer counted it, so this subtracts exactly what went in.
+  const projectedBracket = rawProjection
+    ? bracketPoints(PTS_ALLOW_BRACKETS, scoring, rawProjection.pts_allow ?? 0)
+      + bracketPoints(YDS_ALLOW_BRACKETS, scoring, rawProjection.yds_allow ?? 0)
+    : 0;
+
+  return {
+    meanAdjustment: adjustment.correction,
+    projectedBracket,
+    variance: adjustment.variance,
+    note: {
+      playerId: candidate.playerId,
+      ptsAllow,
+      ydsAllow,
+      credited: adjustment.credited,
+      expected: adjustment.expected,
+    },
+  };
+}

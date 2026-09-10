@@ -2,13 +2,7 @@ import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
 import { findBettingLeague } from '@/lib/betting/leagues';
 import { calculateProjectedPoints } from '@/services/stats/scoring';
-import {
-  PTS_ALLOW_BRACKETS,
-  YDS_ALLOW_BRACKETS,
-  bracketPoints,
-  defenseBracketAdjustment,
-  pricesBrackets,
-} from '@/services/betting/defenseBrackets';
+import { defenceCorrection } from '@/services/betting/defenseBrackets';
 import { bestAvailableLineup, LineupCandidate } from '@/services/betting/bestLineup';
 import {
   StarterInput,
@@ -207,68 +201,35 @@ export async function priceLeagueWeek(
   const ownerByRoster = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
   const nameByUser = new Map((users ?? []).map(u => [u.user_id, u.display_name]));
 
-  const pricesAnyBracket =
-    pricesBrackets(PTS_ALLOW_BRACKETS, scoring) || pricesBrackets(YDS_ALLOW_BRACKETS, scoring);
+  type DefenceNote = NonNullable<SideDetail['defence']>[number];
+  const defenceNotes = new Map<string, DefenceNote>();
 
   /**
    * Corrects a defence whose live score contains a bracket bonus earned by nothing.
    *
-   * Sleeper credits the points-allowed bracket from the score SO FAR, so a defence is holding the
-   * full shutout bonus from the first snap — measured live at +10.00 for Seattle nine minutes into
-   * the 2026 opener, and worth +9.5 to +12.4 on average across every one of this user's leagues.
-   * See services/betting/defenseBrackets.ts for the measurement and the model.
-   *
-   * Applied ONLY while a game is in progress, and that gate is load-bearing in both directions:
-   *
-   *  - before kickoff Sleeper has credited nothing, so subtracting the bracket would remove ten
-   *    points that were never there. The full projection already includes an expected bracket and
-   *    is the right answer.
-   *  - once final the credited bracket IS the bracket, and any correction would move a settled
-   *    score that wagers were struck against.
+   * Sleeper credits the points-allowed bracket from the score SO FAR, so a defence holds the full
+   * shutout bonus from the first snap — measured live at +10.00 for Seattle nine minutes into the
+   * 2026 opener, worth +9.5 to +12.4 on average across every one of this user's leagues. The
+   * model and the measurements are in services/betting/defenseBrackets.ts, shared with the This
+   * Week outlook so the two pages cannot disagree about the same defence.
    */
-  type DefenceNote = NonNullable<SideDetail['defence']>[number];
-  const defenceNotes = new Map<string, DefenceNote>();
-
   const correctDefence = (
     c: LineupCandidate,
     rawProjection: Record<string, number> | undefined,
   ): LineupCandidate => {
-    if (!pricesAnyBracket || c.position !== 'DEF' || c.gameState !== 'in') return c;
-
-    const live = liveStats?.[c.playerId] ?? {};
-    const adjustment = defenseBracketAdjustment({
-      scoring,
-      // Sleeper omits a stat key at zero, so a missing value means none allowed rather than
-      // unknown — confirmed live at 0-0, where pts_allow was absent entirely.
-      currentPtsAllow: live.pts_allow ?? 0,
-      currentYdsAllow: live.yds_allow ?? 0,
-      projectedPtsAllow: rawProjection?.pts_allow ?? null,
-      projectedYdsAllow: rawProjection?.yds_allow ?? null,
-      minutesRemaining: c.remainingMinutes,
-    });
-
-    // The projection has to lose its own bracket too, or the remaining-points term adds a second
-    // one on top of the expectation just computed. Sleeper's projection sets the bracket flag it
-    // expects (`pts_allow_21_27: 1`), and calculateProjectedPoints scored it, so this subtracts
-    // exactly what went in.
-    const projectedBracket = rawProjection
-      ? bracketPoints(PTS_ALLOW_BRACKETS, scoring, rawProjection.pts_allow ?? 0)
-        + bracketPoints(YDS_ALLOW_BRACKETS, scoring, rawProjection.yds_allow ?? 0)
-      : 0;
-
-    defenceNotes.set(c.playerId, {
-      playerId: c.playerId,
-      ptsAllow: live.pts_allow ?? 0,
-      ydsAllow: live.yds_allow ?? 0,
-      credited: adjustment.credited,
-      expected: adjustment.expected,
-    });
-
+    const fix = defenceCorrection(c, scoring, liveStats?.[c.playerId], rawProjection);
+    if (!fix) return c;
+    defenceNotes.set(c.playerId, fix.note);
     return {
       ...c,
-      actualPoints: c.actualPoints + adjustment.correction,
-      projectedPoints: c.projectedPoints - projectedBracket,
-      extraVariance: (c.extraVariance ?? 0) + adjustment.variance,
+      // actualPoints is left ALONE: Sleeper has genuinely credited those points and the manager
+      // genuinely holds them right now, so the live score must match Sleeper's to the cent. The
+      // claim being made here is about the FINAL score. An earlier version subtracted the bracket
+      // here and our scoreboard then disagreed with Sleeper's, which reads as a broken scoreboard
+      // rather than as a projection.
+      meanAdjustment: (c.meanAdjustment ?? 0) + fix.meanAdjustment,
+      projectedPoints: c.projectedPoints - fix.projectedBracket,
+      extraVariance: (c.extraVariance ?? 0) + fix.variance,
     };
   };
 
@@ -337,6 +298,7 @@ export async function priceLeagueWeek(
         remainingMinutes: c.remainingMinutes,
         extraSd: c.extraSd,
         extraVariance: c.extraVariance,
+        meanAdjustment: c.meanAdjustment,
       }));
       const detail: SideDetail = {
         // Names are not in the slim index, so identify a promotion by id. The UI

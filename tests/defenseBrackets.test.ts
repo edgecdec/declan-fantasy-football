@@ -196,3 +196,47 @@ test('worked example', () => {
   console.log('\n' + lines.join('\n') + '\n');
   assert.equal(lines.length, rows.length);
 });
+
+/**
+ * Where the correction lands.
+ *
+ * Not a detail: the banked score is displayed as the live score, so a correction folded into it
+ * makes our scoreboard disagree with Sleeper's, which reads as a broken scoreboard rather than as
+ * a claim about the final score. The claim belongs to the expected remainder.
+ */
+test('the correction moves the expected total, not the points already on the board', async () => {
+  const { sideDistribution } = await import('@/services/betting/liveOdds');
+
+  const defence = {
+    playerId: 'SEA',
+    position: 'DEF',
+    // What Sleeper actually shows: a sack plus the whole shutout bracket.
+    actualPoints: 11,
+    projectedPoints: 2,
+    gameState: 'in' as const,
+    remainingMinutes: 50,
+    meanAdjustment: -8.4,
+  };
+
+  const d = sideDistribution([defence]);
+  // The live score matches Sleeper to the cent.
+  assert.equal(d.banked, 11);
+  // The correction shows up in what is still to come, and drags the expected final down.
+  assert.ok(d.remaining < 0, `remaining was ${d.remaining}`);
+  assert.ok(Math.abs(d.mean - (11 + d.remaining)) < 1e-9);
+  assert.ok(d.mean < 11, `expected final ${d.mean} should sit below the current 11`);
+});
+
+test('a correction is never dropped by a game state or a stopped clock', async () => {
+  const { sideDistribution } = await import('@/services/betting/liveOdds');
+  const base = {
+    playerId: 'SEA', position: 'DEF', actualPoints: 11, projectedPoints: 2, meanAdjustment: -8.4,
+  };
+  // Zero minutes left, and a finished game: both take early exits out of the remaining-points
+  // block, and the adjustment must still be applied.
+  for (const [state, mins] of [['in', 0], ['post', 0]] as const) {
+    const d = sideDistribution([{ ...base, gameState: state, remainingMinutes: mins }]);
+    assert.equal(d.banked, 11, state);
+    assert.ok(Math.abs(d.remaining - -8.4) < 1e-9, `${state} remaining ${d.remaining}`);
+  }
+});

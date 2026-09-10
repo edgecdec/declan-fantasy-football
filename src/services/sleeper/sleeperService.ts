@@ -698,6 +698,33 @@ export const SleeperService = {
     return results;
   },
 
+  /**
+   * Actual stats for a week, keyed by player id (team code for a defence).
+   *
+   * Needed for a defence's `pts_allow` and `yds_allow`, which the matchup feed does not carry —
+   * it gives only the defence's total, and that total is precisely the number with the wrong
+   * points-allowed bracket baked into it.
+   *
+   * 60s TTL, not the hour projections get: this is live in-game data, and a stale value here
+   * would freeze a defence's correction mid-slate.
+   */
+  async getWeeklyStats(season: string, week: number): Promise<SleeperWeeklyProjections> {
+    const cacheKey = `stats_${season}_${week}`;
+    const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/stats/nfl/regular/${season}/${week}`);
+      if (!res.ok) return {};
+      const data: Record<string, SleeperProjection> = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session', ttl: 1000 * 60 });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching stats for ${season} week ${week}`, e);
+      return {};
+    }
+  },
+
   async getWeeklyProjections(season: string, week: number): Promise<SleeperWeeklyProjections> {
     const cacheKey = `projections_${season}_${week}`;
     const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');

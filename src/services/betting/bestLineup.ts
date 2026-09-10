@@ -72,6 +72,11 @@ export type LineupCandidate = {
    * it. Set for a defence, whose points-allowed bracket is re-projected from the live score.
    */
   extraVariance?: number;
+  /**
+   * Signed points against the expected REMAINING total, leaving the banked score untouched. Set
+   * for a defence whose credited points-allowed bracket is unlikely to survive to the whistle.
+   */
+  meanAdjustment?: number;
 };
 
 /** A slot filled from waivers, as a tier average rather than a named player. */
