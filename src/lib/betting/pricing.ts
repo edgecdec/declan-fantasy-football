@@ -2,6 +2,13 @@ import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
 import { findBettingLeague } from '@/lib/betting/leagues';
 import { calculateProjectedPoints } from '@/services/stats/scoring';
+import {
+  PTS_ALLOW_BRACKETS,
+  YDS_ALLOW_BRACKETS,
+  bracketPoints,
+  defenseBracketAdjustment,
+  pricesBrackets,
+} from '@/services/betting/defenseBrackets';
 import { bestAvailableLineup, LineupCandidate } from '@/services/betting/bestLineup';
 import {
   StarterInput,
@@ -73,6 +80,22 @@ export type SideDetail = {
   streams: { slot: string; projectedPoints: number }[];
   unfilledSlots: string[];
   playersRemaining: number;
+  /**
+   * The defence bracket correction, when one was applied.
+   *
+   * Surfaced rather than kept internal because it is the single largest adjustment the pricing
+   * makes to a live score — up to twelve points — and a reader comparing our number against
+   * Sleeper's own live score deserves to see why they differ.
+   */
+  defence?: {
+    playerId: string;
+    ptsAllow: number;
+    ydsAllow: number;
+    /** Bracket points Sleeper's live score is currently crediting. */
+    credited: number;
+    /** Bracket points the game is heading for, in expectation. */
+    expected: number;
+  }[];
 };
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -161,12 +184,18 @@ export async function priceLeagueWeek(
   }>(`${SLEEPER_BASE}/league/${leagueId}`);
   if (!league?.scoring_settings || !league.roster_positions) return [];
 
-  const [rosters, users, matchups, projections, games] = await Promise.all([
+  const [rosters, users, matchups, projections, liveStats, games] = await Promise.all([
     fetchJson<SleeperRosterLite[]>(`${SLEEPER_BASE}/league/${leagueId}/rosters`),
     fetchJson<{ user_id: string; display_name: string }[]>(`${SLEEPER_BASE}/league/${leagueId}/users`),
     fetchJson<SleeperMatchupLite[]>(`${SLEEPER_BASE}/league/${leagueId}/matchups/${week}`),
     fetchJson<Record<string, Record<string, number>>>(
       `${SLEEPER_BASE}/projections/nfl/regular/${league.season}/${week}`,
+    ),
+    // Live stats, for the points and yards a defence has actually allowed so far. The matchup
+    // feed carries only a defence's total, which is the number that already has the wrong
+    // bracket baked into it.
+    fetchJson<Record<string, Record<string, number>>>(
+      `${SLEEPER_BASE}/stats/nfl/regular/${league.season}/${week}`,
     ),
     loadGames(),
   ]);
@@ -178,17 +207,86 @@ export async function priceLeagueWeek(
   const ownerByRoster = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
   const nameByUser = new Map((users ?? []).map(u => [u.user_id, u.display_name]));
 
+  const pricesAnyBracket =
+    pricesBrackets(PTS_ALLOW_BRACKETS, scoring) || pricesBrackets(YDS_ALLOW_BRACKETS, scoring);
+
+  /**
+   * Corrects a defence whose live score contains a bracket bonus earned by nothing.
+   *
+   * Sleeper credits the points-allowed bracket from the score SO FAR, so a defence is holding the
+   * full shutout bonus from the first snap — measured live at +10.00 for Seattle nine minutes into
+   * the 2026 opener, and worth +9.5 to +12.4 on average across every one of this user's leagues.
+   * See services/betting/defenseBrackets.ts for the measurement and the model.
+   *
+   * Applied ONLY while a game is in progress, and that gate is load-bearing in both directions:
+   *
+   *  - before kickoff Sleeper has credited nothing, so subtracting the bracket would remove ten
+   *    points that were never there. The full projection already includes an expected bracket and
+   *    is the right answer.
+   *  - once final the credited bracket IS the bracket, and any correction would move a settled
+   *    score that wagers were struck against.
+   */
+  type DefenceNote = NonNullable<SideDetail['defence']>[number];
+  const defenceNotes = new Map<string, DefenceNote>();
+
+  const correctDefence = (
+    c: LineupCandidate,
+    rawProjection: Record<string, number> | undefined,
+  ): LineupCandidate => {
+    if (!pricesAnyBracket || c.position !== 'DEF' || c.gameState !== 'in') return c;
+
+    const live = liveStats?.[c.playerId] ?? {};
+    const adjustment = defenseBracketAdjustment({
+      scoring,
+      // Sleeper omits a stat key at zero, so a missing value means none allowed rather than
+      // unknown — confirmed live at 0-0, where pts_allow was absent entirely.
+      currentPtsAllow: live.pts_allow ?? 0,
+      currentYdsAllow: live.yds_allow ?? 0,
+      projectedPtsAllow: rawProjection?.pts_allow ?? null,
+      projectedYdsAllow: rawProjection?.yds_allow ?? null,
+      minutesRemaining: c.remainingMinutes,
+    });
+
+    // The projection has to lose its own bracket too, or the remaining-points term adds a second
+    // one on top of the expectation just computed. Sleeper's projection sets the bracket flag it
+    // expects (`pts_allow_21_27: 1`), and calculateProjectedPoints scored it, so this subtracts
+    // exactly what went in.
+    const projectedBracket = rawProjection
+      ? bracketPoints(PTS_ALLOW_BRACKETS, scoring, rawProjection.pts_allow ?? 0)
+        + bracketPoints(YDS_ALLOW_BRACKETS, scoring, rawProjection.yds_allow ?? 0)
+      : 0;
+
+    defenceNotes.set(c.playerId, {
+      playerId: c.playerId,
+      ptsAllow: live.pts_allow ?? 0,
+      ydsAllow: live.yds_allow ?? 0,
+      credited: adjustment.credited,
+      expected: adjustment.expected,
+    });
+
+    return {
+      ...c,
+      actualPoints: c.actualPoints + adjustment.correction,
+      projectedPoints: c.projectedPoints - projectedBracket,
+      extraVariance: (c.extraVariance ?? 0) + adjustment.variance,
+    };
+  };
+
   const candidate = (playerId: string, actualPoints: number): LineupCandidate => {
     const row = PLAYER_INDEX[playerId];
     const game = row ? games.byTeam.get(espnTeam(row.t) ?? '') : undefined;
-    return {
-      playerId,
-      position: row?.p ?? null,
-      actualPoints,
-      projectedPoints: calculateProjectedPoints(projections[playerId], scoring),
-      gameState: game ? game.state : 'unknown',
-      remainingMinutes: game ? game.remainingMinutes : 0,
-    };
+    const rawProjection = projections[playerId];
+    return correctDefence(
+      {
+        playerId,
+        position: row?.p ?? null,
+        actualPoints,
+        projectedPoints: calculateProjectedPoints(rawProjection, scoring),
+        gameState: game ? game.state : 'unknown',
+        remainingMinutes: game ? game.remainingMinutes : 0,
+      },
+      rawProjection,
+    );
   };
 
   // Unrostered K/DEF, for a slot the roster cannot cover.
@@ -238,6 +336,7 @@ export async function priceLeagueWeek(
         gameState: c.gameState,
         remainingMinutes: c.remainingMinutes,
         extraSd: c.extraSd,
+        extraVariance: c.extraVariance,
       }));
       const detail: SideDetail = {
         // Names are not in the slim index, so identify a promotion by id. The UI
@@ -246,6 +345,9 @@ export async function priceLeagueWeek(
         streams: best.streamed.map(s => ({ slot: s.slot, projectedPoints: s.projectedPoints })),
         unfilledSlots: best.unfilledSlots,
         playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
+        defence: starters
+          .map(st => defenceNotes.get(st.playerId))
+          .filter((n): n is DefenceNote => n !== undefined),
       };
       return { starters, distribution: sideDistribution(starters), detail };
     };

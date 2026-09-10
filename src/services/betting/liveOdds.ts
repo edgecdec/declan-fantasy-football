@@ -92,6 +92,13 @@ export type PlayerGameState = 'pre' | 'in' | 'post' | 'unknown';
 
 /** One starter's contribution to a side's score. */
 export type StarterInput = {
+  /**
+   * Variance to add as-is, NOT scaled by the time remaining.
+   *
+   * For an uncertainty that is already expressed relative to the rest of the game — a defence's
+   * points-allowed bracket, whose spread is derived from the share of scoring still to come.
+   */
+  extraVariance?: number;
   playerId: string;
   /** QB/RB/WR/TE/K/DEF. Selects the variance and bias model; unknown falls back. */
   position?: string | null;
@@ -305,6 +312,11 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
     // summing the sds.
     const extra = s.extraSd ?? 0;
     variance += m.variance * fraction + extra * extra * fraction;
+    // Already conditioned on the time left, so it must NOT be scaled again. A defence's
+    // points-allowed bracket is the case: its spread is computed from the share of the game
+    // still to come, and shrinking it a second time would understate the swing exactly when
+    // the bracket is most in play.
+    variance += s.extraVariance ?? 0;
   }
 
   return { mean: banked + remaining, variance, banked, remaining };

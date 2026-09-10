@@ -67,6 +67,11 @@ export type LineupCandidate = {
    * genuine additional uncertainty.
    */
   extraSd?: number;
+  /**
+   * Variance added without being scaled by the time left, because it is already conditioned on
+   * it. Set for a defence, whose points-allowed bracket is re-projected from the live score.
+   */
+  extraVariance?: number;
 };
 
 /** A slot filled from waivers, as a tier average rather than a named player. */
