@@ -311,9 +311,23 @@ function MarketCard({ market, isMine, myWagers, onBet }: {
       {(market.detailA.streams.length > 0 || market.detailA.unfilledSlots.length > 0 ||
         market.detailA.promotions.length > 0 || market.detailB.streams.length > 0 ||
         market.detailB.unfilledSlots.length > 0 || market.detailB.promotions.length > 0) && (
-        <Stack direction="row" spacing={1} sx={{ mt: 0.75 }} justifyContent="space-between">
-          <SideNotes detail={market.detailA} />
-          <SideNotes detail={market.detailB} />
+        /*
+         * Two fixed halves, each aligned to its OWN side.
+         *
+         * Not `justifyContent: space-between` over the two SideNotes directly: SideNotes returns
+         * null when a side has nothing to say, and space-between with a single surviving child
+         * places it at the START of the row — so edgecdec's "streamed DEF" rendered under
+         * pullmanguy's name. The note was attributed to the right side all along; the layout moved
+         * it. Giving each side half the width regardless of what the other has makes the position
+         * structural, matching how SideHeader above already mirrors itself.
+         */
+        <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-start' }}>
+            <SideNotes detail={market.detailA} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+            <SideNotes detail={market.detailB} />
+          </Box>
         </Stack>
       )}
 
