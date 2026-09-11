@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { accountCanBetInLeague, findBettingLeague } from '@/lib/betting/leagues';
-import { findAccountById } from '@/lib/betting/accounts';
+import { findAccountById, leagueBalanceCents } from '@/lib/betting/accounts';
 import { priceLeagueWeek } from '@/lib/betting/pricing';
 import { openExposureCents } from '@/lib/betting/wagers';
 import { valueOpenPositions } from '@/lib/betting/valuation';
@@ -59,9 +59,17 @@ export async function GET(request: Request) {
     )
     .all(account.id, leagueId, cfg.season, week) as unknown[];
 
-  // Valued AFTER priceLeagueWeek above, so these are marked to the line this response
-  // carries rather than to whatever it was on the previous load.
-  const valuation = valueOpenPositions(account.id, account.balance_cents);
+  /*
+   * This league's bankroll and this league's positions.
+   *
+   * Both scoped, and they have to move together: pairing an account-wide equity with a per-league
+   * balance would put two numbers on the page that cannot be reconciled with each other.
+   *
+   * Valued AFTER priceLeagueWeek above, so these are marked to the line this response carries
+   * rather than to whatever it was on the previous load.
+   */
+  const bankrollCents = leagueBalanceCents(account.id, leagueId) ?? 0;
+  const valuation = valueOpenPositions(account.id, bankrollCents, leagueId);
 
   return NextResponse.json({
     ok: true,
@@ -69,10 +77,10 @@ export async function GET(request: Request) {
     league: { leagueId, season: cfg.season, label: cfg.label },
     // So the UI can grey out your own matchup rather than letting you click it.
     mySleeperUserId: account.sleeper_user_id,
-    balanceCents: account.balance_cents,
-    openExposureCents: openExposureCents(account.id),
-    // Account-wide, not week-scoped: it is the answer to "what am I worth", and money riding
-    // on another league still counts toward that.
+    balanceCents: bankrollCents,
+    openExposureCents: openExposureCents(account.id, leagueId),
+    // League-scoped, not week-scoped: every open bet in THIS league counts, including one on a
+    // week other than the one being shown.
     liveValueCents: valuation.liveValueCents,
     equityCents: valuation.equityCents,
     unrealisedPnlCents: valuation.unrealisedPnlCents,

@@ -25,43 +25,79 @@ const SETUP_TOKEN_TTL_DAYS = 7;
 // Must stay in sync with src/lib/betting/leagues.ts.
 const BETTING_LEAGUES = [
   { leagueId: '1383248044669046784', season: '2026', label: "Graham's Football Fantasy" },
+  { leagueId: '1387607608562565120', season: '2026', label: 'Silverback League' },
 ];
+
+/** Matches START_BALANCE_CENTS in src/lib/betting/constants.ts. */
+const START_BALANCE_CENTS = 100_000;
 
 const BASE_URL = process.env.SITE_URL || 'https://fantasyfootball.edgecdec.com';
 const DB_PATH = path.join(process.cwd(), 'data', 'betting.db');
 
+/**
+ * Opens the database and REFUSES to create it.
+ *
+ * This script used to carry its own copy of the schema, which was a standing trap: the copy did not
+ * know about per-league bankrolls, so seeding a fresh database here produced an account_leagues
+ * table with no balance_cents and money that silently had nowhere to live. The app owns the schema
+ * and its migrations; this script is a consumer.
+ */
 function openDb() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  if (!fs.existsSync(DB_PATH)) {
+    throw new Error(
+      `No database at ${DB_PATH}. Start the app once so it can create and migrate the schema, `
+      + 'then re-run this script.',
+    );
+  }
   const db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS accounts (
-      id TEXT PRIMARY KEY, sleeper_user_id TEXT UNIQUE NOT NULL,
-      username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
-      password_hash TEXT, is_admin INTEGER NOT NULL DEFAULT 0,
-      balance_cents INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS account_leagues (
-      account_id TEXT NOT NULL REFERENCES accounts(id),
-      league_id TEXT NOT NULL, season TEXT NOT NULL,
-      PRIMARY KEY (account_id, league_id)
-    );
-    CREATE TABLE IF NOT EXISTS setup_tokens (
-      token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id),
-      expires_at TEXT NOT NULL, used_at TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS ledger (
-      id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id),
-      amount_cents INTEGER NOT NULL, reason TEXT NOT NULL, ref_id TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_ledger_account ON ledger(account_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_setup_tokens_account ON setup_tokens(account_id);
-  `);
+
+  const required = [
+    ['account_leagues', 'balance_cents'],
+    ['ledger', 'league_id'],
+  ];
+  for (const [table, column] of required) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+    if (!cols.includes(column)) {
+      throw new Error(
+        `${table}.${column} is missing — this database predates per-league bankrolls. Start the `
+        + 'app once to run migrations, then re-run this script.',
+      );
+    }
+  }
   return db;
+}
+
+/**
+ * Grants one league's opening bankroll, once, mirroring accounts.ts exactly.
+ *
+ * All three writes or none: the ledger row, the league bankroll, and the account-wide cache. A
+ * grant that moved only two of them would leave a balance disagreeing with the ledger, which is
+ * money either invented or lost.
+ */
+function grantLeagueBankroll(db, accountId, leagueId) {
+  const already = db
+    .prepare(
+      `SELECT 1 AS ok FROM ledger
+       WHERE account_id = ? AND league_id = ? AND reason = 'initial_grant'`,
+    )
+    .get(accountId, leagueId);
+  if (already) return false;
+
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason)
+       VALUES (?, ?, ?, ?, 'initial_grant')`,
+    ).run(randomUUID(), accountId, leagueId, START_BALANCE_CENTS);
+    db.prepare(
+      `UPDATE account_leagues SET balance_cents = balance_cents + ?
+       WHERE account_id = ? AND league_id = ?`,
+    ).run(START_BALANCE_CENTS, accountId, leagueId);
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?')
+      .run(START_BALANCE_CENTS, accountId);
+  })();
+  return true;
 }
 
 async function fetchLeagueUsers(leagueId) {
@@ -177,15 +213,30 @@ async function main() {
       }
 
       db.prepare(
-        `INSERT OR IGNORE INTO account_leagues (account_id, league_id, season)
-         VALUES (?, ?, ?)`,
+        `INSERT OR IGNORE INTO account_leagues (account_id, league_id, season, balance_cents)
+         VALUES (?, ?, ?, 0)`,
       ).run(account.id, league.leagueId, league.season);
 
       if (account.password_hash === null) {
+        // Not set up yet: completeSetup grants every league they belong to when they set a
+        // password, so nothing is granted here. An unclaimed account holding money would show up
+        // in the standings as a manager who has never logged in.
         const token = issueSetupToken(db, account.id);
         links.push({ name: displayName, url: `${BASE_URL}/betting/setup?token=${token}` });
       } else {
-        console.log(`  ${displayName.padEnd(20)} already set up — no new link`);
+        /*
+         * Already set up, and now in a league they were not in before — so this league's opening
+         * bankroll has to be granted HERE. completeSetup will never run for them again, which is
+         * exactly the gap that would have left the three managers already in Graham's with a
+         * Silverback membership and nothing to bet with.
+         *
+         * Guarded on a ledger row for this league, so re-running the script never grants twice.
+         */
+        const granted = grantLeagueBankroll(db, account.id, league.leagueId);
+        console.log(
+          `  ${displayName.padEnd(20)} already set up — `
+          + (granted ? `granted ${league.label} opening bankroll` : 'no new link'),
+        );
       }
     }
   }

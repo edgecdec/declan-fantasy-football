@@ -191,31 +191,54 @@ function summarise(balanceCents: number, positions: OpenPosition[]): AccountValu
   };
 }
 
-/** Marks every unsettled bet on an account to the latest priced line. */
-export function valueOpenPositions(accountId: string, balanceCents: number): AccountValuation {
-  const rows = getDb()
-    .prepare(`${OPEN_POSITION_SELECT} AND w.account_id = ? ORDER BY w.placed_at DESC`)
-    .all(accountId) as Row[];
+/**
+ * Marks an account's unsettled bets to the latest priced line.
+ *
+ * `leagueId` scopes it to one bankroll, which is what a league page needs: since balances are
+ * per-league, an equity figure that mixed leagues would not reconcile with the balance beside it.
+ * Omit it for a whole-account view, and pass the matching balance.
+ */
+export function valueOpenPositions(
+  accountId: string,
+  balanceCents: number,
+  leagueId?: string,
+): AccountValuation {
+  const db = getDb();
+  const rows = leagueId
+    ? (db
+        .prepare(
+          `${OPEN_POSITION_SELECT} AND w.account_id = ? AND m.league_id = ?
+           ORDER BY w.placed_at DESC`,
+        )
+        .all(accountId, leagueId) as Row[])
+    : (db
+        .prepare(`${OPEN_POSITION_SELECT} AND w.account_id = ? ORDER BY w.placed_at DESC`)
+        .all(accountId) as Row[]);
   return summarise(balanceCents, rows.map(toPosition));
 }
 
 /**
  * The same valuation for many accounts at once, for a standings table.
  *
- * One query rather than one per account, and deliberately NOT scoped to a league: the balance a
- * standings table shows is the account's whole balance, so netting it against only one league's
- * open bets would produce a "worth" that reconciles with nothing.
+ * One query rather than one per account, and scoped to the league whose standings are being shown.
+ * That scoping is required now that bankrolls are per-league: the balance in the table is that
+ * league's, so counting another league's open bets against it would produce a "worth" that
+ * reconciles with nothing on the page.
  */
 export function valueOpenPositionsForAccounts(
   accounts: { id: string; balanceCents: number }[],
+  leagueId: string,
 ): Map<string, AccountValuation> {
   const out = new Map<string, AccountValuation>();
   if (accounts.length === 0) return out;
 
   const placeholders = accounts.map(() => '?').join(',');
   const rows = getDb()
-    .prepare(`${OPEN_POSITION_SELECT} AND w.account_id IN (${placeholders}) ORDER BY w.placed_at DESC`)
-    .all(...accounts.map(a => a.id)) as Row[];
+    .prepare(
+      `${OPEN_POSITION_SELECT} AND m.league_id = ? AND w.account_id IN (${placeholders})
+       ORDER BY w.placed_at DESC`,
+    )
+    .all(leagueId, ...accounts.map(a => a.id)) as Row[];
 
   const byAccount = new Map<string, OpenPosition[]>();
   for (const row of rows) {

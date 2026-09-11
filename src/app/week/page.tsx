@@ -17,6 +17,7 @@ import RatingBreakdown from '@/components/week/RatingBreakdown';
 import PlayFeed from '@/components/plays/PlayFeed';
 import { rateWinProbability } from '@/services/week/winRating';
 import useRememberedUsername from '@/hooks/useRememberedUsername';
+import useRememberedTab from '@/hooks/useRememberedTab';
 import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { getNflStateOrFallback } from '@/services/common/seasonService';
@@ -30,6 +31,9 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /** Live pages refresh on the same cadence the NFL scoreboard proxy revalidates. */
 const REFRESH_MS = 30_000;
+
+/** Matchups, Rooting interest, The Zone. Bounds a remembered index that is no longer valid. */
+const WEEK_TABS = 3;
 
 /**
  * A league name, always clickable.
@@ -575,7 +579,9 @@ export default function WeekPage() {
   const [data, setData] = React.useState<WeeklyOutlook | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState(0);
+  // Matchups / Rooting interest / The Zone, remembered so a slate-long stay on one tab survives
+  // navigation and the auto-refresh.
+  const [tab, setTab] = useRememberedTab('week_tab', WEEK_TABS, 0);
   const [updatedAt, setUpdatedAt] = React.useState<string>('');
 
   // Seed the season and the week being played from Sleeper's own calendar.
@@ -606,6 +612,27 @@ export default function WeekPage() {
       setLoading(false);
     }
   }, [remember, fetchUser]);
+
+  /*
+   * Load once on arrival, without waiting for a click.
+   *
+   * The username is remembered and the week comes from Sleeper's calendar, so everything needed is
+   * already known — making someone press "Load Week" after every refresh was asking them to
+   * re-supply what the page had. The ref guards it to a single automatic load, so clearing the
+   * field or changing week is still the reader's call.
+   *
+   * Deferred through a timeout rather than called inline because `load` sets state synchronously,
+   * and the React Compiler (enabled here) rejects that inside an effect — the same rule that
+   * failed the build on the first version of useRememberedTab.
+   */
+  const autoLoaded = React.useRef(false);
+  React.useEffect(() => {
+    if (autoLoaded.current) return;
+    if (!username || !season || !week) return;
+    autoLoaded.current = true;
+    const t = setTimeout(() => { load(username, season, week); }, 0);
+    return () => clearTimeout(t);
+  }, [username, season, week, load]);
 
   // Poll while a slate is in progress. Stops once nothing is live, so a finished week does
   // not keep hitting Sleeper for an answer that cannot change.

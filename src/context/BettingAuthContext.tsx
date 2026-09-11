@@ -23,6 +23,8 @@ export type BettingLeagueRef = {
   leagueId: string;
   season: string;
   label: string;
+  /** This league's own bankroll. Bankrolls are per-league, so there is no single balance. */
+  balanceCents: number;
 };
 
 export type LedgerRow = {
@@ -98,6 +100,21 @@ export type BetSummary = {
   unrealisedPnlCents: number;
   /** The stalest line behind those figures, so the UI can admit to being behind. */
   pricedAt: string | null;
+  /**
+   * The same figures per league.
+   *
+   * Reported alongside the roll-up rather than instead of it, because a stake is only ever checked
+   * against ONE league's bankroll — a single blended total would imply money is fungible across
+   * leagues when it is not.
+   */
+  byLeague: {
+    leagueId: string;
+    balanceCents: number;
+    openStakeCents: number;
+    liveValueCents: number;
+    equityCents: number;
+    unrealisedPnlCents: number;
+  }[];
 };
 
 type BettingAuthState = {
@@ -137,6 +154,7 @@ const EMPTY_SUMMARY: BetSummary = {
   equityCents: 0,
   unrealisedPnlCents: 0,
   pricedAt: null,
+  byLeague: [],
 };
 
 function readSessionHint(): BettingUser | null {
@@ -214,6 +232,7 @@ export function BettingAuthProvider({ children }: { children: React.ReactNode })
         equityCents: data.equityCents ?? data.balanceCents ?? 0,
         unrealisedPnlCents: data.unrealisedPnlCents ?? 0,
         pricedAt: data.pricedAt ?? null,
+        byLeague: data.leagueValuations ?? [],
       });
       writeSessionHint(data.user ?? null);
     } catch {

@@ -28,10 +28,18 @@ export type Account = {
 export type LedgerEntry = {
   id: string;
   account_id: string;
+  /** Which league's bankroll this movement belongs to. */
+  league_id: string | null;
   amount_cents: number;
   reason: LedgerReason;
   ref_id: string | null;
   created_at: string;
+};
+
+export type LeagueBankroll = {
+  leagueId: string;
+  season: string;
+  balanceCents: number;
 };
 
 /**
@@ -53,41 +61,110 @@ export function findAccountById(accountId: string): Account | undefined {
 }
 
 /**
- * Appends a ledger row and moves the cached balance in one transaction.
+ * Appends a ledger row and moves that league's bankroll, in one transaction.
  *
- * The ledger is the source of truth and is never updated or deleted;
- * `accounts.balance_cents` is a cache so the dashboard doesn't sum the whole
- * history on every read. Correct a mistake with a compensating `adjustment`
- * row, never by editing history. Balances are allowed to go negative by design.
+ * The ledger is the source of truth and is never updated or deleted. Two caches sit on top of it
+ * so a read does not have to sum the whole history: `account_leagues.balance_cents` is the league
+ * bankroll — the number that actually constrains a bet — and `accounts.balance_cents` is the sum
+ * across leagues, for a whole-account figure. Both move here, in the same transaction as the
+ * ledger row, so they cannot disagree with it.
+ *
+ * Correct a mistake with a compensating `adjustment` row, never by editing history. Balances are
+ * allowed to go negative by design.
+ *
+ * Throws when the account is not a member of the league. That is deliberate rather than a silent
+ * no-op: crediting a bankroll that does not exist would write a ledger row against money nobody
+ * can ever see, and money that exists only in the ledger is the worst possible failure here.
  */
 export function creditAccount(
   accountId: string,
+  leagueId: string,
   amountCents: number,
   reason: LedgerReason,
   refId?: string,
 ): number {
   const db = getDb();
   const apply = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO ledger (id, account_id, amount_cents, reason, ref_id)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(randomUUID(), accountId, amountCents, reason, refId ?? null);
+    const membership = db
+      .prepare('SELECT 1 AS ok FROM account_leagues WHERE account_id = ? AND league_id = ?')
+      .get(accountId, leagueId) as { ok: number } | undefined;
+    if (!membership) {
+      throw new Error(`Account ${accountId} has no bankroll in league ${leagueId}`);
+    }
 
     db.prepare(
-      'UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?',
-    ).run(amountCents, accountId);
+      `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason, ref_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(randomUUID(), accountId, leagueId, amountCents, reason, refId ?? null);
+
+    db.prepare(
+      `UPDATE account_leagues SET balance_cents = balance_cents + ?
+       WHERE account_id = ? AND league_id = ?`,
+    ).run(amountCents, accountId, leagueId);
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?')
+      .run(amountCents, accountId);
 
     const row = db
-      .prepare('SELECT balance_cents FROM accounts WHERE id = ?')
-      .get(accountId) as { balance_cents: number } | undefined;
-    if (!row) throw new Error(`Account ${accountId} not found`);
+      .prepare(
+        'SELECT balance_cents FROM account_leagues WHERE account_id = ? AND league_id = ?',
+      )
+      .get(accountId, leagueId) as { balance_cents: number } | undefined;
+    if (!row) throw new Error(`Account ${accountId} not found in league ${leagueId}`);
     return row.balance_cents;
   });
   return apply();
 }
 
-export function getLedger(accountId: string, limit = 100): LedgerEntry[] {
+/** The bankroll an account may stake in one league, or null if they are not a member. */
+export function leagueBalanceCents(accountId: string, leagueId: string): number | null {
+  const row = getDb()
+    .prepare('SELECT balance_cents FROM account_leagues WHERE account_id = ? AND league_id = ?')
+    .get(accountId, leagueId) as { balance_cents: number } | undefined;
+  return row ? row.balance_cents : null;
+}
+
+/** Every league this account can bet in, with its own bankroll. */
+export function leagueBankrolls(accountId: string): LeagueBankroll[] {
   return getDb()
+    .prepare(
+      `SELECT league_id AS leagueId, season, balance_cents AS balanceCents
+       FROM account_leagues WHERE account_id = ? ORDER BY season DESC, league_id`,
+    )
+    .all(accountId) as LeagueBankroll[];
+}
+
+/**
+ * Grants the opening bankroll for one league membership, once.
+ *
+ * Guarded on the ledger rather than on the balance, because a legitimate zero is
+ * indistinguishable from an ungranted one — someone who has lost their whole $1,000 must not be
+ * handed another. Returns whether it granted, so a caller can report it.
+ */
+export function ensureLeagueGrant(accountId: string, leagueId: string): boolean {
+  const db = getDb();
+  const already = db
+    .prepare(
+      `SELECT 1 AS ok FROM ledger
+       WHERE account_id = ? AND league_id = ? AND reason = 'initial_grant'`,
+    )
+    .get(accountId, leagueId) as { ok: number } | undefined;
+  if (already) return false;
+  creditAccount(accountId, leagueId, START_BALANCE_CENTS, 'initial_grant');
+  return true;
+}
+
+/** `leagueId` narrows the ledger to one bankroll; omit it for the whole account. */
+export function getLedger(accountId: string, limit = 100, leagueId?: string): LedgerEntry[] {
+  const db = getDb();
+  if (leagueId) {
+    return db
+      .prepare(
+        `SELECT * FROM ledger WHERE account_id = ? AND league_id = ?
+         ORDER BY created_at DESC, id DESC LIMIT ?`,
+      )
+      .all(accountId, leagueId, limit) as LedgerEntry[];
+  }
+  return db
     .prepare(
       `SELECT * FROM ledger WHERE account_id = ?
        ORDER BY created_at DESC, id DESC LIMIT ?`,
@@ -169,22 +246,35 @@ export function completeSetup(raw: string, passwordHash: string): Account | null
       "UPDATE setup_tokens SET used_at = datetime('now') WHERE token_hash = ?",
     ).run(tokenHash);
 
-    // First-time setup is also when the opening balance lands. Guarded on the
-    // account never having had a grant, so a re-issued token can't double it.
-    const granted = db
-      .prepare(
-        "SELECT 1 AS ok FROM ledger WHERE account_id = ? AND reason = 'initial_grant'",
-      )
-      .get(account.id) as { ok: number } | undefined;
+    /*
+     * First-time setup is when the opening balance lands — now once PER LEAGUE, since each has its
+     * own bankroll. Guarded on a ledger row for that league, so a re-issued token cannot double
+     * anything, and someone added to a second league later gets that league's grant without
+     * touching the first.
+     */
+    const leagues = db
+      .prepare('SELECT league_id FROM account_leagues WHERE account_id = ?')
+      .all(account.id) as { league_id: string }[];
 
-    if (!granted) {
+    for (const { league_id: leagueId } of leagues) {
+      const granted = db
+        .prepare(
+          `SELECT 1 AS ok FROM ledger
+           WHERE account_id = ? AND league_id = ? AND reason = 'initial_grant'`,
+        )
+        .get(account.id, leagueId) as { ok: number } | undefined;
+      if (granted) continue;
+
       db.prepare(
-        `INSERT INTO ledger (id, account_id, amount_cents, reason)
-         VALUES (?, ?, ?, 'initial_grant')`,
-      ).run(randomUUID(), account.id, START_BALANCE_CENTS);
+        `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason)
+         VALUES (?, ?, ?, ?, 'initial_grant')`,
+      ).run(randomUUID(), account.id, leagueId, START_BALANCE_CENTS);
       db.prepare(
-        'UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?',
-      ).run(START_BALANCE_CENTS, account.id);
+        `UPDATE account_leagues SET balance_cents = balance_cents + ?
+         WHERE account_id = ? AND league_id = ?`,
+      ).run(START_BALANCE_CENTS, account.id, leagueId);
+      db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?')
+        .run(START_BALANCE_CENTS, account.id);
     }
 
     return db.prepare('SELECT * FROM accounts WHERE id = ?').get(account.id) as Account;

@@ -176,6 +176,74 @@ function initDb(database: Database.Database): void {
   // renames themselves after the bet was struck.
   addColumnIfMissing(database, 'markets', 'name_a', 'TEXT');
   addColumnIfMissing(database, 'markets', 'name_b', 'TEXT');
+
+  /*
+   * Per-league bankrolls.
+   *
+   * Balances used to live only on `accounts`, so one pot funded every league. With a second league
+   * that is wrong: a bad week in one should not shrink what you can stake in the other, and a
+   * league's standings should rank people on that league's money.
+   *
+   * `account_leagues.balance_cents` is now the bankroll, and `ledger.league_id` says which pot each
+   * movement belongs to. `accounts.balance_cents` is KEPT, as a cache of the sum across leagues —
+   * see creditAccount. Leaving it unmaintained would be worse than removing it: a stale column
+   * that still looks authoritative is exactly the kind of thing that gets read by mistake.
+   */
+  addColumnIfMissing(database, 'account_leagues', 'balance_cents', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(database, 'ledger', 'league_id', 'TEXT');
+  database.exec(
+    'CREATE INDEX IF NOT EXISTS idx_ledger_account_league ON ledger(account_id, league_id)',
+  );
+
+  backfillLeagueBankrolls(database);
+}
+
+/** The league every pre-existing balance and ledger row belongs to. */
+const ORIGINAL_BETTING_LEAGUE = '1383248044669046784';
+const BANKROLL_MIGRATION_KEY = 'migration_per_league_bankrolls';
+
+/**
+ * Moves the single shared balance onto the league it was always really in.
+ *
+ * Every row that existed before per-league bankrolls belongs to Graham's league, because it was
+ * the only one betting was enabled for — so the migration is an attribution, not a split, and
+ * nothing has to be divided or guessed.
+ *
+ * Guarded through `meta` and not merely by "is the column empty", because a legitimate zero
+ * balance is indistinguishable from an unmigrated one, and running twice would double every
+ * balance while leaving the ledger untouched.
+ */
+function backfillLeagueBankrolls(database: Database.Database): void {
+  const done = database
+    .prepare('SELECT value FROM meta WHERE key = ?')
+    .get(BANKROLL_MIGRATION_KEY) as { value: string } | undefined;
+  if (done) return;
+
+  database.transaction(() => {
+    database
+      .prepare('UPDATE ledger SET league_id = ? WHERE league_id IS NULL')
+      .run(ORIGINAL_BETTING_LEAGUE);
+
+    // Taken from the ledger rather than copied off accounts.balance_cents: the ledger is the
+    // source of truth, so this also repairs a cached balance that had drifted.
+    database
+      .prepare(
+        `UPDATE account_leagues
+         SET balance_cents = COALESCE((
+           SELECT SUM(l.amount_cents) FROM ledger l
+           WHERE l.account_id = account_leagues.account_id AND l.league_id = account_leagues.league_id
+         ), 0)
+         WHERE league_id = ?`,
+      )
+      .run(ORIGINAL_BETTING_LEAGUE);
+
+    database
+      .prepare(
+        `INSERT INTO meta (key, value, updated_at) VALUES (?, datetime('now'), datetime('now'))
+         ON CONFLICT(key) DO NOTHING`,
+      )
+      .run(BANKROLL_MIGRATION_KEY);
+  })();
 }
 
 /**

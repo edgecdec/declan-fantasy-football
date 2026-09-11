@@ -41,9 +41,26 @@ export type PlaceResult =
   | { ok: true; wagerId: string; balanceCents: number; toWinCents: number }
   | { ok: false; error: string; status: number };
 
-/** Total stake on wagers that have not settled yet. */
-export function openExposureCents(accountId: string): number {
-  const row = getDb()
+/**
+ * Total stake on wagers that have not settled yet, in one league.
+ *
+ * League-scoped because the negative-balance cap is now per bankroll: being under water in one
+ * league must not restrict what you can stake in another, and vice versa. Omit `leagueId` only for
+ * a whole-account figure that is never used as a limit.
+ */
+export function openExposureCents(accountId: string, leagueId?: string): number {
+  const db = getDb();
+  if (leagueId) {
+    const row = db
+      .prepare(
+        `SELECT COALESCE(SUM(w.stake_cents), 0) AS total
+         FROM wagers w JOIN markets m ON m.id = w.market_id
+         WHERE w.account_id = ? AND w.status = 'open' AND m.league_id = ?`,
+      )
+      .get(accountId, leagueId) as { total: number };
+    return row.total;
+  }
+  const row = db
     .prepare(
       `SELECT COALESCE(SUM(stake_cents), 0) AS total
        FROM wagers WHERE account_id = ? AND status = 'open'`,
@@ -101,21 +118,33 @@ export function placeWager(
       };
     }
 
-    const account = db
-      .prepare('SELECT id, balance_cents FROM accounts WHERE id = ?')
-      .get(accountId) as { id: string; balance_cents: number } | undefined;
-    if (!account) return { ok: false, error: 'Account not found.', status: 401 };
+    /*
+     * The bankroll is the one for THIS market's league, and so is the open exposure.
+     *
+     * Read inside the transaction, as before, so two simultaneous requests cannot both pass the
+     * check and overdraw. Reading `accounts.balance_cents` here instead would let a loss in one
+     * league block a bet in another, which is the whole point of separating them.
+     */
+    const bankroll = db
+      .prepare(
+        'SELECT balance_cents FROM account_leagues WHERE account_id = ? AND league_id = ?',
+      )
+      .get(accountId, market.league_id) as { balance_cents: number } | undefined;
+    if (!bankroll) {
+      return { ok: false, error: 'You are not a member of this league.', status: 403 };
+    }
 
     const openStake = (
       db
         .prepare(
-          `SELECT COALESCE(SUM(stake_cents), 0) AS total
-           FROM wagers WHERE account_id = ? AND status = 'open'`,
+          `SELECT COALESCE(SUM(w.stake_cents), 0) AS total
+           FROM wagers w JOIN markets m ON m.id = w.market_id
+           WHERE w.account_id = ? AND w.status = 'open' AND m.league_id = ?`,
         )
-        .get(accountId) as { total: number }
+        .get(accountId, market.league_id) as { total: number }
     ).total;
 
-    if (account.balance_cents < 0) {
+    if (bankroll.balance_cents < 0) {
       // Under water: capped on TOTAL unsettled stake, not per bet, so someone deep
       // in the hole can't stack the cap across every matchup in a week.
       const remaining = NEGATIVE_OPEN_EXPOSURE_CAP_CENTS - openStake;
@@ -129,8 +158,8 @@ export function placeWager(
           status: 400,
         };
       }
-    } else if (stakeCents > account.balance_cents) {
-      return { ok: false, error: 'Stake exceeds your balance.', status: 400 };
+    } else if (stakeCents > bankroll.balance_cents) {
+      return { ok: false, error: 'Stake exceeds your balance in this league.', status: 400 };
     }
 
     const price = side === 'a' ? market.price_a : market.price_b;
@@ -142,20 +171,25 @@ export function placeWager(
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(wagerId, accountId, marketId, side, stakeCents, price, toWin);
 
-    // The stake leaves the balance now; a win returns stake + profit at settlement.
+    // The stake leaves the league's bankroll now; a win returns stake + profit at settlement.
     db.prepare(
-      `INSERT INTO ledger (id, account_id, amount_cents, reason, ref_id)
-       VALUES (?, ?, ?, 'wager_place', ?)`,
-    ).run(randomUUID(), accountId, -stakeCents, wagerId);
-    db.prepare('UPDATE accounts SET balance_cents = balance_cents - ? WHERE id = ?').run(
-      stakeCents,
-      accountId,
-    );
+      `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason, ref_id)
+       VALUES (?, ?, ?, ?, 'wager_place', ?)`,
+    ).run(randomUUID(), accountId, market.league_id, -stakeCents, wagerId);
+    db.prepare(
+      `UPDATE account_leagues SET balance_cents = balance_cents - ?
+       WHERE account_id = ? AND league_id = ?`,
+    ).run(stakeCents, accountId, market.league_id);
+    // The account-wide cache moves with it, or it drifts from the sum of the bankrolls.
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents - ? WHERE id = ?')
+      .run(stakeCents, accountId);
 
     const after = (
-      db.prepare('SELECT balance_cents FROM accounts WHERE id = ?').get(accountId) as {
-        balance_cents: number;
-      }
+      db
+        .prepare(
+          'SELECT balance_cents FROM account_leagues WHERE account_id = ? AND league_id = ?',
+        )
+        .get(accountId, market.league_id) as { balance_cents: number }
     ).balance_cents;
 
     return { ok: true, wagerId, balanceCents: after, toWinCents: toWin };
@@ -215,7 +249,7 @@ export function settleFinishedMarkets(
           db.prepare(
             `UPDATE wagers SET status = 'void', settled_at = datetime('now') WHERE id = ?`,
           ).run(w.id);
-          credit(db, w.account_id, w.stake_cents, 'wager_void', w.id);
+          credit(db, w.account_id, market.league_id, w.stake_cents, 'wager_void', w.id);
           paid += w.stake_cents;
           continue;
         }
@@ -224,7 +258,7 @@ export function settleFinishedMarkets(
           db.prepare(
             `UPDATE wagers SET status = 'won', settled_at = datetime('now') WHERE id = ?`,
           ).run(w.id);
-          credit(db, w.account_id, payout, 'wager_win', w.id);
+          credit(db, w.account_id, market.league_id, payout, 'wager_win', w.id);
           paid += payout;
         } else {
           // The stake already left the balance at placement, so a loss is just a
@@ -243,17 +277,30 @@ export function settleFinishedMarkets(
 
 type DbHandle = ReturnType<typeof getDb>;
 
+/**
+ * A payout, into the bankroll of the league the bet was struck in.
+ *
+ * A local copy of creditAccount rather than a call to it, because settlement runs inside one
+ * transaction over a whole league week and must not open a nested one. The two must stay in step:
+ * ledger row, league bankroll, account-wide cache — all three, or a payout lands somewhere it
+ * cannot be spent.
+ */
 function credit(
   db: DbHandle,
   accountId: string,
+  leagueId: string,
   amountCents: number,
   reason: string,
   refId: string,
 ): void {
   db.prepare(
-    `INSERT INTO ledger (id, account_id, amount_cents, reason, ref_id)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(randomUUID(), accountId, amountCents, reason, refId);
+    `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason, ref_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), accountId, leagueId, amountCents, reason, refId);
+  db.prepare(
+    `UPDATE account_leagues SET balance_cents = balance_cents + ?
+     WHERE account_id = ? AND league_id = ?`,
+  ).run(amountCents, accountId, leagueId);
   db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(
     amountCents,
     accountId,

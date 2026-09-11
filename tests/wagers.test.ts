@@ -30,14 +30,36 @@ async function load() {
   return { wagers, db: getDb() };
 }
 
-function seedAccount(db: ReturnType<DbMod['getDb']>, name: string, cents: number, sleeperId: string) {
+/** The league every market in this file belongs to. */
+const LEAGUE = 'L1';
+
+/**
+ * An account with a bankroll IN A LEAGUE.
+ *
+ * The membership row is not optional scaffolding: bankrolls live on account_leagues, so an account
+ * without one has no money to stake and placeWager refuses it. That is deliberate — a credit
+ * against a bankroll that does not exist would write a ledger row for money nobody can ever see.
+ */
+function seedAccount(
+  db: ReturnType<DbMod['getDb']>,
+  name: string,
+  cents: number,
+  sleeperId: string,
+  leagueId = LEAGUE,
+) {
   const id = randomUUID();
   db.prepare(
     `INSERT INTO accounts (id, sleeper_user_id, username, display_name, balance_cents)
      VALUES (?, ?, ?, ?, ?)`,
   ).run(id, sleeperId, name, name, cents);
-  db.prepare(`INSERT INTO ledger (id, account_id, amount_cents, reason) VALUES (?, ?, ?, 'initial_grant')`)
-    .run(randomUUID(), id, cents);
+  db.prepare(
+    `INSERT INTO account_leagues (account_id, league_id, season, balance_cents)
+     VALUES (?, ?, '2026', ?)`,
+  ).run(id, leagueId, cents);
+  db.prepare(
+    `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason)
+     VALUES (?, ?, ?, ?, 'initial_grant')`,
+  ).run(randomUUID(), id, leagueId, cents);
   return id;
 }
 
@@ -57,13 +79,67 @@ function seedMarket(
   return id;
 }
 
+/**
+ * Both caches agree with the ledger, which is the only real source of truth.
+ *
+ * Two of them now: the per-league bankroll that constrains a stake, and the account-wide total.
+ * Checking only one would let the other drift silently, and a bankroll that disagrees with the
+ * ledger is money either invented or lost.
+ */
 function ledgerMatchesBalances(db: ReturnType<DbMod['getDb']>) {
-  const rows = db.prepare(
-    `SELECT a.username, a.balance_cents AS bal,
+  const perLeague = db.prepare(
+    `SELECT al.account_id, al.league_id, al.balance_cents AS bal,
+            COALESCE((SELECT SUM(amount_cents) FROM ledger l
+                      WHERE l.account_id = al.account_id AND l.league_id = al.league_id), 0) AS sum
+     FROM account_leagues al`,
+  ).all() as { bal: number; sum: number }[];
+
+  const accountWide = db.prepare(
+    `SELECT a.balance_cents AS bal,
             COALESCE((SELECT SUM(amount_cents) FROM ledger WHERE account_id = a.id), 0) AS sum
      FROM accounts a`,
-  ).all() as { username: string; bal: number; sum: number }[];
-  return rows.every(r => r.bal === r.sum);
+  ).all() as { bal: number; sum: number }[];
+
+  return perLeague.every(r => r.bal === r.sum) && accountWide.every(r => r.bal === r.sum);
+}
+
+
+/**
+ * A second (or third) league bankroll for an existing account.
+ *
+ * Writes all THREE places production writes — the membership row, the ledger, and the
+ * account-wide cache. Seeding only the first two is what made these tests fail on
+ * ledgerMatchesBalances: the invariant is real and my scaffolding was the thing breaking it.
+ */
+function addLeague(
+  db: ReturnType<DbMod['getDb']>,
+  accountId: string,
+  leagueId: string,
+  cents: number,
+) {
+  db.prepare(
+    `INSERT INTO account_leagues (account_id, league_id, season, balance_cents)
+     VALUES (?, ?, '2026', ?)`,
+  ).run(accountId, leagueId, cents);
+  if (cents !== 0) {
+    db.prepare(
+      `INSERT INTO ledger (id, account_id, league_id, amount_cents, reason)
+       VALUES (?, ?, ?, ?, 'initial_grant')`,
+    ).run(randomUUID(), accountId, leagueId, cents);
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?')
+      .run(cents, accountId);
+  }
+}
+
+/** A market belonging to a specific league. */
+function seedMarketIn(
+  db: ReturnType<DbMod['getDb']>,
+  leagueId: string,
+  matchupId: number,
+) {
+  const id = seedMarket(db, { matchupId });
+  db.prepare('UPDATE markets SET league_id = ? WHERE id = ?').run(leagueId, id);
+  return id;
 }
 
 test('a stake below the minimum is refused', async () => {
@@ -210,4 +286,76 @@ test('the client cannot influence the price it gets', async () => {
   // Taken from the server's market row, and the payout derived from it.
   assert.equal(row.price, -250);
   assert.equal(row.to_win_cents, 4_000);
+});
+
+/**
+ * Per-league bankrolls.
+ *
+ * The property that matters: a loss in one league must not shrink what you can stake in another.
+ * Before this, one pot funded every league, so a bad Sunday in Graham's silently capped your
+ * Silverback bets.
+ */
+test('a bankroll in one league is not spendable in another', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'twoLeagues', 20_000, 'sleeper-two', 'LA');
+  addLeague(db, id, 'LB', 500);
+
+  const marketA = seedMarketIn(db, 'LA', 9001);
+  const marketB = seedMarketIn(db, 'LB', 9002);
+
+  // $150 is fine in LA ($200 pot) and refused in LB ($5 pot) — the whole point.
+  assert.equal(w.placeWager(id, null, marketA, 'a', 15_000).ok, true);
+  const refused = w.placeWager(id, null, marketB, 'a', 15_000);
+  assert.equal(refused.ok, false);
+  if (!refused.ok) assert.match(refused.error, /balance in this league/);
+
+  // And LB's own pot still works at its own size.
+  assert.equal(w.placeWager(id, null, marketB, 'a', 400).ok, true);
+  assert.ok(ledgerMatchesBalances(db));
+});
+
+test('the negative-balance cap is per league, not per account', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'underWater', -5_000, 'sleeper-uw', 'LC');
+  addLeague(db, id, 'LD', 50_000);
+
+  const cMarket = seedMarketIn(db, 'LC', 9101);
+  const dMarket = seedMarketIn(db, 'LD', 9102);
+
+  // Under water in LC, so capped there...
+  assert.equal(w.placeWager(id, null, cMarket, 'a', 40_000).ok, false);
+  // ...but healthy in LD, where the same stake is fine. An account-wide cap would refuse both.
+  assert.equal(w.placeWager(id, null, dMarket, 'a', 40_000).ok, true);
+  assert.ok(ledgerMatchesBalances(db));
+});
+
+test('a payout lands in the league the bet was struck in', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'settler', 10_000, 'sleeper-settle', 'LE');
+  addLeague(db, id, 'LF', 0);
+
+  const market = seedMarketIn(db, 'LE', 9201);
+  assert.equal(w.placeWager(id, null, market, 'a', 5_000).ok, true);
+
+  w.settleFinishedMarkets('LE', '2026', 1, new Map([[9201, { a: 120, b: 100 }]]));
+
+  const bal = (league: string) => (db.prepare(
+    'SELECT balance_cents b FROM account_leagues WHERE account_id = ? AND league_id = ?',
+  ).get(id, league) as { b: number }).b;
+
+  // Stake back plus profit, all in LE. The other league must not have moved by a cent.
+  assert.ok(bal('LE') > 10_000, `LE balance ${bal('LE')} should exceed the original 10000`);
+  assert.equal(bal('LF'), 0);
+  assert.ok(ledgerMatchesBalances(db));
+});
+
+test('a bet in a league you are not in is refused, not credited into nowhere', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'outsider', 10_000, 'sleeper-out', 'LG');
+  const foreign = seedMarketIn(db, 'LH', 9301);
+
+  const result = w.placeWager(id, null, foreign, 'a', 1_000);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.status, 403);
+  assert.ok(ledgerMatchesBalances(db));
 });

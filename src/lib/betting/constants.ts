@@ -33,3 +33,26 @@ export const LEDGER_REASON_LABELS: Record<string, string> = {
   wager_void: 'Bet voided',
   adjustment: 'Adjustment',
 };
+
+/**
+ * Leagues whose members may bet. Single source of truth — adding a league is one entry here plus a
+ * re-run of scripts/seed_betting_accounts.mjs.
+ *
+ * Lives in constants.ts, which imports nothing server-only, because the betting dashboard is a
+ * client component and needs the labels. It used to sit in leagues.ts alongside the membership
+ * queries — importing that from the client pulled better-sqlite3 into the browser bundle and the
+ * build failed on `Can't resolve 'fs'`.
+ *
+ * Each league carries its OWN bankroll (account_leagues.balance_cents), so adding one does not
+ * dilute an existing balance and a loss in one cannot restrict staking in another. Scoring settings
+ * differ between them and that is fine — every market is priced with its own league's settings.
+ *
+ * Note there are two Silverback leagues in this user's account, a redraft and a dynasty. This is
+ * the redraft one; the dynasty (1387602471991414784) is deliberately not enabled.
+ */
+export const BETTING_LEAGUES = [
+  { leagueId: '1383248044669046784', season: '2026', label: "Graham's Football Fantasy" },
+  { leagueId: '1387607608562565120', season: '2026', label: 'Silverback League' },
+] as const;
+
+export type BettingLeague = typeof BETTING_LEAGUES[number];

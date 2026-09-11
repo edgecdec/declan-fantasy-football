@@ -67,28 +67,32 @@ export async function GET(request: Request) {
 
   const rows = db
     .prepare(
-      `SELECT a.id AS account_id, a.username, a.display_name, a.balance_cents,
+      // al.balance_cents, not a.balance_cents: this league's bankroll is what this table ranks.
+      `SELECT a.id AS account_id, a.username, a.display_name, al.balance_cents AS balance_cents,
               CASE WHEN a.password_hash IS NULL THEN 0 ELSE 1 END AS claimed,
-              COALESCE((SELECT SUM(stake_cents) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status = 'open'), 0) AS open_stake,
-              COALESCE((SELECT COUNT(*) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status = 'open'), 0) AS open_count,
-              COALESCE((SELECT COUNT(*) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status <> 'open'), 0) AS settled_count,
-              COALESCE((SELECT COUNT(*) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status = 'won'), 0) AS won,
-              COALESCE((SELECT COUNT(*) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status = 'lost'), 0) AS lost,
-              COALESCE((SELECT COUNT(*) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status = 'void'), 0) AS void_count,
-              COALESCE((SELECT SUM(stake_cents) FROM wagers w WHERE w.account_id = a.id), 0) AS total_staked,
+              -- Every wager aggregate is joined through markets to THIS league. Without that,
+              -- a second league's bets would show up in this league's record and ROI.
+              COALESCE((SELECT SUM(w.stake_cents) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status = 'open' AND m.league_id = al.league_id), 0) AS open_stake,
+              COALESCE((SELECT COUNT(*) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status = 'open' AND m.league_id = al.league_id), 0) AS open_count,
+              COALESCE((SELECT COUNT(*) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status <> 'open' AND m.league_id = al.league_id), 0) AS settled_count,
+              COALESCE((SELECT COUNT(*) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status = 'won' AND m.league_id = al.league_id), 0) AS won,
+              COALESCE((SELECT COUNT(*) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status = 'lost' AND m.league_id = al.league_id), 0) AS lost,
+              COALESCE((SELECT COUNT(*) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status = 'void' AND m.league_id = al.league_id), 0) AS void_count,
+              COALESCE((SELECT SUM(w.stake_cents) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND m.league_id = al.league_id), 0) AS total_staked,
               -- Profit counts RESOLVED wagers only. Summing every wager_place ledger
               -- row would show someone with nothing but open bets at -100%, when in
               -- fact they have lost nothing yet — that stake is at risk, not gone.
-              COALESCE((SELECT SUM(stake_cents) FROM wagers w
-                        WHERE w.account_id = a.id AND w.status <> 'open'), 0) AS settled_staked,
+              COALESCE((SELECT SUM(w.stake_cents) FROM wagers w JOIN markets m ON m.id = w.market_id
+                        WHERE w.account_id = a.id AND w.status <> 'open' AND m.league_id = al.league_id), 0) AS settled_staked,
               COALESCE((SELECT SUM(l.amount_cents) FROM ledger l
-                        WHERE l.account_id = a.id
+                        WHERE l.account_id = a.id AND l.league_id = al.league_id
                           AND l.reason IN ('wager_win','wager_void')), 0) AS returns
        FROM accounts a
        JOIN account_leagues al ON al.account_id = a.id
@@ -111,6 +115,7 @@ export async function GET(request: Request) {
 
   const valuations = valueOpenPositionsForAccounts(
     rows.map(r => ({ id: r.account_id, balanceCents: r.balance_cents })),
+    leagueId,
   );
 
   const standings = rows.map(r => {

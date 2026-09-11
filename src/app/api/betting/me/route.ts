@@ -4,8 +4,9 @@ import {
   NEGATIVE_OPEN_EXPOSURE_CAP_CENTS,
   findAccountById,
   getLedger,
+  leagueBankrolls,
 } from '@/lib/betting/accounts';
-import { BETTING_LEAGUES } from '@/lib/betting/leagues';
+import { BETTING_LEAGUES, syncLeagueMemberships } from '@/lib/betting/leagues';
 import { getDb } from '@/lib/db';
 import { settleQuietly } from '@/lib/betting/settlement';
 import { priceLeagueWeek } from '@/lib/betting/pricing';
@@ -42,6 +43,15 @@ export async function GET(request: Request) {
   }
 
   /*
+   * Pick up any newly-enabled league this account is already in on Sleeper.
+   *
+   * Before the bankrolls are read, so a league enabled since their last visit shows up with its
+   * opening balance on this very response rather than on the next one. Swallowed on failure: a
+   * Sleeper hiccup should cost a league appearing a few minutes later, not the dashboard.
+   */
+  const joinedLeagues = await syncLeagueMemberships(account).catch(() => []);
+
+  /*
    * Refresh the lines behind any open bet before valuing them.
    *
    * Only the weeks this account actually has money on, so the cost is proportional to their
@@ -56,14 +66,19 @@ export async function GET(request: Request) {
     stale.map(w => priceLeagueWeek(w.leagueId, w.week).catch(() => undefined)),
   );
 
-  const leagueRows = getDb()
-    .prepare('SELECT league_id, season FROM account_leagues WHERE account_id = ?')
-    .all(account.id) as { league_id: string; season: string }[];
-
-  const leagues = leagueRows.map(row => ({
-    leagueId: row.league_id,
-    season: row.season,
-    label: BETTING_LEAGUES.find(l => l.leagueId === row.league_id)?.label ?? 'Unknown league',
+  /*
+   * One bankroll per league, each with its own valuation.
+   *
+   * The dashboard spans leagues, so it reports them individually AND summed. A single blended
+   * figure would be the thing per-league bankrolls exist to stop: it would imply money is fungible
+   * across leagues when a stake is checked against one pot only.
+   */
+  const bankrolls = leagueBankrolls(account.id);
+  const leagues = bankrolls.map(b => ({
+    leagueId: b.leagueId,
+    season: b.season,
+    label: BETTING_LEAGUES.find(l => l.leagueId === b.leagueId)?.label ?? 'Unknown league',
+    balanceCents: b.balanceCents,
   }));
 
   /*
@@ -98,7 +113,27 @@ export async function GET(request: Request) {
    * picture: see src/lib/betting/valuation.ts for why it uses the fair probability rather than
    * the priced one, and why a fresh bet is worth slightly less than its stake.
    */
-  const valuation = valueOpenPositions(account.id, account.balance_cents);
+  const perLeague = bankrolls.map(b => ({
+    leagueId: b.leagueId,
+    valuation: valueOpenPositions(account.id, b.balanceCents, b.leagueId),
+  }));
+  // The account-wide roll-up. Every component is a sum of per-league figures, so it can never
+  // disagree with the individual cards below it.
+  const valuation = {
+    balanceCents: bankrolls.reduce((s, b) => s + b.balanceCents, 0),
+    openStakeCents: perLeague.reduce((s, p) => s + p.valuation.openStakeCents, 0),
+    liveValueCents: perLeague.reduce((s, p) => s + p.valuation.liveValueCents, 0),
+    equityCents: perLeague.reduce((s, p) => s + p.valuation.equityCents, 0),
+    unrealisedPnlCents: perLeague.reduce((s, p) => s + p.valuation.unrealisedPnlCents, 0),
+    positions: perLeague.flatMap(p => p.valuation.positions),
+    oldestPricedAt: perLeague.reduce<string | null>(
+      (oldest, p) =>
+        p.valuation.oldestPricedAt !== null && (oldest === null || p.valuation.oldestPricedAt < oldest)
+          ? p.valuation.oldestPricedAt
+          : oldest,
+      null,
+    ),
+  };
   const openStakeCents = valuation.openStakeCents;
 
   // Realised P&L only. An open bet has no result yet, and counting its stake as a
@@ -126,9 +161,21 @@ export async function GET(request: Request) {
       displayName: account.display_name,
       isAdmin: account.is_admin === 1,
     },
-    balanceCents: account.balance_cents,
+    // The sum of the per-league bankrolls, which is also what accounts.balance_cents caches.
+    balanceCents: valuation.balanceCents,
+    leagueValuations: perLeague.map(p => ({
+      leagueId: p.leagueId,
+      balanceCents: p.valuation.balanceCents,
+      openStakeCents: p.valuation.openStakeCents,
+      liveValueCents: p.valuation.liveValueCents,
+      equityCents: p.valuation.equityCents,
+      unrealisedPnlCents: p.valuation.unrealisedPnlCents,
+    })),
     // Surfaced so the UI can explain the rule before someone tries to bet.
     negativeExposureCapCents: NEGATIVE_OPEN_EXPOSURE_CAP_CENTS,
+    // Surfaced so the UI can tell someone a league just appeared, rather than it materialising
+    // with a thousand dollars in it and no explanation.
+    joinedLeagues,
     leagues,
     bets,
     openStakeCents,

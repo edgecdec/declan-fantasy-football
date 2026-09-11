@@ -12,7 +12,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PageHeader from '@/components/common/PageHeader';
 import DataTable, { Column } from '@/components/common/DataTable';
 import { useBettingAuth, BetRow, OpenPositionRow } from '@/context/BettingAuthContext';
-import { formatCents, LEDGER_REASON_LABELS } from '@/lib/betting/constants';
+import { formatCents, LEDGER_REASON_LABELS, BETTING_LEAGUES } from '@/lib/betting/constants';
 
 /**
  * Why an open bet's P&L is shown at all, and why it can start negative.
@@ -161,9 +161,21 @@ function signedCents(cents: number): string {
 }
 
 function BetHistory({ bets, positions }: { bets: BetRow[]; positions: OpenPositionRow[] }) {
+  const LEAGUE_LABELS: Record<string, string> = Object.fromEntries(
+    BETTING_LEAGUES.map(l => [l.leagueId, l.label]),
+  );
   const rows = React.useMemo(() => buildHistoryRows(bets, positions), [bets, positions]);
 
   const columns: Column<HistoryRow>[] = [
+    { id: 'league_id', label: 'League',
+      // Named per row because the history now spans leagues and a week number alone is ambiguous.
+      sortValue: r => LEAGUE_LABELS[r.league_id] ?? r.league_id,
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+          {LEAGUE_LABELS[r.league_id] ?? 'Unknown'}
+        </Box>
+      ),
+    },
     { id: 'week', label: 'Wk', numeric: true },
     {
       id: 'pick', label: 'Your pick',
@@ -285,16 +297,24 @@ function Dashboard() {
             <Typography variant="h3" sx={{ mt: 0.5, color: negative ? 'error.main' : 'success.main' }}>
               {formatCents(headlineCents)}
             </Typography>
+            {/*
+              * Across every league, and said so explicitly once there is more than one.
+              *
+              * Bankrolls are per league: a stake is only ever checked against the pot for the
+              * league it is in. A headline that looked like one spendable balance would be a lie
+              * about what you can actually bet, so the per-league figures sit right below it.
+              */}
             {hasOpen ? (
               <Typography variant="caption" color="text.secondary">
-                Live worth — {formatCents(balanceCents)} settled plus{' '}
-                {formatCents(summary.liveValueCents)} riding on {openPositions.length} open bet
-                {openPositions.length === 1 ? '' : 's'}
+                Live worth{leagues.length > 1 ? ' across all leagues' : ''} —{' '}
+                {formatCents(balanceCents)} settled plus {formatCents(summary.liveValueCents)}{' '}
+                riding on {openPositions.length} open bet{openPositions.length === 1 ? '' : 's'}
                 {negative && ' — you are in the hole'}
               </Typography>
             ) : (
               <Typography variant="caption" color="text.secondary">
-                Declan Dollars {negative && '— you are in the hole'}
+                Declan Dollars{leagues.length > 1 ? ' across all leagues' : ''}
+                {negative && ' — you are in the hole'}
               </Typography>
             )}
           </Box>
@@ -342,19 +362,42 @@ function Dashboard() {
         {leagues.length > 0 && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {leagues.map(l => (
-                <Button
-                  key={l.leagueId}
-                  component={Link}
-                  href={`/betting/${l.leagueId}`}
-                  variant="contained"
-                  size="small"
-                  endIcon={<ArrowForwardIcon />}
-                >
-                  {l.label} ({l.season})
-                </Button>
-              ))}
+            <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+              Each league has its own bankroll — a bad week in one does not shrink what you can
+              stake in another.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+              {leagues.map(l => {
+                const v = summary.byLeague.find(b => b.leagueId === l.leagueId);
+                const worth = v ? v.equityCents : l.balanceCents;
+                const live = v ? v.unrealisedPnlCents : 0;
+                const open = v ? v.openStakeCents : 0;
+                return (
+                  <Button
+                    key={l.leagueId}
+                    component={Link}
+                    href={`/betting/${l.leagueId}`}
+                    variant="outlined"
+                    endIcon={<ArrowForwardIcon />}
+                    sx={{ textTransform: 'none', textAlign: 'left', px: 1.5, py: 1 }}
+                  >
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                        {l.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3 }}>
+                        {formatCents(worth)}
+                        {open > 0 && (
+                          <Box component="span" sx={{ color: pnlColor(live) }}>
+                            {' '}({signedCents(live)} live)
+                          </Box>
+                        )}
+                        {' · '}{l.season}
+                      </Typography>
+                    </Box>
+                  </Button>
+                );
+              })}
             </Box>
           </>
         )}

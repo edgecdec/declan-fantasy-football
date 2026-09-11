@@ -212,13 +212,13 @@ test('many accounts are valued in one pass, and identically to one at a time', (
   const batch = valueOpenPositionsForAccounts([
     { id: ACCOUNT, balanceCents: 100_000 },
     { id: other, balanceCents: 50_000 },
-  ]);
+  ], 'L1');
 
   // The batch path exists for the standings table; it must not be a second, subtly different
   // valuation. Compare it against the single-account path rather than against hand-computed
   // figures, so the two can never drift.
   for (const [id, balance] of [[ACCOUNT, 100_000], [other, 50_000]] as const) {
-    assert.deepEqual(batch.get(id), valueOpenPositions(id, balance));
+    assert.deepEqual(batch.get(id), valueOpenPositions(id, balance, 'L1'));
   }
   assert.equal(batch.get(other)!.openStakeCents, 30_000);
 });
@@ -228,7 +228,7 @@ test('an account with nothing open is still present, worth exactly its balance',
   seedAccount(idle, 77_000);
   clearBets();
 
-  const batch = valueOpenPositionsForAccounts([{ id: idle, balanceCents: 77_000 }]);
+  const batch = valueOpenPositionsForAccounts([{ id: idle, balanceCents: 77_000 }], 'L1');
   const v = batch.get(idle);
   // Omitting a bet-less account would drop them off the standings entirely rather than ranking
   // them on their balance.
@@ -238,7 +238,7 @@ test('an account with nothing open is still present, worth exactly its balance',
 });
 
 test('valuing no accounts is empty, not a malformed IN () query', () => {
-  assert.equal(valueOpenPositionsForAccounts([]).size, 0);
+  assert.equal(valueOpenPositionsForAccounts([], 'L1').size, 0);
 });
 
 test('an unreadable price timestamp counts as stale', () => {
