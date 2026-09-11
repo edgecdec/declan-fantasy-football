@@ -35,6 +35,7 @@ import playerData from '../../../data/sleeper_players.json';
 import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import { starterSlotLabel } from '@/services/stats/lineupSlots';
+import { espnTeamCode, type NflGamesResponse } from '@/app/api/betting/nfl-games/route';
 import useSeason from '@/hooks/useSeason';
 import { safeLocalSet } from '@/services/common/cacheService';
 
@@ -54,6 +55,14 @@ type MedicIssue = {
 type LeagueHealth = {
   league: SleeperLeague;
   issues: MedicIssue[];
+  /**
+   * Problems that are real but can no longer be fixed, because the player's game has started.
+   *
+   * Counted rather than silently dropped. A to-do list should only list things you can do — an
+   * inactive starter whose game kicked off two hours ago is a fact, not a task — but hiding them
+   * without trace would leave someone wondering whether the scan had run.
+   */
+  lockedCount: number;
 };
 
 export default function RosterMedicPage() {
@@ -66,6 +75,8 @@ export default function RosterMedicPage() {
   const [progress, setProgress] = React.useState(0);
   const [results, setResults] = React.useState<LeagueHealth[]>([]);
   const [scanned, setScanned] = React.useState(false);
+  /** Problems whose games have started, so they can no longer be acted on. */
+  const [lockedTotal, setLockedTotal] = React.useState(0);
   
   const { fetchUser } = useUser(); 
 
@@ -104,6 +115,7 @@ export default function RosterMedicPage() {
     setLoading(true);
     setProgress(0);
     setResults([]);
+    setLockedTotal(0);
     setScanned(false);
 
     try {
@@ -124,7 +136,33 @@ export default function RosterMedicPage() {
       );
 
       const healthReports: LeagueHealth[] = [];
+      // Locked problems in leagues that ended up with nothing actionable at all.
+      let lockedElsewhere = 0;
       const allPlayers = (playerData as any).players;
+
+      /*
+       * NFL game state, so the scan only reports what can still be acted on.
+       *
+       * Fetched once for every league rather than per league: the scoreboard is identical for all
+       * of them. A failed fetch leaves `games` null and every issue is reported as before —
+       * degrading to noisy is right, degrading to silent would hide a real inactive starter.
+       */
+      const games = await fetch('/api/betting/nfl-games')
+        .then(r => (r.ok ? (r.json() as Promise<NflGamesResponse>) : null))
+        .catch(() => null);
+
+      const stateOf = (playerId: string): 'pre' | 'in' | 'post' | 'unknown' => {
+        if (!games) return 'unknown';
+        const team = allPlayers[playerId]?.team;
+        if (!team) return 'unknown';
+        const gameId = games.teamToGame[espnTeamCode(team)];
+        const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+        return game ? game.state : 'unknown';
+      };
+
+      // An empty slot can be filled by anyone whose game has not kicked off. Once the whole week is
+      // final there is nobody left to add, so reporting the hole is pure noise.
+      const anyGameLeft = games ? games.games.some(g => g.state === 'pre') : true;
 
       leagues.forEach(league => {
         const roster = rosterMap.get(league.league_id);
@@ -132,6 +170,7 @@ export default function RosterMedicPage() {
         if (SleeperService.isZeroPointRoster(roster)) return;
 
         const issues: MedicIssue[] = [];
+        let locked = 0;
         
         // A. Empty Spots
         const maxRoster = league.settings.max_roster_size || 0;
@@ -193,7 +232,10 @@ export default function RosterMedicPage() {
            * not set a lineup at all.
            */
           const wholeLineupUnset = emptyCount > 1 && emptyCount === roster.starters.length;
-          if (wholeLineupUnset) {
+          if (!anyGameLeft) {
+            // Every game is final, so no empty slot can be filled any more.
+            locked += wholeLineupUnset ? 1 : emptyCount;
+          } else if (wholeLineupUnset) {
             issues.push({
               id: `start-unset-${league.league_id}`,
               leagueId: league.league_id,
@@ -206,7 +248,8 @@ export default function RosterMedicPage() {
 
           roster.starters.forEach((pid, index) => {
             if (pid === '0') {
-               if (wholeLineupUnset) return; // already reported once, above
+               if (!anyGameLeft) return;      // nobody left to add — counted as locked above
+               if (wholeLineupUnset) return;  // already reported once, above
                // Name the slot. "Empty starter slot detected!" told you a lineup was broken but
                // not where, so fixing it meant opening the league and comparing by eye.
                const slot = starterSlotLabel(league.roster_positions, index);
@@ -224,23 +267,35 @@ export default function RosterMedicPage() {
                const pInfo = allPlayers[pid];
                if (pInfo) {
                  if (['Out', 'IR', 'PUP', 'Doubtful'].includes(pInfo.injury_status)) {
-                    issues.push({
-                      id: `start-inj-${league.league_id}-${pid}`,
-                      leagueId: league.league_id,
-                      leagueName: league.name,
-                      leagueAvatar: league.avatar || '',
-                      type: 'critical',
-                      message: `Starting ${pInfo.first_name} ${pInfo.last_name} is ${pInfo.injury_status || 'Inactive'}.`,
-                      player: pInfo
-                    });
+                    // Only while the player could still be benched. Once his game is under way or
+                    // over, an inactive starter is a result rather than something to fix, and
+                    // listing it buries the leagues where a swap is still possible.
+                    const state = stateOf(pid);
+                    if (state === 'in' || state === 'post') {
+                      locked++;
+                    } else {
+                      issues.push({
+                        id: `start-inj-${league.league_id}-${pid}`,
+                        leagueId: league.league_id,
+                        leagueName: league.name,
+                        leagueAvatar: league.avatar || '',
+                        type: 'critical',
+                        message: `Starting ${pInfo.first_name} ${pInfo.last_name} is ${pInfo.injury_status || 'Inactive'}.`,
+                        player: pInfo
+                      });
+                    }
                  }
                }
             }
           });
         }
 
+        // A league with nothing left to fix gets no card — its locked count rolls into the one
+        // line at the bottom, so a scan does not open a section you cannot act on.
         if (issues.length > 0) {
-          healthReports.push({ league, issues });
+          healthReports.push({ league, issues, lockedCount: locked });
+        } else if (locked > 0) {
+          lockedElsewhere += locked;
         }
       });
 
@@ -252,6 +307,9 @@ export default function RosterMedicPage() {
       });
 
       setResults(healthReports);
+      setLockedTotal(
+        healthReports.reduce((sum, r) => sum + r.lockedCount, 0) + lockedElsewhere,
+      );
       setScanned(true);
 
     } catch (e) {
@@ -298,10 +356,13 @@ export default function RosterMedicPage() {
       </Paper>
 
       {scanned && totalIssues === 0 && (
-        <Alert severity="success" variant="filled" sx={{ mb: 4 }}>
-          <Typography variant="h6">All clear! No roster issues found.</Typography>
+        <Alert severity="success" variant="filled" sx={{ mb: lockedTotal > 0 ? 1 : 4 }}>
+          <Typography variant="h6">
+            {lockedTotal > 0 ? 'Nothing left to fix.' : 'All clear! No roster issues found.'}
+          </Typography>
         </Alert>
       )}
+
 
       {scanned && totalIssues > 0 && (
         <>
@@ -358,6 +419,22 @@ export default function RosterMedicPage() {
             </Card>
           ))}
         </>
+      )}
+
+      {/*
+        * Said once, quietly, and AFTER the results — a caveat printed above the headline count read
+        * as though it were the headline.
+        *
+        * These are real problems (an inactive starter, an unfilled slot) whose games have kicked
+        * off, so there is nothing to do about them. Listing them as tasks buried the leagues where
+        * a swap is still possible; dropping them silently would leave you wondering whether the
+        * scan had worked.
+        */}
+      {scanned && lockedTotal > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+          {lockedTotal} other problem{lockedTotal === 1 ? '' : 's'} can no longer be fixed — those
+          games have already kicked off.
+        </Typography>
       )}
     </Container>
   );
