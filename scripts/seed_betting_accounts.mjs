@@ -126,13 +126,28 @@ function issueSetupToken(db, accountId) {
  * written to setup_links.html, which is gitignored: it contains live credentials
  * and must never be committed.
  */
+/**
+ * The handout, grouped by league.
+ *
+ * Grouped because these get DMed per league and a flat list makes you cross-reference who is in
+ * which — and someone in two leagues needs only ONE link, since setting a password grants every
+ * league they belong to.
+ */
 function writeHtml(links) {
-  const rows = links.map(l => `
+  const byLeague = new Map();
+  for (const l of links) {
+    if (!byLeague.has(l.league)) byLeague.set(l.league, []);
+    byLeague.get(l.league).push(l);
+  }
+
+  const rows = [...byLeague.entries()].map(([league, group]) => `
+    <tr><th colspan="3" class="league">${escapeHtml(league)} — ${group.length} to set up</th></tr>
+    ${group.map(l => `
     <tr>
       <td class="name">${escapeHtml(l.name)}</td>
       <td><a href="${escapeHtml(l.url)}">${escapeHtml(l.url)}</a></td>
       <td><button data-url="${escapeHtml(l.url)}">Copy</button></td>
-    </tr>`).join('');
+    </tr>`).join('')}`).join('');
 
   const html = `<!doctype html>
 <meta charset="utf-8">
@@ -144,6 +159,7 @@ function writeHtml(links) {
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
   td.name { font-weight: 600; white-space: nowrap; }
+  th.league { padding-top: 1.2rem; font-size: 1.05rem; color: #1565c0; border-bottom: 2px solid #1565c0; }
   a { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
   button { cursor: pointer; padding: .3rem .7rem; }
   button.done { background: #2e7d32; color: #fff; border-color: #2e7d32; }
@@ -222,7 +238,11 @@ async function main() {
         // password, so nothing is granted here. An unclaimed account holding money would show up
         // in the standings as a manager who has never logged in.
         const token = issueSetupToken(db, account.id);
-        links.push({ name: displayName, url: `${BASE_URL}/betting/setup?token=${token}` });
+        links.push({
+          name: displayName,
+          league: league.label,
+          url: `${BASE_URL}/betting/setup?token=${token}`,
+        });
       } else {
         /*
          * Already set up, and now in a league they were not in before — so this league's opening
