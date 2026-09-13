@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import {
-  Alert, Box, Button, CircularProgress, Chip, FormControlLabel, Paper, Switch, Tooltip, Typography,
+  Alert, Box, Button, CircularProgress, Chip, FormControlLabel, Paper, Switch, ToggleButton,
+  ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import PlayCard from '@/components/plays/PlayCard';
 import type { FeedEntry } from '@/services/plays/playFeed';
@@ -77,12 +78,26 @@ export default function PlayFeed({
   username, season, week,
 }: { username: string; season: string; week: number }) {
   const [startersOnly, setStartersOnly] = React.useState(true);
-  // Off by default: the full feed is the thing, and a filter that hides most of it should be a
-  // choice rather than the state you arrive in.
-  const [bigPlaysOnly, setBigPlaysOnly] = React.useState(false);
-  // Also off by default. Most plays touch nobody's roster, and the feed's job is to say what a play
-  // was worth to YOU — but for anyone who wants the whole game, it is one switch.
-  const [allPlays, setAllPlays] = React.useState(false);
+  /*
+   * ONE scope choice, not two switches that can contradict each other.
+   *
+   * "Big plays only" and "Every play" were independent toggles, and together they asked for two
+   * opposite things — the narrowest possible feed and the widest. There was no sensible answer, so
+   * the control should not have been able to express it.
+   *
+   * The three scopes form a strict ladder, each a superset of the one before, which is why they are
+   * mutually exclusive rather than composable:
+   *
+   *   big      plays worth BIG_PLAY_POINTS+ to someone in your lineups
+   *   lineups  every play touching your starters or the ones you are playing against  (default)
+   *   all      every play of every game, yours or not
+   *
+   * "Starters only" stays a separate switch because it is genuinely orthogonal: it narrows the
+   * IMPACTS shown on a play, not which plays qualify, and that question is live in all three scopes.
+   */
+  const [scope, setScope] = React.useState<'big' | 'lineups' | 'all'>('lineups');
+  const bigPlaysOnly = scope === 'big';
+  const allPlays = scope === 'all';
 
   const [data, setData] = React.useState<FeedResponse | null>(null);
   const [entries, setEntries] = React.useState<FeedEntry[]>([]);
@@ -213,27 +228,30 @@ export default function PlayFeed({
               label="Starters only"
             />
           </Tooltip>
-          <Tooltip
-            title={
-              `Only plays worth ${BIG_PLAY_POINTS}+ points to someone, in some league. Measured on `
-              + 'the largest swing either way, so a fumble or an interception counts as a big play.'
-            }
-            arrow
+          {/* Narrowest to widest, left to right, so the control reads as one dial. */}
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={scope}
+            onChange={(_, next) => { if (next) setScope(next); }}
+            aria-label="how much of the game to show"
           >
-            <FormControlLabel
-              control={<Switch checked={bigPlaysOnly} onChange={e => setBigPlaysOnly(e.target.checked)} />}
-              label="Big plays only"
-            />
-          </Tooltip>
-          <Tooltip
-            title="Includes every play of every game, even ones involving nobody in any of your lineups. A full NFL play-by-play with your points annotated where they apply."
-            arrow
-          >
-            <FormControlLabel
-              control={<Switch checked={allPlays} onChange={e => setAllPlays(e.target.checked)} />}
-              label="Every play"
-            />
-          </Tooltip>
+            <Tooltip
+              arrow
+              title={
+                `Only plays worth ${BIG_PLAY_POINTS}+ points to someone, in some league. Measured on `
+                + 'the largest swing either way, so a fumble or an interception counts too.'
+              }
+            >
+              <ToggleButton value="big" sx={{ textTransform: 'none', px: 1.25 }}>Big plays</ToggleButton>
+            </Tooltip>
+            <Tooltip arrow title="Every play involving your starters or the ones you're playing against, across all your leagues.">
+              <ToggleButton value="lineups" sx={{ textTransform: 'none', px: 1.25 }}>My lineups</ToggleButton>
+            </Tooltip>
+            <Tooltip arrow title="The whole NFL play-by-play, including plays involving nobody in any of your lineups, with your points annotated where they apply.">
+              <ToggleButton value="all" sx={{ textTransform: 'none', px: 1.25 }}>Every play</ToggleButton>
+            </Tooltip>
+          </ToggleButtonGroup>
           {/*
             * There is deliberately no "only plays in my matchups" control.
             *
@@ -242,9 +260,12 @@ export default function PlayFeed({
             * exactly zero of 225 real plays. Measured, not assumed. The scope note below says
             * what the feed already is, which is what that toggle was really trying to express.
             */}
-          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 320 }}>
-            Every play involving your starters or the ones you&apos;re playing against, across all
-            your leagues. A blue edge means one of yours.
+          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 300 }}>
+            {scope === 'big'
+              ? `Only plays worth ${BIG_PLAY_POINTS}+ points to someone. A blue edge means one of yours.`
+              : scope === 'all'
+                ? 'The whole play-by-play, annotated where it affects you. A blue edge means one of yours.'
+                : "Plays involving your starters or the ones you're playing against. A blue edge means one of yours."}
           </Typography>
           <Box sx={{ flex: 1 }} />
           {data?.ok && (
@@ -286,11 +307,11 @@ export default function PlayFeed({
         <Alert severity="info">
           {(data.playsStored ?? 0) === 0
             ? 'No plays captured for this week yet. The feed fills in once games kick off.'
-            : bigPlaysOnly
-              ? `No plays worth ${BIG_PLAY_POINTS}+ points yet. Turn off "big plays only" to see everything.`
-              : allPlays
+            : scope === 'big'
+              ? `Nothing worth ${BIG_PLAY_POINTS}+ points yet — try "My lineups".`
+              : scope === 'all'
                 ? 'No plays captured for this week yet.'
-                : 'No plays yet involving anyone in your lineups this week. Turn on "every play" for the whole game.'}
+                : 'No plays yet involving anyone in your lineups this week — try "Every play".'}
         </Alert>
       )}
 
