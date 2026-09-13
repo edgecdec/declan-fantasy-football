@@ -7,7 +7,9 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { getPositionColor } from '@/constants/colors';
 import { MARKET_SIDE_COLORS } from '@/constants/colors';
 import { leagueUrl } from '@/services/common/leagueLinks';
-import { describeStats, type FeedEntry, type FeedPlayer, type LeagueImpact } from '@/services/plays/playFeed';
+import {
+  BIG_PLAY_POINTS, describeStats, type FeedEntry, type FeedPlayer, type LeagueImpact,
+} from '@/services/plays/playFeed';
 
 /**
  * One play, and what it was worth in each of your leagues.
@@ -188,6 +190,20 @@ export default function PlayCard({ entry }: { entry: FeedEntry }) {
         )}
         {entry.isScoringPlay && (
           <Chip size="small" color="success" label="SCORE" sx={{ height: 18, fontSize: '0.68rem' }} />
+        )}
+        {/*
+          * BIG earns the same treatment as SCORE, because it answers the same question at a glance:
+          * is this one worth reading. Filled rather than outlined so it reads as a flag, and using
+          * the shared BIG_PLAY_POINTS threshold so a play can never be tagged big and then hidden by
+          * the big-plays filter.
+          *
+          * Not shown alongside SCORE: a touchdown is always a big play, so the pair would be
+          * redundant and SCORE is the more specific of the two.
+          */}
+        {entry.isBigPlay && !entry.isScoringPlay && (
+          <Tooltip arrow title={`Worth ${BIG_PLAY_POINTS}+ points to someone, in some league.`}>
+            <Chip size="small" color="info" label="BIG" sx={{ height: 18, fontSize: '0.68rem' }} />
+          </Tooltip>
         )}
         <Typography variant="caption" color="text.secondary" sx={{ flex: 1, minWidth: 200 }}>
           {entry.description || entry.playType || 'play'}

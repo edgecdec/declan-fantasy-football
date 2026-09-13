@@ -6,7 +6,7 @@ import {
   ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import PlayCard from '@/components/plays/PlayCard';
-import type { FeedEntry } from '@/services/plays/playFeed';
+import { BIG_PLAY_POINTS, type FeedEntry } from '@/services/plays/playFeed';
 
 /**
  * The Zone: live play-by-play, scored in every league you are in at once.
@@ -40,8 +40,7 @@ const REFRESH_MS = 30_000;
  */
 const PAGE_SIZE = 100;
 
-/** Kept in step with BIG_PLAY_POINTS in the feed route, purely for the label. */
-const BIG_PLAY_POINTS = 2;
+
 
 type FeedResponse = {
   ok: boolean;

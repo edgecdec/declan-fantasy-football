@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildPlayFeed, buildPlayFeedPage, describeStats, type FeedLeague,
+  BIG_PLAY_POINTS, buildPlayFeed, buildPlayFeedPage, describeStats, type FeedLeague,
 } from '@/services/plays/playFeed';
 import type { StoredPlay } from '@/lib/plays/playStore';
 
@@ -452,4 +452,27 @@ test('every-play mode does not disturb the totals of the plays that do count', (
   const totalOf = (list: typeof filtered, id: string) =>
     list.find(e => e.playId === id)!.players[0].impacts[0].totalPoints;
   assert.equal(totalOf(filtered, 'b'), totalOf(all, 'b'));
+});
+
+test('a big play is flagged on the entry, using the same threshold as the filter', () => {
+  const plays = [
+    play('small', 1, { '1': { rush_yd: 5 } }),      // 0.5 in PPR
+    play('big', 2, { '1': { rec: 1, rec_yd: 30 } }), // 4.0
+  ];
+  const entries = buildPlayFeed(plays, [PPR], PLAYERS);
+  const flag = (id: string) => entries.find(e => e.playId === id)!.isBigPlay;
+  assert.equal(flag('big'), true);
+  assert.equal(flag('small'), false);
+
+  // The tag and the filter must agree by construction: everything the filter keeps is tagged.
+  const kept = buildPlayFeed(plays, [PPR], PLAYERS, { minPeakPoints: BIG_PLAY_POINTS });
+  for (const e of kept) assert.equal(e.isBigPlay, true, e.playId);
+});
+
+test('a play exactly on the threshold counts as big', () => {
+  // 2.00 is the boundary, and the filter uses >=, so the tag must too or they disagree on it.
+  const plays = [play('edge', 1, { '1': { rec: 1, rec_yd: 10 } })]; // 1 + 1.0 = 2.0
+  const [entry] = buildPlayFeed(plays, [PPR], PLAYERS);
+  assert.equal(entry.players[0].peakPoints, BIG_PLAY_POINTS);
+  assert.equal(entry.isBigPlay, true);
 });

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import playerIndex from '../../../../../data/player_index.json';
 import { playsForWeek, observedLatencySeconds, playCount } from '@/lib/plays/playStore';
 import { buildLeagueContexts, resolveUserId } from '@/lib/plays/leagueContext';
-import { buildPlayFeedPage, type PlayerMeta } from '@/services/plays/playFeed';
+import { BIG_PLAY_POINTS, buildPlayFeedPage, type PlayerMeta } from '@/services/plays/playFeed';
 import { pollQuietly } from '@/services/plays/playPoller';
 
 export const dynamic = 'force-dynamic';
@@ -30,24 +30,22 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 300;
 
-/**
- * What counts as a big play.
- *
- * Two points is about a twenty-yard gain in a typical league, or any touchdown, reception bonus
- * or turnover — low enough to keep the drive-defining plays and high enough to drop the two-yard
- * runs that make up most of a feed.
- */
-const BIG_PLAY_POINTS = 2;
 
 /**
  * How long a built feed is reused.
  *
  * Building one replays every play of the week and scores each one in up to twenty leagues —
- * on the order of 100k scoring operations. Plays arrive about once a minute, so serving a
- * few-second-old feed costs nothing in freshness, while an uncached endpoint would repeat
- * that work for every viewer's 30-second refresh on a 1.9 GB box.
+ * measured at 98,172 player-play pairs and about 0.18s warm. Plays arrive about once a minute and
+ * the page refreshes every 30 seconds, so a 25-second window means a viewer sitting there costs one
+ * build per refresh at most, and two viewers on the same leagues usually cost one between them.
+ *
+ * This is the ceiling that matters at scale, not bandwidth: polls are 1.4 KB, but the replay is
+ * per-user because the key includes the username. Roughly 0.18s per build per user per 25s is about
+ * 0.7 of a core at a hundred concurrent viewers. Past that the fix is to cache the SCORED result per
+ * (league, week) and assemble a user's feed from those, since users overlap on leagues even though
+ * their league sets differ.
  */
-const FEED_CACHE_MS = 15_000;
+const FEED_CACHE_MS = 25_000;
 
 type CachedFeed = { at: number; playCount: number; body: unknown };
 const feedCache = new Map<string, CachedFeed>();

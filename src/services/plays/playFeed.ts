@@ -97,6 +97,8 @@ export type FeedEntry = {
    */
   yourStarter: boolean;
   theirStarter: boolean;
+  /** Worth BIG_PLAY_POINTS+ to someone, in some league — the same test the filter uses. */
+  isBigPlay: boolean;
 };
 
 /** Where a player sits in one league. */
@@ -119,6 +121,19 @@ export type PlayerMeta = { n?: string | null; p?: string | null; t?: string | nu
 
 /** Points below this are treated as no gain, so a 0.00 row never appears. */
 const POINTS_EPSILON = 0.005;
+
+/**
+ * What counts as a big play.
+ *
+ * Two points is about a twenty-yard gain in a typical league, or any touchdown, reception bonus or
+ * turnover — low enough to keep the drive-defining plays and high enough to drop the two-yard runs
+ * that make up most of a feed. Measured against a real week it keeps 26% and hides 74%.
+ *
+ * Lives here rather than in the route so the FILTER and the TAG read the same number. Two copies
+ * would eventually disagree, and a play tagged big that the big-plays filter then hid would be an
+ * obvious lie.
+ */
+export const BIG_PLAY_POINTS = 2;
 
 export type FeedOptions = {
   /** How many entries to return, applied AFTER scoring and filtering. */
@@ -310,6 +325,7 @@ export function buildPlayFeed(
       players: feedPlayers,
       yourStarter: feedPlayers.some(p => p.impacts.some(i => i.isStarter && i.side === 'for')),
       theirStarter: feedPlayers.some(p => p.impacts.some(i => i.isStarter && i.side === 'against')),
+      isBigPlay: feedPlayers.some(p => p.peakPoints >= BIG_PLAY_POINTS),
     });
   }
 
