@@ -298,11 +298,22 @@ export function scorePlayForPlayer(
   position: string | null,
   scoring: Record<string, number>,
   context: PlayContext = {},
+  /**
+   * Trust the defensive keys in this line.
+   *
+   * Normally they are excluded, because the feed over-attributes `idp_*`/`def_*` to offensive
+   * players — a quarterback credited with two forced fumbles he did not force. A DERIVED team
+   * defence line is the exception: it was reconstructed from the offence's own primitives plus who
+   * had the ball, which is the reliable half of the feed, so filtering it would score every
+   * defence at zero. See defenseFromPlays.ts.
+   */
+  trustDefensiveStats = false,
 ): ScoredPlay {
   const delta = normalisePlayStats(rawDelta, context);
   const bonusStats = derivedBonusStats(position, before, delta);
-  const base = scoreStatLine(delta, scoring, true);
-  const bonus = scoreStatLine(bonusStats, scoring, true);
+  const fromPlay = !trustDefensiveStats;
+  const base = scoreStatLine(delta, scoring, fromPlay);
+  const bonus = scoreStatLine(bonusStats, scoring, fromPlay);
   return { base, bonus, total: base + bonus, bonusStats };
 }
 

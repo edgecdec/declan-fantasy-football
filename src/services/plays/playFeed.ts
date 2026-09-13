@@ -6,6 +6,7 @@ import {
   scorePlayForPlayer,
 } from '@/services/plays/playScoring';
 import type { StoredPlay } from '@/lib/plays/playStore';
+import { defenseStatsForPlay } from '@/services/plays/defenseFromPlays';
 
 /**
  * The live play-by-play feed: what just happened, and what it was worth to you.
@@ -200,7 +201,30 @@ export function buildPlayFeed(
 
     const feedPlayers: FeedPlayer[] = [];
 
-    for (const { player_id: playerId, stats: rawStats } of play.playStats) {
+    /*
+     * Team defences, derived rather than read.
+     *
+     * A team entry in the feed carries only series-level stats, so a defence's sacks and takeaways
+     * have to be reconstructed from the offence's own line plus who had the ball — see
+     * defenseFromPlays.ts for the measurements. Merged into the same per-player loop below by
+     * keying on the team code, which IS Sleeper's player id for a defence, so scoring, running
+     * totals and roster lookup all work unchanged.
+     */
+    const defenceStats = defenseStatsForPlay(play.playStats, {
+      playType: context.playType,
+      description: context.description,
+      possession: str(metadata.possession),
+      opponent: str(metadata.opponent),
+      isScoringPlay: context.isScoringPlay,
+      scoringTeam: str(metadata.scoring_team),
+    });
+
+    const contributors: { player_id: string; stats: StatLine }[] = [
+      ...play.playStats,
+      ...[...defenceStats.entries()].map(([team, stats]) => ({ player_id: team, stats })),
+    ];
+
+    for (const { player_id: playerId, stats: rawStats } of contributors) {
       const before = totals.get(playerId) ?? {};
       const delta = normalisePlayStats(rawStats ?? {}, context);
       // Advance the running total for EVERY player, whether or not they are rostered
@@ -220,7 +244,13 @@ export function buildPlayFeed(
         // is measured against what the reader will actually see. Filtering afterwards let a
         // bench-only play clear the threshold and then arrive with nothing in it.
         if (startersOnly && !spot.isStarter) continue;
-        const scored = scorePlayForPlayer(rawStats ?? {}, before, position, league.scoring, context);
+        const scored = scorePlayForPlayer(
+          rawStats ?? {}, before, position, league.scoring, context,
+          // A derived team-defence line is exactly the keys the play feed cannot be trusted for
+          // when they appear on an offensive player — but here they were reconstructed from the
+          // offence's own stats, so they are the reliable ones and must not be filtered out.
+          defenceStats.has(playerId),
+        );
         // Accumulated for EVERY play, including the scoreless ones skipped below: a running total
         // that only counted the plays worth showing would drift from the real one.
         const key = `${playerId}|${league.leagueId}`;
@@ -244,13 +274,20 @@ export function buildPlayFeed(
       if (peak < minPeakPoints) continue;
       feedPlayers.push({
         playerId,
-        name: meta.n ?? `Player ${playerId}`,
+        // A derived defence has a team code for an id, which the slim index resolves to the team
+        // name ("Seattle Seahawks"); the fallback keeps it legible if it ever does not.
+        name: meta.n ?? (defenceStats.has(playerId) ? `${playerId} defence` : `Player ${playerId}`),
         position,
         team: meta.t ?? null,
-        // Only the stats a play can actually be trusted for. The feed over-attributes
-        // defensive and IDP keys to offensive players, so showing them would caption a
-        // quarterback with tackles he did not make.
-        stats: Object.fromEntries(Object.entries(delta).filter(([k]) => !isNonPlayStat(k))),
+        /*
+         * Only the stats a play can be trusted for. The feed over-attributes defensive and IDP keys
+         * to offensive players, so showing them would caption a quarterback with tackles he did not
+         * make — but a DERIVED team-defence line is entirely made of those keys, and filtering it
+         * left every defence captioned with nothing at all.
+         */
+        stats: defenceStats.has(playerId)
+          ? delta
+          : Object.fromEntries(Object.entries(delta).filter(([k]) => !isNonPlayStat(k))),
         impacts,
         peakPoints: peak,
       });
@@ -348,6 +385,16 @@ export function describeStats(stats: StatLine): string {
 
   if (n('st_td')) bits.push('return TD');
   if (n('fum_lost')) bits.push('fumble lost');
+
+  // Team defence. Derived rather than read from the feed — see defenseFromPlays.ts — and phrased as
+  // the unit's own event so a defence's line does not read like a player's.
+  if (n('sack')) bits.push(n('sack') > 1 ? `${n('sack')} sacks` : 'sack');
+  if (n('int')) bits.push(n('int') > 1 ? `${n('int')} INTs` : 'interception');
+  if (n('fum_rec')) bits.push('fumble recovered');
+  if (n('def_td')) bits.push('defensive TD');
+  if (n('def_st_td')) bits.push('return TD');
+  if (n('safe')) bits.push('safety');
+  if (n('blk_kick')) bits.push('blocked kick');
   if (n('fgm')) bits.push('FG');
   if (n('fgmiss')) bits.push('FG miss');
   if (n('xpm')) bits.push('XP');

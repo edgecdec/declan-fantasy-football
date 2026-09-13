@@ -340,11 +340,17 @@ export default function PlayFeed({
       {entries.length > 0 && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
           The smaller figure on each chip is that player&apos;s running total for the week in that
-          league, as of this play. Sleeper&apos;s play feed carries offence only, so team defences
-          do not appear at all and an IDP league&apos;s defensive points are missing from these
-          totals. For QB, RB, WR, TE and K they reconcile to the cent against Sleeper&apos;s
-          official numbers — measured at 132 of 134 player-league totals, with both exceptions in
-          the one IDP league.
+          league, as of this play. Offence reconciles to the cent against Sleeper&apos;s official
+          numbers — 132 of 134 player-league totals, with both exceptions in one IDP league.
+          <br />
+          Team defences are <strong>derived</strong>: the feed does not report a defence directly, so
+          sacks and interceptions are reconstructed from the quarterback&apos;s own line plus who had
+          the ball. Sacks, interceptions, safeties and defensive and return touchdowns matched
+          Sleeper exactly across five test weeks; fumble recoveries are right about 95% of the time.
+          A defence&apos;s points-allowed bonus is <strong>not</strong> included here — it is a
+          whole-game bracket rather than a per-play event, so it comes from the periodic stats feed.
+          Individual defenders in an IDP league are still missing, because the feed attributes those
+          unreliably.
         </Typography>
       )}
 
