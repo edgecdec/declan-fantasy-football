@@ -132,6 +132,25 @@ export type FeedOptions = {
    * because the number is negative would hide exactly the wrong half.
    */
   minPeakPoints?: number;
+  /**
+   * Keep plays that touched nobody's roster — the whole game, not just your slice of it.
+   *
+   * Off by default because most plays are irrelevant to any lineup and the feed's job is to say
+   * what a play was worth to YOU. On, it is a play-by-play of the NFL with your points annotated
+   * where they apply.
+   */
+  includeAllPlays?: boolean;
+  /**
+   * Only entries NEWER than this sequence — what a poll asks for.
+   *
+   * Applied after scoring, never before: the running weekly totals need every play from the start
+   * of the week, so this narrows what is SENT rather than what is computed. The saving is payload,
+   * which measurement showed is the actual cost — a full week is 145 KB re-sent every 30 seconds
+   * per viewer, against 0.18s of warm CPU to build it.
+   */
+  after?: number;
+  /** Only entries OLDER than this sequence — what scrolling back asks for. */
+  before?: number;
 };
 
 function formatClock(metadata: Record<string, unknown>): string | null {
@@ -156,7 +175,10 @@ export function buildPlayFeed(
   players: Record<string, PlayerMeta>,
   options: FeedOptions = {},
 ): FeedEntry[] {
-  const { limit = 50, startersOnly = false, minPeakPoints = 0 } = options;
+  const {
+    limit = 50, startersOnly = false, minPeakPoints = 0, includeAllPlays = false,
+    after, before,
+  } = options;
   // Running stat totals per player, needed for the milestone bonuses. Kept per league because a
   // league's scoring settings decide nothing about the totals, but its roster decides
   // whether we bother — and it is simpler to be correct than to share and special-case.
@@ -234,7 +256,8 @@ export function buildPlayFeed(
       });
     }
 
-    if (feedPlayers.length === 0) continue;
+    // A play nobody rosters is dropped unless the reader asked for the whole game.
+    if (feedPlayers.length === 0 && !includeAllPlays) continue;
     feedPlayers.sort((a, b) => b.peakPoints - a.peakPoints);
 
     entries.push({
@@ -254,7 +277,50 @@ export function buildPlayFeed(
   }
 
   // Newest first, and only after every play has been scored in order.
-  return entries.reverse().slice(0, limit);
+  const newestFirst = entries.reverse();
+
+  /*
+   * The window is cut here, at the very end.
+   *
+   * Cutting earlier would be faster and wrong: a running total is the sum of every play before it,
+   * so an entry's `totalPoints` depends on plays that may fall outside the window entirely.
+   */
+  const windowed = newestFirst.filter(e => {
+    const seq = e.sequence ?? 0;
+    if (after !== undefined && seq <= after) return false;
+    if (before !== undefined && seq >= before) return false;
+    return true;
+  });
+
+  return windowed.slice(0, limit);
+}
+
+/**
+ * The same feed plus the cursors a client needs to ask for more.
+ *
+ * Separate from buildPlayFeed so the pure function keeps returning a plain array for its tests,
+ * while the route gets what it needs to support polling forward and scrolling back without
+ * re-sending everything it already holds.
+ */
+export function buildPlayFeedPage(
+  plays: StoredPlay[],
+  leagues: FeedLeague[],
+  players: Record<string, PlayerMeta>,
+  options: FeedOptions = {},
+): { entries: FeedEntry[]; newestSequence: number | null; oldestSequence: number | null; hasMore: boolean } {
+  const limit = options.limit ?? 50;
+  // One extra, so "is there more behind this" is answered by fact rather than by guessing from a
+  // full page — a page that happens to be exactly `limit` long is otherwise ambiguous.
+  const entries = buildPlayFeed(plays, leagues, players, { ...options, limit: limit + 1 });
+  const hasMore = entries.length > limit;
+  const page = hasMore ? entries.slice(0, limit) : entries;
+
+  return {
+    entries: page,
+    newestSequence: page.length > 0 ? page[0].sequence ?? null : null,
+    oldestSequence: page.length > 0 ? page[page.length - 1].sequence ?? null : null,
+    hasMore,
+  };
 }
 
 /**

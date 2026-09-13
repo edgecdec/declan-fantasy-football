@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlayFeed, describeStats, type FeedLeague } from '@/services/plays/playFeed';
+import {
+  buildPlayFeed, buildPlayFeedPage, describeStats, type FeedLeague,
+} from '@/services/plays/playFeed';
 import type { StoredPlay } from '@/lib/plays/playStore';
 
 /**
@@ -349,4 +351,105 @@ test('a bench player carries a total too, so promoting him is an informed choice
   const plays = [play('a', 1, { '1': { rec: 1, rec_yd: 30 } })];
   const [entry] = buildPlayFeed(plays, [benched], PLAYERS);
   assert.equal(entry.players[0].impacts[0].totalPoints, 4);
+});
+
+/**
+ * Cursor windowing.
+ *
+ * The cut happens AFTER scoring, and that ordering is the whole correctness question: a running
+ * total is the sum of every play before it, so an entry's totalPoints depends on plays that may fall
+ * outside the requested window entirely. Cutting first would be faster and wrong.
+ */
+const seqPlays = [
+  play('p1', 100, { '1': { rec: 1, rec_yd: 10 } }),
+  play('p2', 200, { '1': { rec: 1, rec_yd: 10 } }),
+  play('p3', 300, { '1': { rec: 1, rec_yd: 10 } }),
+  play('p4', 400, { '1': { rec: 1, rec_yd: 10 } }),
+];
+
+test('after= returns only newer entries, and nothing when there are none', () => {
+  const newer = buildPlayFeed(seqPlays, [PPR], PLAYERS, { after: 200 });
+  assert.deepEqual(newer.map(e => e.playId), ['p4', 'p3']);
+  // The point of the cursor: a poll that finds nothing sends an empty list, not the whole week.
+  assert.deepEqual(buildPlayFeed(seqPlays, [PPR], PLAYERS, { after: 400 }), []);
+});
+
+test('before= pages backward', () => {
+  assert.deepEqual(
+    buildPlayFeed(seqPlays, [PPR], PLAYERS, { before: 300 }).map(e => e.playId),
+    ['p2', 'p1'],
+  );
+});
+
+test('a windowed total still counts the plays outside the window', () => {
+  // p4 is the fourth 10-yard catch, so 2.0 each -> 8.0, even when asked for on its own.
+  const [only] = buildPlayFeed(seqPlays, [PPR], PLAYERS, { after: 300 });
+  assert.equal(only.playId, 'p4');
+  assert.equal(only.players[0].impacts[0].totalPoints, 8);
+  // And identical to what the unwindowed feed reports for the same play.
+  const full = buildPlayFeed(seqPlays, [PPR], PLAYERS);
+  assert.equal(full[0].players[0].impacts[0].totalPoints, 8);
+});
+
+test('a page reports whether more exists, without a full page being ambiguous', () => {
+  // Exactly `limit` entries left is the case that cannot be distinguished by length alone, which is
+  // why the builder fetches one extra rather than inferring.
+  const exact = buildPlayFeedPage(seqPlays, [PPR], PLAYERS, { limit: 4 });
+  assert.equal(exact.entries.length, 4);
+  assert.equal(exact.hasMore, false);
+
+  const partial = buildPlayFeedPage(seqPlays, [PPR], PLAYERS, { limit: 2 });
+  assert.equal(partial.entries.length, 2);
+  assert.equal(partial.hasMore, true);
+  assert.equal(partial.newestSequence, 400);
+  assert.equal(partial.oldestSequence, 300);
+});
+
+test('paging backward with the reported cursor covers every entry exactly once', () => {
+  const seen: string[] = [];
+  let before: number | undefined;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = buildPlayFeedPage(seqPlays, [PPR], PLAYERS, { limit: 2, before });
+    seen.push(...page.entries.map(e => e.playId));
+    if (!page.hasMore || page.oldestSequence == null) break;
+    before = page.oldestSequence;
+  }
+  // No duplicates and no gaps — the contract infinite scroll depends on.
+  assert.deepEqual(seen, ['p4', 'p3', 'p2', 'p1']);
+  assert.equal(new Set(seen).size, seen.length);
+});
+
+test('an empty page reports null cursors rather than a misleading zero', () => {
+  const page = buildPlayFeedPage(seqPlays, [PPR], PLAYERS, { after: 400 });
+  assert.deepEqual(page.entries, []);
+  assert.equal(page.newestSequence, null);
+  assert.equal(page.oldestSequence, null);
+  assert.equal(page.hasMore, false);
+});
+
+test('includeAllPlays keeps plays that touched nobody', () => {
+  const plays = [
+    play('mine', 1, { '1': { rec: 1, rec_yd: 10 } }),
+    play('theirs', 2, { '99': { rush_yd: 40 } }),
+  ];
+  assert.deepEqual(buildPlayFeed(plays, [PPR], PLAYERS).map(e => e.playId), ['mine']);
+
+  const all = buildPlayFeed(plays, [PPR], PLAYERS, { includeAllPlays: true });
+  assert.deepEqual(all.map(e => e.playId), ['theirs', 'mine']);
+  // The irrelevant one carries no players, so the card has nothing to attribute.
+  assert.deepEqual(all.find(e => e.playId === 'theirs')!.players, []);
+  assert.equal(all.find(e => e.playId === 'theirs')!.yourStarter, false);
+});
+
+test('every-play mode does not disturb the totals of the plays that do count', () => {
+  const plays = [
+    play('a', 1, { '1': { rec: 1, rec_yd: 10 } }),
+    play('noise', 2, { '99': { rush_yd: 40 } }),
+    play('b', 3, { '1': { rec: 1, rec_yd: 10 } }),
+  ];
+  const filtered = buildPlayFeed(plays, [PPR], PLAYERS);
+  const all = buildPlayFeed(plays, [PPR], PLAYERS, { includeAllPlays: true });
+  const totalOf = (list: typeof filtered, id: string) =>
+    list.find(e => e.playId === id)!.players[0].impacts[0].totalPoints;
+  assert.equal(totalOf(filtered, 'b'), totalOf(all, 'b'));
 });

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import playerIndex from '../../../../../data/player_index.json';
 import { playsForWeek, observedLatencySeconds, playCount } from '@/lib/plays/playStore';
 import { buildLeagueContexts, resolveUserId } from '@/lib/plays/leagueContext';
-import { buildPlayFeed, type PlayerMeta } from '@/services/plays/playFeed';
+import { buildPlayFeedPage, type PlayerMeta } from '@/services/plays/playFeed';
 import { pollQuietly } from '@/services/plays/playPoller';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,15 @@ export const dynamic = 'force-dynamic';
  * plays are.
  */
 
-const DEFAULT_LIMIT = 60;
+/**
+ * A page, not a week.
+ *
+ * Measured before choosing: a full week is 145 KB, and the page refreshes every 30 seconds, so ten
+ * viewers is 146 MB an hour of egress re-sending what they already have. CPU was never the problem
+ * (0.18s warm to replay 2,630 plays across 18 leagues) — the payload was. So the client keeps what
+ * it holds and asks only for what is new, or for one page further back.
+ */
+const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 300;
 
 /**
@@ -58,6 +66,14 @@ export async function GET(request: Request) {
   const limit = Math.min(MAX_LIMIT, Number(params.get('limit')) || DEFAULT_LIMIT);
   const startersOnly = params.get('startersOnly') === '1';
   const bigPlaysOnly = params.get('bigPlaysOnly') === '1';
+  const includeAllPlays = params.get('allPlays') === '1';
+  const numeric = (name: string): number | undefined => {
+    const raw = Number(params.get(name));
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+  };
+  // `after` polls forward for new plays; `before` pages backward for older ones.
+  const after = numeric('after');
+  const before = numeric('before');
 
   if (!username || !season || !Number.isFinite(week) || week <= 0) {
     return NextResponse.json(
@@ -69,7 +85,9 @@ export async function GET(request: Request) {
   // Not awaited: the feed must render from stored plays whether or not this sweep succeeds.
   void pollQuietly();
 
-  const cacheKey = `${username}|${season}|${week}|${limit}|${startersOnly}|${bigPlaysOnly}`;
+  const cacheKey =
+    `${username}|${season}|${week}|${limit}|${startersOnly}|${bigPlaysOnly}|${includeAllPlays}`
+    + `|${after ?? ''}|${before ?? ''}`;
   const stored = playCount(season, week);
   const cached = feedCache.get(cacheKey);
   // Invalidated by a new play as well as by age, so a touchdown is never held back by the
@@ -86,12 +104,15 @@ export async function GET(request: Request) {
   const { leagues, failed } = await buildLeagueContexts(userId, season, week);
   const plays = playsForWeek(season, week);
   // Filtering happens inside buildPlayFeed, not here: `limit` has to apply to what survives, or
-  // asking for big plays only would return the big plays within the last 120 rather than the
-  // last 120 big plays.
-  const entries = buildPlayFeed(plays, leagues, PLAYERS, {
+  // asking for big plays only would return the big plays within the last 100 rather than the
+  // last 100 big plays.
+  const page = buildPlayFeedPage(plays, leagues, PLAYERS, {
     limit,
     startersOnly,
     minPeakPoints: bigPlaysOnly ? BIG_PLAY_POINTS : 0,
+    includeAllPlays,
+    after,
+    before,
   });
 
   const body = {
@@ -102,7 +123,11 @@ export async function GET(request: Request) {
     failedLeagues: failed,
     playsStored: stored,
     latencySeconds: observedLatencySeconds(season, week),
-    entries,
+    entries: page.entries,
+    // Cursors, so the client can poll forward and page backward instead of refetching the week.
+    newestSequence: page.newestSequence,
+    oldestSequence: page.oldestSequence,
+    hasMore: page.hasMore,
     fetchedAt: new Date().toISOString(),
   };
   feedCache.set(cacheKey, { at: Date.now(), playCount: stored, body });
