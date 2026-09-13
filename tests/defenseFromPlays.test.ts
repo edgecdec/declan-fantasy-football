@@ -147,3 +147,71 @@ test('the LAST recovery named wins, since a ball can change hands twice', () => 
   );
   assert.equal(fumbleRecoveries('no recovery here'), null);
 });
+
+/**
+ * Return yardage — the largest thing a first version missed.
+ *
+ * Easy to overlook because it is not an "event": a league paying 0.04 a return yard scored one
+ * defence 6.68 points for 167 kickoff-return yards, more than three sacks were worth.
+ */
+test('kickoff return yards go to the returning unit, not the kicking one', () => {
+  const out = defenseStatsForPlay(
+    [{ player_id: 'r', stats: { kr: 1, kr_yd: 34 } }],
+    ctx({ possession: 'LAR', opponent: 'ARI', playType: 'kickoff', description: 'kicks 65 yards. J.Brooks returns the kickoff.' }),
+  );
+  // Possession on a kickoff is the KICKING team, so the returner is on the other side.
+  assert.equal(out.get('ARI')?.def_kr_yd, 34);
+  assert.equal(out.get('LAR'), undefined);
+});
+
+test('punt return yards are separated from kickoff return yards', () => {
+  const out = defenseStatsForPlay(
+    [{ player_id: 'r', stats: { pr: 1, pr_yd: 12 } }],
+    ctx({ possession: 'MIA', opponent: 'NYJ', playType: 'punt', description: 'punts 58 yards. I.Williams returned punt.' }),
+  );
+  assert.equal(out.get('NYJ')?.def_pr_yd, 12);
+  assert.equal(out.get('NYJ')?.def_kr_yd, undefined);
+});
+
+test('return yards are only credited on a return play', () => {
+  // A receiver's yards are not return yards, however the stat happens to be named.
+  const out = defenseStatsForPlay(
+    [{ player_id: 'wr', stats: { rec: 1, rec_yd: 40, kr_yd: 0 } }],
+    ctx({ playType: 'pass' }),
+  );
+  assert.equal(out.get('LAC')?.def_kr_yd, undefined);
+});
+
+test('a forced fumble comes from the narration, not from idp_ff', () => {
+  /*
+   * idp_ff is the field that looks right and is not: on a sack-fumble it lands on the FUMBLING
+   * quarterback, which is how an IDP league came to price a quarterback for two forced fumbles.
+   */
+  const out = defenseStatsForPlay(
+    [{ player_id: 'qb', stats: { fum: 1, idp_ff: 1 } }],
+    ctx({ description: 'J.Herbert FUMBLES, forced by J.Hunt. Fumble RECOVERED by LAC-S.Matlock.' }),
+  );
+  assert.equal(out.get('LAC')?.ff, 1);
+  assert.equal(out.get('PHI')?.ff, undefined);
+});
+
+test('a forced fumble on a return is credited to the KICKING team', () => {
+  // The forcing side is whoever does not have the ball — which on a return is the kicking team.
+  const out = defenseStatsForPlay(
+    [{ player_id: 'r', stats: { kr: 1, fum: 1 } }],
+    ctx({
+      possession: 'GB', opponent: 'CHI', playType: 'kickoff',
+      description: 'J.Blackwell returns the kickoff. J.Blackwell FUMBLES, forced by T.Hopper.',
+    }),
+  );
+  assert.equal(out.get('GB')?.def_st_ff, 1);
+  assert.equal(out.get('CHI')?.ff, undefined);
+});
+
+test('a fumble with nobody forcing it credits no forced fumble', () => {
+  const out = defenseStatsForPlay(
+    [{ player_id: 'rb', stats: { fum: 1 } }],
+    ctx({ description: 'A.Jones FUMBLES. Fumble RECOVERED by PHI-A.Jones.' }),
+  );
+  assert.equal(out.get('LAC')?.ff, undefined);
+});

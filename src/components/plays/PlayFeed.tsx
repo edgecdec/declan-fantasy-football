@@ -345,8 +345,10 @@ export default function PlayFeed({
           <br />
           Team defences are <strong>derived</strong>: the feed does not report a defence directly, so
           sacks and interceptions are reconstructed from the quarterback&apos;s own line plus who had
-          the ball. Sacks, interceptions, safeties and defensive and return touchdowns matched
-          Sleeper exactly across five test weeks; fumble recoveries are right about 95% of the time.
+          the ball, and return yardage from the returner. Measured against Sleeper across five test
+          weeks: 1,445 of 1,460 stat cells exact. Sacks, interceptions, safeties, return yards and
+          defensive and return touchdowns were exact throughout; fumble recoveries carry almost all
+          of the residual.
           A defence&apos;s points-allowed bonus is <strong>not</strong> included here — it is a
           whole-game bracket rather than a per-play event, so it comes from the periodic stats feed.
           Individual defenders in an IDP league are still missing, because the feed attributes those

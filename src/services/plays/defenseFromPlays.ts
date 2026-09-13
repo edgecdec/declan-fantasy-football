@@ -25,10 +25,15 @@ import type { StatLine } from '@/services/plays/playScoring';
  * MEASURED, per stat, by rebuilding every team's line for a full week and diffing against Sleeper's
  * official team entries (2025 weeks 5, 9, 12, 14 and 17):
  *
- *   sack, int, safe          exact, every team, every week
- *   def_td                   exact once return scores are separated out (see below)
- *   def_st_td                exact
- *   fum_rec                  95-98% — the residual is documented on `fumbleRecoveries`
+ *   1,445 of 1,460 stat cells exact — 98.97%
+ *   sack, int, safe                    exact, every team, every week
+ *   def_kr_yd, def_pr_yd, def_st_ff    exact
+ *   def_td, def_st_td                  exact once return scores are separated out (see below)
+ *   fum_rec                            11 misses, ff 3, def_st_td 1 — the whole residual
+ *
+ * Return YARDAGE was the largest thing an earlier version of this file missed, and it is easy to
+ * overlook because it is not an "event": at 0.04 a yard, one defence's 167 kickoff-return yards were
+ * worth 6.68 points, more than its three sacks.
  *
  * THE TRAP THAT COST THE MOST. On a kickoff or punt, `possession` is the KICKING team, so the
  * returner always looks like "the defence" — which credited every return touchdown as a defensive
@@ -111,6 +116,31 @@ export function defenseStatsForPlay(
   if (totals.fum_lost) {
     const recoveredBy = fumbleRecoveries(description) ?? defence;
     add(recoveredBy, 'fum_rec', 1);
+  }
+
+  /*
+   * RETURN YARDAGE, credited to the returning unit.
+   *
+   * The largest thing missing from a first version of this file, and easy to overlook because it is
+   * not an "event": a league paying 0.04 a return yard scored one defence 6.68 points for 167
+   * kickoff-return yards — more than three sacks. On a kickoff or punt `possession` is the KICKING
+   * team, so the returner is on the defence's side of the ball.
+   */
+  if (RETURN_PLAY.test(playType)) {
+    add(defence, 'def_kr_yd', totals.kr_yd ?? 0);
+    add(defence, 'def_pr_yd', totals.pr_yd ?? 0);
+  }
+
+  /*
+   * FORCED FUMBLES, from the description rather than from `idp_ff`.
+   *
+   * `idp_ff` is the field that looks right and is not: on a sack-fumble it lands on the FUMBLING
+   * quarterback. "forced by" in the narration means a defender caused it, and the forcing side is
+   * whichever team did not have the ball — on a return, the kicking team.
+   */
+  if ((totals.fum ?? 0) > 0 && /forced by/i.test(description)) {
+    const forcedBy = RETURN_PLAY.test(playType) ? offence : defence;
+    add(forcedBy, RETURN_PLAY.test(playType) ? 'def_st_ff' : 'ff', 1);
   }
 
   if (context.isScoringPlay && context.scoringTeam && /touchdown/i.test(description)) {
