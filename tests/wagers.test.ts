@@ -359,3 +359,46 @@ test('a bet in a league you are not in is refused, not credited into nowhere', a
   if (!result.ok) assert.equal(result.status, 403);
   assert.ok(ledgerMatchesBalances(db));
 });
+
+/**
+ * A decided matchup takes no action, even if its cached status still says open.
+ *
+ * Four of five live markets were sitting at 99%+ with a price of -19900, where $50 on the other side
+ * would have paid $9,950. `status` is only as fresh as the last re-price, so the check has to be made
+ * against the probability itself or there is a window where the bet still lands.
+ */
+test('a bet on a decided matchup is refused even while status says open', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'noDeadCerts', 100_000, 'sleeper-dead', 'LDEC');
+  const market = seedMarketIn(db, 'LDEC', 9401);
+  // Deliberately leaves status = 'open', which is the stale-cache case.
+  db.prepare("UPDATE markets SET prob_a = 0.999, status = 'open' WHERE id = ?").run(market);
+
+  const result = w.placeWager(id, null, market, 'a', 5_000);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.status, 409);
+    assert.match(result.error, /already decided/);
+  }
+  assert.ok(ledgerMatchesBalances(db));
+});
+
+test('the certain side is refused too, not just the longshot', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'noDeadCerts2', 100_000, 'sleeper-dead2', 'LDE2');
+  const market = seedMarketIn(db, 'LDE2', 9402);
+  db.prepare("UPDATE markets SET prob_a = 0.0, status = 'open' WHERE id = ?").run(market);
+  for (const side of ['a', 'b'] as const) {
+    assert.equal(w.placeWager(id, null, market, side, 5_000).ok, false, side);
+  }
+  assert.ok(ledgerMatchesBalances(db));
+});
+
+test('a competitive matchup still takes action', async () => {
+  const { wagers: w, db } = await load();
+  const id = seedAccount(db, 'stillOpen', 100_000, 'sleeper-open', 'LOPN');
+  const market = seedMarketIn(db, 'LOPN', 9403);
+  db.prepare("UPDATE markets SET prob_a = 0.55, status = 'open' WHERE id = ?").run(market);
+  assert.equal(w.placeWager(id, null, market, 'a', 5_000).ok, true);
+  assert.ok(ledgerMatchesBalances(db));
+});

@@ -88,6 +88,39 @@ export const HOUSE_VIG = 0.0476;
 /** Markets close once this little game time remains across the whole matchup. */
 export const MARKET_CLOSE_MINUTES = 30;
 
+/**
+ * Outside this band the outcome is not in doubt, so the market closes.
+ *
+ * Time alone was not enough. A matchup can be decided with an hour of football left — the opponent
+ * has no players yet to play, so nothing they do can change it — and the clock-based cutoff happily
+ * kept taking action on a 99.9% certainty. That is what this fixes.
+ *
+ * 5% is picked to sit just inside where the price stays defensible. At 95% the line is about
+ * -1580/+860, which is steep but a real bet; a couple of points further out it becomes a lottery
+ * ticket on our own model being wrong, and the model is a normal approximation, not an oracle.
+ */
+export const MARKET_CLOSE_PROBABILITY = 0.05;
+
+/*
+ * NO PRICE IS QUOTED OUTSIDE THE BAND ABOVE, and the vig is split additively rather than applied as
+ * a multiplier. Both changes are the same bug fix.
+ *
+ * `probability * (1 + vig)` is not a probability once the input passes 1/(1+vig) = 0.955: at 99% it
+ * came out at 1.0345, and `toAmericanOdds` clamped that to 0.995 and produced -19900 — a real,
+ * bettable price where $50 on the other side paid $9,950. The clamp was inventing a 199:1 lottery on
+ * a model error rather than refusing to quote.
+ *
+ * Capping the implied probability instead was my first attempt and was also wrong: it silently broke
+ * the overround, so at the extremes the house was giving edge AWAY (sum 0.98 rather than 1.048), and
+ * at a certainty the underdog's implied probability hit zero, which is infinite odds by another
+ * route. An existing invariant test caught both.
+ *
+ * Adding half the vig to each side keeps the overround exactly `vig` at every input, keeps both
+ * sides strictly inside (0, 1) for any probability in the band, and is unchanged at a coin flip. It
+ * charges the favourite slightly less than the multiplicative version did, which is the fairer
+ * direction anyway.
+ */
+
 export type PlayerGameState = 'pre' | 'in' | 'post' | 'unknown';
 
 /** One starter's contribution to a side's score. */
@@ -402,10 +435,17 @@ export type PricedSides = {
  * implied probabilities sum above 100%.
  */
 export function priceSides(probA: number, vig: number = HOUSE_VIG): PricedSides {
-  const pA = Math.min(1, Math.max(0, probA));
+  /*
+   * Clamped to the same band the market closes outside of.
+   *
+   * Nothing beyond it is ever offered, so quoting a price there is meaningless — and it is exactly
+   * where the arithmetic stops producing a probability. Clamping the input rather than the output
+   * keeps the overround intact.
+   */
+  const pA = Math.min(1 - MARKET_CLOSE_PROBABILITY, Math.max(MARKET_CLOSE_PROBABILITY, probA));
   const pB = 1 - pA;
-  const impliedA = pA * (1 + vig);
-  const impliedB = pB * (1 + vig);
+  const impliedA = pA + vig / 2;
+  const impliedB = pB + vig / 2;
   return {
     probA: pA,
     probB: pB,
@@ -441,6 +481,33 @@ export function matchupRemainingMinutes(
   return total;
 }
 
-export function isMarketOpen(remainingMinutes: number): boolean {
-  return remainingMinutes >= MARKET_CLOSE_MINUTES;
+/**
+ * Whether a market should still take action.
+ *
+ * Two independent reasons to stop, and the second was missing: enough football left, AND the result
+ * still genuinely in doubt. A matchup where the opponent has nobody left to play is over regardless
+ * of what the clock says.
+ *
+ * `probA` is optional so an existing caller that only has the clock keeps working, but every caller
+ * that can supply it should — without it the decided case is invisible.
+ */
+export function isMarketOpen(remainingMinutes: number, probA?: number): boolean {
+  if (remainingMinutes < MARKET_CLOSE_MINUTES) return false;
+  if (probA !== undefined && !outcomeInDoubt(probA)) return false;
+  return true;
+}
+
+/** True while neither side is near enough to certain that a price would be a formality. */
+export function outcomeInDoubt(probA: number): boolean {
+  return probA > MARKET_CLOSE_PROBABILITY && probA < 1 - MARKET_CLOSE_PROBABILITY;
+}
+
+/** Why a market is not taking action, for the UI to explain rather than just greying out. */
+export function marketCloseReason(
+  remainingMinutes: number,
+  probA: number,
+): 'open' | 'decided' | 'time' {
+  if (!outcomeInDoubt(probA)) return 'decided';
+  if (remainingMinutes < MARKET_CLOSE_MINUTES) return 'time';
+  return 'open';
 }

@@ -13,7 +13,9 @@ import PageHeader from '@/components/common/PageHeader';
 import MatchupMeter, { SideSwatch } from '@/components/betting/MatchupMeter';
 import LeagueStandings from '@/components/betting/LeagueStandings';
 import SeasonOdds from '@/components/betting/SeasonOdds';
-import { MARKET_CLOSE_MINUTES, HOUSE_VIG, profitForStake } from '@/services/betting/liveOdds';
+import {
+  MARKET_CLOSE_MINUTES, HOUSE_VIG, marketCloseReason, profitForStake,
+} from '@/services/betting/liveOdds';
 import { formatCents, CENTS_PER_DOLLAR } from '@/lib/betting/constants';
 import type { OpenPosition } from '@/lib/betting/valuation';
 
@@ -274,8 +276,13 @@ function MarketCard({ market, isMine, myWagers, onBet }: {
       : market.open
         ? { label: `${Math.round(market.remainingMinutes)}m left`, color: 'success' as const,
             title: 'Open for betting.' }
-        : { label: `Closed · ${Math.round(market.remainingMinutes)}m`, color: 'warning' as const,
-            title: `Markets close under ${MARKET_CLOSE_MINUTES} minutes of remaining game action — odds get unreliable in the last stretch.` };
+        // Say WHICH reason. "Closed · 60m" beside a 99.9% line read as a bug, because a
+        // clock-based explanation cannot account for a market that shut with an hour left.
+        : marketCloseReason(market.remainingMinutes, market.probA) === 'decided'
+          ? { label: 'Decided', color: 'warning' as const,
+              title: 'The outcome is no longer in doubt, so this market is not taking action. Bets already placed still settle normally.' }
+          : { label: `Closed · ${Math.round(market.remainingMinutes)}m`, color: 'warning' as const,
+              title: `Markets close under ${MARKET_CLOSE_MINUTES} minutes of remaining game action — odds get unreliable in the last stretch.` };
 
   return (
     <Paper variant="outlined" sx={{ px: 1.5, py: 1.25, mb: 1 }}>

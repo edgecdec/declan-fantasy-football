@@ -130,3 +130,85 @@ test('the overround is the configured vig, not an accident of rounding', () => {
   const fair = priceSides(0.5, 0);
   assert.ok(Math.abs(fair.overround - 1) < 1e-9);
 });
+
+/**
+ * Markets that should not be taking action.
+ *
+ * A real matchup was open at 99.9% with "60m left" and a price of -19900/+19900, where $50 on the
+ * other side would have paid $9,950. Two independent defects: the clock was the only close condition,
+ * and the vig shade pushed the implied probability above 1 where a clamp turned it into a bettable
+ * lottery ticket.
+ */
+test('a decided matchup is closed even with plenty of clock left', async () => {
+  const { isMarketOpen, marketCloseReason } = await import('@/services/betting/liveOdds');
+  // The exact shape of the bug: an hour of football, and no doubt at all about the result.
+  assert.equal(isMarketOpen(60, 0.999), false);
+  assert.equal(marketCloseReason(60, 0.999), 'decided');
+  assert.equal(isMarketOpen(60, 0.001), false);
+  // A close matchup with the same clock stays open.
+  assert.equal(isMarketOpen(60, 0.55), true);
+  assert.equal(marketCloseReason(60, 0.55), 'open');
+});
+
+test('the clock still closes a market on its own', async () => {
+  const { isMarketOpen, marketCloseReason } = await import('@/services/betting/liveOdds');
+  assert.equal(isMarketOpen(10, 0.5), false);
+  assert.equal(marketCloseReason(10, 0.5), 'time');
+  // Decided takes precedence when both apply, since it is the more informative reason.
+  assert.equal(marketCloseReason(10, 0.999), 'decided');
+});
+
+test('omitting the probability leaves the old clock-only behaviour', async () => {
+  const { isMarketOpen } = await import('@/services/betting/liveOdds');
+  // So a caller that only has the clock cannot silently start refusing every market.
+  assert.equal(isMarketOpen(60), true);
+  assert.equal(isMarketOpen(10), false);
+});
+
+test('an implied probability can never exceed 1, however certain the outcome', async () => {
+  const { priceSides } = await import('@/services/betting/liveOdds');
+  for (const p of [0.9, 0.95, 0.99, 0.999, 1]) {
+    const priced = priceSides(p);
+    assert.ok(priced.impliedA < 1, `impliedA ${priced.impliedA} at p=${p}`);
+    assert.ok(priced.impliedB < 1, `impliedB ${priced.impliedB} at p=${p}`);
+    assert.ok(priced.impliedA > 0 && priced.impliedB > 0);
+  }
+});
+
+test('the odds are bounded, so a model error cannot pay 199 to 1', async () => {
+  const { priceSides, profitForStake, isMarketOpen } = await import('@/services/betting/liveOdds');
+  for (const p of [0.99, 0.999, 0.99999, 1]) {
+    const { oddsA, oddsB } = priceSides(p);
+    /*
+     * The old code produced -19900 / +19900 here, and $50 on the underdog won $9,950. The bound is
+     * now the edge of the quoting band rather than a clamp inside the odds conversion, so the worst
+     * line is about -3720 / +1255 — $627 on a $50 stake.
+     */
+    assert.ok(Math.abs(oddsA) < 4_000, `oddsA ${oddsA} at p=${p}`);
+    assert.ok(Math.abs(oddsB) < 2_000, `oddsB ${oddsB} at p=${p}`);
+    assert.ok(profitForStake(5_000, oddsB) < 100_000, `$50 on the dog at p=${p}`);
+    // And the real protection: a market this lopsided is not taking action at all, so even the
+    // band-edge price is never actually offered.
+    assert.equal(isMarketOpen(60, p), false, `market should be closed at p=${p}`);
+  }
+});
+
+test('the worst price a bettable market can show is the band edge', async () => {
+  const { priceSides, isMarketOpen, MARKET_CLOSE_PROBABILITY } =
+    await import('@/services/betting/liveOdds');
+  // Just inside the band, so it is genuinely open — this is the steepest real line.
+  const edge = 1 - MARKET_CLOSE_PROBABILITY - 0.001;
+  assert.equal(isMarketOpen(60, edge), true);
+  const { oddsA, oddsB } = priceSides(edge);
+  assert.ok(Math.abs(oddsA) < 4_000 && Math.abs(oddsB) < 2_000, `${oddsA}/${oddsB}`);
+});
+
+test('a normal line is untouched by the cap', async () => {
+  const { priceSides } = await import('@/services/betting/liveOdds');
+  // The cap must only bite at the extremes, or every price shifts.
+  const even = priceSides(0.5);
+  assert.equal(even.oddsA, even.oddsB);
+  assert.ok(even.overround > 1, 'the house edge is still carried');
+  const lean = priceSides(0.6);
+  assert.ok(lean.impliedA < 1 && lean.impliedA > 0.6, 'still shaded by the vig');
+});

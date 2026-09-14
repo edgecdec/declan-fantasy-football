@@ -405,7 +405,7 @@ export async function buildMatchupMarkets(
       b,
       pricing: priceSides(probA),
       remainingMinutes: remaining,
-      open: isMarketOpen(remaining),
+      open: isMarketOpen(remaining, probA),
     });
   }
 

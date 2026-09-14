@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
 import { NEGATIVE_OPEN_EXPOSURE_CAP_CENTS } from '@/lib/betting/constants';
-import { profitForStake } from '@/services/betting/liveOdds';
+import {
+  MARKET_CLOSE_MINUTES, outcomeInDoubt, profitForStake,
+} from '@/services/betting/liveOdds';
 
 /** Smallest wager, so the ledger doesn't fill with penny bets. */
 export const MIN_STAKE_CENTS = 100; // $1
@@ -95,12 +97,29 @@ export function placeWager(
       | undefined;
     if (!market) return { ok: false, error: 'No such market.', status: 404 };
 
+    /*
+     * The outcome check is made HERE, against the stored probability, not just against the cached
+     * status.
+     *
+     * `status` is only as fresh as the last re-price, so trusting it alone leaves a window where a
+     * market that is plainly decided still accepts action — which is exactly the failure this
+     * guards: four of five open markets were sitting at 99%+ with a price of -19900, where $50 on
+     * the other side would have paid $9,950.
+     */
+    if (!outcomeInDoubt(market.prob_a)) {
+      return {
+        ok: false,
+        error: 'This matchup is already decided, so it is no longer taking action.',
+        status: 409,
+      };
+    }
+
     if (market.status !== 'open') {
       return {
         ok: false,
         error:
           market.status === 'closed'
-            ? 'This market is closed — under 30 minutes of game action remain.'
+            ? `This market is closed — under ${MARKET_CLOSE_MINUTES} minutes of game action remain.`
             : 'This market is no longer taking action.',
         status: 409,
       };

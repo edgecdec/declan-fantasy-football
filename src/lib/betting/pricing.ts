@@ -345,7 +345,8 @@ export async function priceLeagueWeek(
     if (existing?.status === 'settled' || existing?.status === 'void') continue;
 
     const id = existing?.id ?? randomUUID();
-    const status = isMarketOpen(remaining) ? 'open' : 'closed';
+    // Probability too, not just the clock: a matchup can be decided with an hour left.
+    const status = isMarketOpen(remaining, probA) ? 'open' : 'closed';
 
     if (existing) {
       db.prepare(
