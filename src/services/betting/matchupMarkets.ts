@@ -92,6 +92,13 @@ export type MatchupMarket = {
   matchupId: number;
   a: MarketSide;
   b: MarketSide;
+  /**
+   * The model's probability that side A wins — unclamped, and the one to display.
+   *
+   * `pricing` carries a copy clamped to the quoting band, which is right for striking a price and
+   * wrong for showing someone their odds of winning.
+   */
+  probA: number;
   pricing: PricedSides;
   /** Summed regulation minutes across distinct unfinished games. */
   remainingMinutes: number;
@@ -403,6 +410,9 @@ export async function buildMatchupMarkets(
       matchupId,
       a,
       b,
+      // The model's belief, kept alongside the price. The price is struck from a clamped copy, so a
+      // consumer that wants the real probability must not read it off `pricing`.
+      probA,
       pricing: priceSides(probA),
       remainingMinutes: remaining,
       open: isMarketOpen(remaining, probA),

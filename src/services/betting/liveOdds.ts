@@ -420,8 +420,16 @@ export function profitForStake(stakeCents: number, americanOdds: number): number
 }
 
 export type PricedSides = {
-  probA: number;
-  probB: number;
+  /**
+   * The probability the PRICE was struck from — clamped to the quoting band, so NOT the model's
+   * belief.
+   *
+   * Named `quoted` because the plain name was a trap that caught me: This Week displayed
+   * `pricing.probA` as its win probability, and the moment the band clamp was added every matchup
+   * flatlined at 95%. Anything that wants the real number wants `winProbability`, not this.
+   */
+  quotedProbA: number;
+  quotedProbB: number;
   impliedA: number;
   impliedB: number;
   oddsA: number;
@@ -447,8 +455,8 @@ export function priceSides(probA: number, vig: number = HOUSE_VIG): PricedSides 
   const impliedA = pA + vig / 2;
   const impliedB = pB + vig / 2;
   return {
-    probA: pA,
-    probB: pB,
+    quotedProbA: pA,
+    quotedProbB: pB,
     impliedA,
     impliedB,
     oddsA: toAmericanOdds(impliedA),

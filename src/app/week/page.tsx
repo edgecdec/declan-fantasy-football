@@ -26,7 +26,9 @@ import {
 } from '@/services/week/weeklyOutlook';
 import { leagueUrl } from '@/services/common/leagueLinks';
 import { getPositionColor } from '@/constants/colors';
-import { formatProjection, formatScore, formatScoreDelta } from '@/services/common/formatPoints';
+import {
+  formatProjection, formatScore, formatScoreDelta, formatWinProbability,
+} from '@/services/common/formatPoints';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /** Live pages refresh on the same cadence the NFL scoreboard proxy revalidates. */
@@ -284,7 +286,7 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       tooltip: 'Chance you win this matchup. The bar in the Matchup column is the same number.',
       render: r => (
         <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-          {(r.winProbability * 100).toFixed(0)}%
+          {formatWinProbability(r.winProbability, r.status === 'final')}
         </Box>
       ),
     },

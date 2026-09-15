@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
 import MatchupMeter from '@/components/betting/MatchupMeter';
 import { MARKET_SIDE_COLORS } from '@/constants/colors';
-import { formatProjection, formatScore } from '@/services/common/formatPoints';
+import { formatProjection, formatScore, formatWinProbability } from '@/services/common/formatPoints';
 
 /**
  * A head-to-head scoreboard: names flanking centred scores, mirrored inward.
@@ -149,7 +149,7 @@ export default function MatchupScoreboard({
         }}
       >
         <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
-          {(leftWinProbability * 100).toFixed(0)}%
+          {formatWinProbability(leftWinProbability, final)}
         </Typography>
         {/* Yet-to-play is the context that decides how to read a lead at all: 40 points up
             with nobody left is over, 40 up with eight to play is not. */}
@@ -161,7 +161,7 @@ export default function MatchupScoreboard({
               : ''}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          {((1 - leftWinProbability) * 100).toFixed(0)}%
+          {formatWinProbability(1 - leftWinProbability, final)}
         </Typography>
       </Box>
     </Box>

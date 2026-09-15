@@ -239,7 +239,14 @@ export async function buildWeeklyOutlook(
     const iAmA = mine.a.ownerId === userId;
     const me = iAmA ? mine.a : mine.b;
     const opponent = iAmA ? mine.b : mine.a;
-    const winProbability = iAmA ? mine.pricing.probA : mine.pricing.probB;
+    /*
+     * The model's probability, not the priced one.
+     *
+     * `pricing` is struck from a copy clamped to the betting band, so reading it here capped every
+     * matchup on this page at 95% — a decided game showed as a coin-flip-adjacent 95% rather than
+     * the certainty it was.
+     */
+    const winProbability = iAmA ? mine.probA : 1 - mine.probA;
     const scored = me.distribution.banked > 0 || opponent.distribution.banked > 0;
 
     matchups.push({
