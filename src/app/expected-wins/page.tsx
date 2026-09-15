@@ -58,12 +58,14 @@ type LeagueData = {
   category: 'included' | 'excluded';
   userStats?: TeamStats;
   standings?: TeamStats[];
+  /** Weeks behind the figures, so the card can say how much evidence there is. */
+  weeksCounted?: number;
 };
 
 // --- Helper Components ---
 
 function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData, userId: string, onToggle: () => void, showAdvanced: boolean }) {
-  const { league, status, userStats: stats, standings, category } = item;
+  const { league, status, userStats: stats, standings, category, weeksCounted } = item;
   const isIncluded = category === 'included';
   const enriched = React.useMemo(() => (standings || []).map(t => ({
     ...t,
@@ -154,6 +156,22 @@ function LeagueRow({ item, userId, onToggle, showAdvanced }: { item: LeagueData,
         </AccordionSummary>
         
         <AccordionDetails>
+          {/*
+            * The sample size, stated before the table.
+            *
+            * Half a win of "luck" over one week is noise and over twelve is a story, and nothing on
+            * the page distinguished them. This also makes the mid-season bug it replaced impossible
+            * to reintroduce quietly: six expected wins next to "1 week" would be obviously wrong.
+            */}
+          {weeksCounted !== undefined && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {weeksCounted === 0
+                ? 'No completed weeks yet — nothing to compare against.'
+                : `Based on ${weeksCounted} completed week${weeksCounted === 1 ? '' : 's'}.`}
+              {weeksCounted > 0 && weeksCounted < 4
+                && ' Over this few weeks, treat the luck figure as noise rather than a signal.'}
+            </Typography>
+          )}
           {standings && (
             <TableContainer>
               <Table size="small">
@@ -327,7 +345,10 @@ export default function ExpectedWinsPage() {
         const result = await analyzeLeagueWrapper(league, userId);
         setLeagueData(prev => prev.map(d => 
           d.league.league_id === league.league_id 
-            ? { ...d, status: 'complete', userStats: result.userStats, standings: result.standings } 
+            ? {
+                ...d, status: 'complete', userStats: result.userStats,
+                standings: result.standings, weeksCounted: result.weeksCounted,
+              } 
             : d
         ));
       } catch (e) {

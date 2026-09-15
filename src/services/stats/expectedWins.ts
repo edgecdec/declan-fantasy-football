@@ -1,5 +1,6 @@
 import { SleeperService, SleeperLeague, SleeperRoster } from '@/services/sleeper/sleeperService';
 import { CacheService } from '@/services/common/cacheService';
+import { completedWeekCount, getNflStateOrFallback } from '@/services/common/seasonService';
 
 export type TeamStats = {
   rosterId: number;
@@ -17,6 +18,14 @@ export type TeamStats = {
 export type LeagueAnalysisResult = {
   standings: TeamStats[];
   userStats?: TeamStats;
+  /**
+   * How many weeks actually went into these figures.
+   *
+   * Reported because the numbers mean very different things at week 2 and week 12, and nothing on
+   * the page said which you were looking at. Half a win of "luck" over one week is noise; over
+   * twelve it is a real story.
+   */
+  weeksCounted: number;
 };
 
 export async function analyzeLeague(league: SleeperLeague, userId?: string): Promise<LeagueAnalysisResult> {
@@ -61,7 +70,19 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
   // 3. Determine Schedule
   const startWeek = league.settings.start_week || 1;
   const playoffStart = league.settings.playoff_week_start;
-  const endWeek = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
+  const settingsEndWeek = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
+
+  /*
+   * Bounded by the weeks that have actually finished, matching every other week-looping service
+   * here — this was the one that never got that guard.
+   *
+   * It rules out the IN-PROGRESS week as well as the future ones, which the points-total check below
+   * cannot: mid-slate a live week has partial scores, so it would pass as played and every all-play
+   * record would be computed against teams whose players had not kicked off yet.
+   */
+  const nflState = await getNflStateOrFallback();
+  const playedWeeks = completedWeekCount(nflState, league.season, league.settings.last_scored_leg);
+  const endWeek = Math.min(settingsEndWeek, playedWeeks);
   const useMedian = league.settings.league_average_match === 1;
 
   const weeks: number[] = [];
@@ -83,6 +104,27 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
           if (!matchups || matchups.length < 2) return;
           const validMatchups = matchups.filter(m => m.points !== undefined && m.points !== null);
           if (validMatchups.length < 2) return;
+
+          /*
+           * A week nobody has played yet is not a week.
+           *
+           * Sleeper returns a full set of matchups for the WHOLE season from day one, with
+           * `points: 0` on every future week. `points !== null` therefore passes for all of them,
+           * and every unplayed week was being counted: each team ties everyone at 0, so
+           * `points === points` scores half a win against each opponent and the week hands out
+           * exactly 0.5 expected wins to all ten teams plus an opportunity.
+           *
+           * Measured on a real league in week 2: 12 phantom weeks, +6.0 expected wins for every
+           * team and +12 opportunities. Luck is actual minus expected, so mid-season it read as
+           * though everyone had been catastrophically unlucky.
+           *
+           * Detected by the week's own total rather than by the calendar, so it needs no extra call
+           * and stays correct for a league that starts late or has an unusual schedule. A week in
+           * which every team genuinely scored zero is indistinguishable from an unplayed one, and
+           * cannot happen in practice.
+           */
+          const weekTotal = validMatchups.reduce((sum, m) => sum + m.points, 0);
+          if (weekTotal <= 0) return;
 
           // Increment opportunities for all teams since this was a valid week
           const weekOpps = useMedian ? 2 : 1;
@@ -121,9 +163,17 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
   // Exclude teams with 0 total points (test leagues or leagues with no real games)
   const validUserStats = myStats && myStats.pointsFor > 0 ? myStats : undefined;
 
+  // Counted from the weeks that survived the played-week guard, so it can never disagree with the
+  // figures it describes.
+  const weekOppsPerWeek = useMedian ? 2 : 1;
+  const weeksCounted = standings.length > 0
+    ? Math.round((standings[0].totalOpportunities || 0) / weekOppsPerWeek)
+    : 0;
+
   const result = {
     standings,
-    userStats: validUserStats
+    userStats: validUserStats,
+    weeksCounted,
   };
 
   // Cache results: Long-lived for complete leagues, short-lived for active ones
