@@ -329,7 +329,10 @@ export async function buildMatchupMarkets(
     SleeperService.getLeagueUsers(leagueId),
     sharedGames
       ? Promise.resolve(sharedGames)
-      : fetch('/api/betting/nfl-games').then(r => r.json() as Promise<NflGamesResponse>),
+      // The week being priced, explicitly. ESPN's default lags Sleeper's calendar, and taking it
+      // priced week 2's lineups against week 1's finished games — a flat 50/50 on everything.
+      : fetch(`/api/betting/nfl-games?season=${league.season}&week=${week}`)
+          .then(r => r.json() as Promise<NflGamesResponse>),
   ]);
 
   if (!gamesRes?.ok) return null;

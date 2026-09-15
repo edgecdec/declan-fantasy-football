@@ -30,6 +30,8 @@ import playerIndex from '../../../data/player_index.json';
 const SLEEPER_BASE = 'https://api.sleeper.app/v1';
 const ESPN_SCOREBOARD =
   'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
+/** ESPN's seasontype for the regular season. */
+const ESPN_REGULAR_SEASON = 2;
 
 /** Sleeper team codes that differ from ESPN's. */
 const TEAM_ALIASES: Record<string, string> = { WAS: 'WSH', OAK: 'LV' };
@@ -126,8 +128,20 @@ type EspnPayload = {
   }[];
 };
 
-async function loadGames(): Promise<{ byTeam: Map<string, GameInfo> } | null> {
-  const data = await fetchJson<EspnPayload>(ESPN_SCOREBOARD);
+/**
+ * The scoreboard for the week being priced, not ESPN's default.
+ *
+ * ESPN's bare scoreboard lags Sleeper's calendar: on the Tuesday after week 1 it still returned week
+ * 1 with all sixteen games `post`, so every week-2 starter mapped to a finished game and both sides
+ * priced at a mean and variance of zero — a flat 50/50 on every matchup. Asking for the week
+ * explicitly keeps the two calendars in step.
+ */
+async function loadGames(
+  season: string,
+  week: number,
+): Promise<{ byTeam: Map<string, GameInfo> } | null> {
+  const url = `${ESPN_SCOREBOARD}?dates=${season}&seasontype=${ESPN_REGULAR_SEASON}&week=${week}`;
+  const data = await fetchJson<EspnPayload>(url);
   if (!data) return null;
   const byTeam = new Map<string, GameInfo>();
   for (const event of data.events ?? []) {
@@ -191,7 +205,7 @@ export async function priceLeagueWeek(
     fetchJson<Record<string, Record<string, number>>>(
       `${SLEEPER_BASE}/stats/nfl/regular/${league.season}/${week}`,
     ),
-    loadGames(),
+    loadGames(league.season, week),
   ]);
 
   if (!rosters || !matchups || !projections || !games) return [];

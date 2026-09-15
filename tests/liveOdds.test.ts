@@ -212,3 +212,50 @@ test('a normal line is untouched by the cap', async () => {
   const lean = priceSides(0.6);
   assert.ok(lean.impliedA < 1 && lean.impliedA > 0.6, 'still shaded by the vig');
 });
+
+/**
+ * Why a stale scoreboard produced a page full of coin flips.
+ *
+ * On the Tuesday after week 1, Sleeper's NFL state had advanced to week 2 while ESPN's bare
+ * scoreboard still returned week 1 with all sixteen games `post`. Every week-2 starter therefore
+ * mapped to a FINISHED game, so the whole lineup was skipped as settled and both sides came out with
+ * a mean and variance of zero — which `winProbability` correctly reports as 0.5.
+ *
+ * The arithmetic was never wrong; the input was. These pin the mechanism so a stale scoreboard shows
+ * up as an obviously broken distribution rather than as a plausible-looking 50/50.
+ */
+const settled = (points: number) => ({
+  playerId: 'p', position: 'WR', actualPoints: points, projectedPoints: 15,
+  gameState: 'post' as const, remainingMinutes: 0,
+});
+
+test('a lineup whose games are all final has no upside and no variance', async () => {
+  const { sideDistribution } = await import('@/services/betting/liveOdds');
+  const d = sideDistribution([settled(0), settled(0)]);
+  assert.equal(d.remaining, 0);
+  assert.equal(d.variance, 0);
+  // Zero banked as well is the tell-tale: a genuinely finished week has points on the board.
+  assert.equal(d.banked, 0);
+});
+
+test('two empty distributions are a coin flip, which is the symptom to recognise', async () => {
+  const { sideDistribution, winProbability } = await import('@/services/betting/liveOdds');
+  const a = sideDistribution([settled(0)]);
+  const b = sideDistribution([settled(0)]);
+  assert.equal(winProbability(a, b), 0.5);
+});
+
+test('an unstarted lineup prices on projection, not as a coin flip', async () => {
+  const { sideDistribution, winProbability } = await import('@/services/betting/liveOdds');
+  // What a correctly-fetched upcoming week looks like: games `pre`, full projection in play.
+  const pre = (projected: number) => ({
+    playerId: 'p', position: 'WR', actualPoints: 0, projectedPoints: projected,
+    gameState: 'pre' as const, remainingMinutes: 60,
+  });
+  const strong = sideDistribution([pre(20), pre(18), pre(16)]);
+  const weak = sideDistribution([pre(8), pre(7), pre(6)]);
+  assert.ok(strong.remaining > weak.remaining);
+  assert.ok(strong.variance > 0 && weak.variance > 0);
+  const p = winProbability(strong, weak);
+  assert.ok(p > 0.6 && p < 1, `expected a clear favourite, got ${p}`);
+});
