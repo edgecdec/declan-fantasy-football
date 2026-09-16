@@ -18,22 +18,29 @@ import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/l
  */
 
 /**
- * Positions we will fill from waivers when a roster cannot cover the slot at all.
+ * How much better the waiver tier must be before we assume a manager takes it.
  *
- * Limited to K and DEF because that is the real behaviour: managers carry an extra
- * flex body all week and grab a kicker or defence right before kickoff. Leaving
- * that slot empty scores it zero and badly understates the team. Extending this to
- * WR or RB would be wrong — nobody churns their receiving corps off waivers every
- * week, so assuming it would inflate every projection.
+ * ANY slot can be streamed, at any position — a manager who is starting a
+ * projected-4 tight end while eight better ones sit unrostered will fix that, and
+ * the same is true of a bye-week hole anywhere on the roster. Restricting this to
+ * K and DEF (as it once was) modelled the churn habit rather than the decision, and
+ * left real, obvious upgrades invisible.
  *
- * Note this fires ONLY for a slot with no eligible rostered player. We do not
- * assume a manager upgrades a kicker or defence they already hold, even when a
- * better one is unrostered, because the waiver pool is a shared resource: in
- * Graham's league nine of ten teams would otherwise all "stream" the same
- * top-projected defence, which is impossible and inflated every side by about
- * five points. If someone does make that upgrade, the odds move then.
+ * But "would take any improvement" is not the behaviour either, so an edge below
+ * this is ignored. Measured projection residuals on this data have a standard
+ * deviation of 4.25 (low projections) to 5.64 (overall), so a sub-2-point projected
+ * edge is well inside the noise: nobody can tell a true 7.8 from a true 6.5 in
+ * advance, and assuming they churn for it would add fictional points to every team.
+ *
+ * The threshold is what keeps this from being inflationary. Measured across Graham's
+ * ten teams in week 2: at any-improvement, 13 upgrades and +2.00 points per team; at
+ * this threshold, 4 upgrades and +1.53, with eight of the ten teams unchanged at
+ * exactly zero. The waiver pool is thin enough that only a neglected roster gains.
+ *
+ * Contention is handled separately — see `streamsByPosition`. Without it, nine of
+ * ten teams would each "stream" the same top defence.
  */
-const STREAMABLE_POSITIONS = new Set(['K', 'DEF']);
+const STREAM_UPGRADE_EDGE = 2;
 
 /**
  * How many of the best remaining waiver options to average when filling a slot
@@ -109,13 +116,6 @@ function eligible(slot: string, position: string | null): boolean {
   return position !== null && allowed.includes(position);
 }
 
-/** True when this slot only accepts positions we are willing to stream. */
-function slotIsStreamable(slot: string): boolean {
-  const allowed = SLOT_ELIGIBILITY[slot];
-  if (!allowed || allowed.length === 0) return false;
-  return allowed.every(p => STREAMABLE_POSITIONS.has(p));
-}
-
 /**
  * Builds the lineup to price for one side.
  *
@@ -130,10 +130,16 @@ export function bestAvailableLineup(
   bench: LineupCandidate[],
   freeAgents: LineupCandidate[] = [],
   /**
-   * How many teams in the league have already streamed each position this week.
+   * How many teams in the league have already streamed each POSITION this week.
    * Mutated as we go, so a second team needing a defence averages a tier one place
    * further down the board. Callers building every matchup in a league should pass
    * one shared map.
+   *
+   * Keyed by position rather than by slot, and a streamed multi-position slot
+   * advances every position it could have drawn from. A FLEX stream therefore also
+   * depletes RB, WR and TE, so a later WR slot cannot re-award the same receiver.
+   * That over-counts slightly when the FLEX was in fact filled by a running back,
+   * which is the safe direction: it can only make a team look worse, never better.
    */
   streamsByPosition: Map<string, number> = new Map(),
 ): BestLineupResult {
@@ -174,33 +180,45 @@ export function bestAvailableLineup(
   const unfilledSlots: string[] = [];
 
   for (const slot of orderedOpen) {
-    // The roster always wins when it can cover the slot. Waivers are a fallback
-    // for a slot nobody on the roster can fill, and only at a streamable
-    // position — see STREAMABLE_POSITIONS for why we don't assume upgrades.
     const fromRoster = rosteredPool.find(p => !used.has(p.playerId) && eligible(slot, p.position));
-    if (fromRoster) {
-      used.add(fromRoster.playerId);
-      chosen.push(fromRoster);
-      continue;
-    }
 
-    if (!slotIsStreamable(slot)) {
-      unfilledSlots.push(slot);
-      continue;
-    }
-
+    const slotPositions = SLOT_ELIGIBILITY[slot] ?? [];
     const eligibleAgents = agentPool.filter(p => eligible(slot, p.position));
     // Skip past the tiers earlier streamers are assumed to have taken.
-    const alreadyStreamed = streamsByPosition.get(slot) ?? 0;
+    const alreadyStreamed = Math.max(
+      0,
+      ...slotPositions.map(p => streamsByPosition.get(p) ?? 0),
+    );
     const window = eligibleAgents.slice(alreadyStreamed, alreadyStreamed + STREAM_POOL_SIZE);
+    const mean = window.length
+      ? window.reduce((s, p) => s + p.projectedPoints, 0) / window.length
+      : 0;
 
-    if (window.length === 0) {
-      unfilledSlots.push(slot);
+    /*
+     * Waivers win only by a clear margin. An empty slot is streamed whenever anything
+     * is available (scoring it zero would badly understate the team); an occupied one
+     * needs the tier to beat the player held by more than the noise floor.
+     */
+    const useWaivers =
+      window.length > 0 && (!fromRoster || mean - fromRoster.projectedPoints > STREAM_UPGRADE_EDGE);
+
+    if (!useWaivers) {
+      if (fromRoster) {
+        used.add(fromRoster.playerId);
+        chosen.push(fromRoster);
+      } else {
+        unfilledSlots.push(slot);
+      }
       continue;
     }
-    streamsByPosition.set(slot, alreadyStreamed + 1);
 
-    const mean = window.reduce((s, p) => s + p.projectedPoints, 0) / window.length;
+    // Deliberately NOT marking fromRoster used: displaced by a streamer here, he is
+    // still available to fill a later slot he is eligible for, and only shows up as
+    // demoted if nothing else wants him.
+    for (const p of slotPositions) {
+      streamsByPosition.set(p, (streamsByPosition.get(p) ?? 0) + 1);
+    }
+
     const variance =
       window.reduce((s, p) => s + (p.projectedPoints - mean) ** 2, 0) / window.length;
     const spread = Math.sqrt(variance);

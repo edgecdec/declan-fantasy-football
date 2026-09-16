@@ -264,12 +264,17 @@ function buildLineup(
 }
 
 /**
- * Everyone at a streamable position who is not on any roster in the league.
+ * Everyone who is not on any roster in the league — the waiver pool.
  *
- * A manager who carries no kicker or defence all week and grabs one right before
- * kickoff would otherwise be priced as scoring zero in that slot. Restricted to
- * K and DEF, and to active players with a real projection, so this stays a
- * plausible waiver pool rather than the whole player database.
+ * A manager who carries no kicker all week and grabs one right before kickoff would
+ * otherwise be priced as scoring zero in that slot, and one starting a projected-4
+ * tight end with eight better ones unrostered would be priced as if he will not
+ * notice. Both are decisions a manager really makes, at any position, so the pool is
+ * every position; `bestAvailableLineup` applies the edge threshold that decides when
+ * taking one is plausible.
+ *
+ * Still limited to players carrying a real projection for the week, which is what
+ * keeps it a waiver pool rather than the whole player database.
  */
 function buildFreeAgentPool(
   rosters: { players: string[] | null }[],
@@ -283,10 +288,8 @@ function buildFreeAgentPool(
   }
 
   const pool: LineupCandidate[] = [];
-  for (const [playerId, row] of Object.entries(PLAYERS)) {
+  for (const [playerId] of Object.entries(PLAYERS)) {
     if (rostered.has(playerId)) continue;
-    const pos = row.position;
-    if (pos !== 'K' && pos !== 'DEF') continue;
     if (!projections[playerId]) continue;
     // A free agent has no live game of its own in this pool (actualPoints 0), so an empty stats
     // object is honest rather than a shortcut.

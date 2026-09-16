@@ -264,13 +264,14 @@ export async function priceLeagueWeek(
     );
   };
 
-  // Unrostered K/DEF, for a slot the roster cannot cover.
+  // Every unrostered player with a projection, for a slot the roster cannot cover or
+  // covers far worse than waivers can. bestAvailableLineup decides which; it needs the
+  // whole board to compare against, not just the traditionally streamed positions.
   const rostered = new Set<string>();
   for (const r of rosters) for (const p of r.players ?? []) rostered.add(p);
   const freeAgents: LineupCandidate[] = [];
-  for (const [playerId, row] of Object.entries(PLAYER_INDEX)) {
+  for (const [playerId] of Object.entries(PLAYER_INDEX)) {
     if (rostered.has(playerId)) continue;
-    if (row.p !== 'K' && row.p !== 'DEF') continue;
     if (!projections[playerId]) continue;
     const c = candidate(playerId, 0);
     if (c.projectedPoints > 0) freeAgents.push(c);
