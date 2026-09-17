@@ -3,7 +3,11 @@ import { getDb } from '@/lib/db';
 import { findBettingLeague } from '@/lib/betting/leagues';
 import { calculateProjectedPoints } from '@/services/stats/scoring';
 import { defenceCorrection } from '@/services/betting/defenseBrackets';
-import { bestAvailableLineup, LineupCandidate } from '@/services/betting/bestLineup';
+import {
+  bestAvailableLineup,
+  priceWithStreamContention,
+  LineupCandidate,
+} from '@/services/betting/bestLineup';
 import {
   StarterInput,
   isMarketOpen,
@@ -73,7 +77,18 @@ export type PricedMarket = {
 
 export type SideDetail = {
   promotions: { name: string; projectedPoints: number }[];
-  streams: { slot: string; projectedPoints: number }[];
+  streams: {
+    slot: string;
+    projectedPoints: number;
+    /**
+     * What the rostered player in this slot projects, when the pickup is an UPGRADE rather
+     * than filling an empty slot. Absent means there was nobody there.
+     *
+     * Without this the two cases render identically, and "streamed DEF" on a roster that
+     * plainly holds a defence reads as a bug rather than as an assumed waiver move.
+     */
+    replacesProjectedPoints?: number;
+  }[];
   unfilledSlots: string[];
   playersRemaining: number;
   /**
@@ -285,52 +300,70 @@ export async function priceLeagueWeek(
     pairs.set(m.matchup_id, list);
   }
 
-  const streamsByPosition = new Map<string, number>();
   const db = getDb();
   const out: PricedMarket[] = [];
 
-  for (const [matchupId, sides] of [...pairs.entries()].sort((x, y) => x[0] - y[0])) {
-    if (sides.length !== 2) continue;
-
-    const build = (m: SleeperMatchupLite) => {
-      const starterIds = m.starters ?? [];
-      const starterPoints = m.starters_points ?? [];
-      const playersPoints = m.players_points ?? {};
-      const current = starterIds.map((pid, i) =>
-        !pid || pid === '0' ? null : candidate(pid, starterPoints[i] ?? 0),
-      );
-      const startingSet = new Set(starterIds.filter(p => p && p !== '0'));
-      const bench = (m.players ?? [])
-        .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
-        .map(pid => candidate(pid, playersPoints[pid] ?? 0));
-      const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, streamsByPosition);
-      const starters: StarterInput[] = best.starters.map(c => ({
-        playerId: c.playerId,
-        position: c.position,
-        actualPoints: c.actualPoints,
-        projectedPoints: c.projectedPoints,
-        gameState: c.gameState,
-        remainingMinutes: c.remainingMinutes,
-        extraSd: c.extraSd,
-        extraVariance: c.extraVariance,
-        meanAdjustment: c.meanAdjustment,
-      }));
-      const detail: SideDetail = {
-        // Names are not in the slim index, so identify a promotion by id. The UI
-        // shows the projection, which is the part that explains the price.
-        promotions: best.promoted.map(c => ({ name: c.playerId, projectedPoints: c.projectedPoints })),
-        streams: best.streamed.map(s => ({ slot: s.slot, projectedPoints: s.projectedPoints })),
-        unfilledSlots: best.unfilledSlots,
-        playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
-        defence: starters
-          .map(st => defenceNotes.get(st.playerId))
-          .filter((n): n is DefenceNote => n !== undefined),
-      };
-      return { starters, distribution: sideDistribution(starters), detail };
+  const build = (m: SleeperMatchupLite, streamersByPosition: Map<string, number>) => {
+    const starterIds = m.starters ?? [];
+    const starterPoints = m.starters_points ?? [];
+    const playersPoints = m.players_points ?? {};
+    const current = starterIds.map((pid, i) =>
+      !pid || pid === '0' ? null : candidate(pid, starterPoints[i] ?? 0),
+    );
+    const startingSet = new Set(starterIds.filter(p => p && p !== '0'));
+    const bench = (m.players ?? [])
+      .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
+      .map(pid => candidate(pid, playersPoints[pid] ?? 0));
+    const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, streamersByPosition);
+    const starters: StarterInput[] = best.starters.map(c => ({
+      playerId: c.playerId,
+      position: c.position,
+      actualPoints: c.actualPoints,
+      projectedPoints: c.projectedPoints,
+      gameState: c.gameState,
+      remainingMinutes: c.remainingMinutes,
+      extraSd: c.extraSd,
+      extraVariance: c.extraVariance,
+      meanAdjustment: c.meanAdjustment,
+    }));
+    const detail: SideDetail = {
+      // Names are not in the slim index, so identify a promotion by id. The UI
+      // shows the projection, which is the part that explains the price.
+      promotions: best.promoted.map(c => ({ name: c.playerId, projectedPoints: c.projectedPoints })),
+      streams: best.streamed.map(s => ({
+        slot: s.slot,
+        projectedPoints: s.projectedPoints,
+        replacesProjectedPoints: s.replaces?.projectedPoints,
+      })),
+      unfilledSlots: best.unfilledSlots,
+      playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
+      defence: starters
+        .map(st => defenceNotes.get(st.playerId))
+        .filter((n): n is DefenceNote => n !== undefined),
     };
+    return {
+      starters,
+      distribution: sideDistribution(starters),
+      detail,
+      streamed: best.streamed,
+    };
+  };
 
-    const a = build(sides[0]);
-    const b = build(sides[1]);
+  /*
+   * Every side priced together, repeatedly, until waiver contention settles. How thin a streamed
+   * tier is depends on how many teams in the LEAGUE want that position, so no side can be priced
+   * on its own — see priceWithStreamContention.
+   */
+  const playablePairs = [...pairs.entries()]
+    .sort((x, y) => x[0] - y[0])
+    .filter(([, sides]) => sides.length === 2);
+  const orderedSides = playablePairs.flatMap(([, sides]) => sides);
+  const built = priceWithStreamContention(demand => orderedSides.map(m => build(m, demand)));
+  const builtByRoster = new Map(orderedSides.map((m, i) => [m.roster_id, built[i]]));
+
+  for (const [matchupId, sides] of playablePairs) {
+    const a = builtByRoster.get(sides[0].roster_id)!;
+    const b = builtByRoster.get(sides[1].roster_id)!;
     const probA = winProbability(a.distribution, b.distribution);
     const pricing = priceSides(probA);
 

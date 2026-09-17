@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bestAvailableLineup, type LineupCandidate } from '@/services/betting/bestLineup';
+import {
+  bestAvailableLineup,
+  priceWithStreamContention,
+  type LineupCandidate,
+} from '@/services/betting/bestLineup';
 
 /**
  * Fielding the lineup a manager will actually field.
@@ -37,9 +41,17 @@ function player(
   };
 }
 
-/** Five options at a position, so a stream window is full rather than truncated. */
+/**
+ * A deep waiver board at one position.
+ *
+ * Twelve rather than five on purpose: contention WIDENS the averaging window, so a board only
+ * STREAM_POOL_SIZE deep would give an identical mean at every level of demand and quietly make
+ * the contention tests vacuous. It did exactly that on the first attempt.
+ */
 function tier(position: string, top: number): LineupCandidate[] {
-  return [0, 1, 2, 3, 4].map(i => player(`fa-${position}-${i}`, position, top - i * 0.5));
+  return Array.from({ length: 12 }, (_, i) =>
+    player(`fa-${position}-${i}`, position, top - i * 0.5),
+  );
 }
 
 const FREE_AGENTS = [
@@ -159,44 +171,77 @@ test('a player whose game has kicked off is never displaced by a waiver upgrade'
   assert.ok(result.starters.some(p => p.playerId === 'playing'));
 });
 
-test('two teams needing the same position do not both get the top of the board', () => {
-  const shared = new Map<string, number>();
+test('contention thins the tier, and thins it equally for everyone in it', () => {
   const needsTe = () => {
     const s = solidStarters();
     s[3] = null;
     return s;
   };
+  const tierWith = (rivals: number) => {
+    const demand = new Map([['TE', rivals]]);
+    const r = bestAvailableLineup(SLOTS, needsTe(), [], FREE_AGENTS, demand);
+    return r.streamed.find(s => s.slot === 'TE')!.projectedPoints;
+  };
 
-  const first = bestAvailableLineup(SLOTS, needsTe(), [], FREE_AGENTS, shared);
-  const second = bestAvailableLineup(SLOTS, needsTe(), [], FREE_AGENTS, shared);
-
-  const a = first.streamed.find(s => s.slot === 'TE');
-  const b = second.streamed.find(s => s.slot === 'TE');
-  assert.ok(a && b);
-  assert.ok(
-    b.projectedPoints < a.projectedPoints,
-    'the second streamer must average a tier further down the board',
-  );
-  assert.ok(
-    !b.options.some(o => o.playerId === a.options[0].playerId),
-    'the best option cannot be awarded to both teams',
-  );
+  assert.ok(tierWith(4) < tierWith(1), 'four teams chasing a tight end must each get less');
+  assert.equal(tierWith(4), tierWith(4), 'and all four get the SAME number');
 });
 
-test('streaming a multi-position slot depletes every position it could have drawn from', () => {
-  const shared = new Map<string, number>();
-  const flexOpen = () => {
+test('a side is priced identically wherever it sits in the league', () => {
+  /*
+   * The bug this pins: contention used to be a running counter mutated as sides were priced, so
+   * a team's projection depended on the order Sleeper returned the matchups, and side A of every
+   * pair beat side B. The demand map is now read-only, so position in the list cannot matter.
+   */
+  const needsTe = () => {
     const s = solidStarters();
-    s[4] = null;
+    s[3] = null;
     return s;
   };
-  bestAvailableLineup(SLOTS, flexOpen(), [], FREE_AGENTS, shared);
+  const demand = new Map([['TE', 3]]);
+  const runs = [0, 1, 2].map(
+    () => bestAvailableLineup(SLOTS, needsTe(), [], FREE_AGENTS, demand)
+      .streamed.find(s => s.slot === 'TE')!.projectedPoints,
+  );
 
-  // FLEX is RB/WR/TE, so all three advance — never awarding the same body twice.
-  assert.equal(shared.get('RB'), 1);
-  assert.equal(shared.get('WR'), 1);
-  assert.equal(shared.get('TE'), 1);
-  assert.equal(shared.get('QB') ?? 0, 0);
+  assert.deepEqual(runs, [runs[0], runs[0], runs[0]]);
+  assert.equal(demand.get('TE'), 3, 'the demand map must not be mutated');
+});
+
+test('priceWithStreamContention settles on a demand count and applies it to everyone', () => {
+  const needsDef = () => {
+    const s = solidStarters();
+    s[6] = null;
+    return s;
+  };
+  const sides = [0, 1, 2, 3];
+
+  const results = priceWithStreamContention(demand =>
+    sides.map(() => bestAvailableLineup(SLOTS, needsDef(), [], FREE_AGENTS, demand)),
+  );
+
+  const values = results.map(r => r.streamed.find(s => s.slot === 'DEF')!.projectedPoints);
+  assert.equal(new Set(values).size, 1, 'four teams streaming a defence all get one value');
+
+  const solo = priceWithStreamContention(demand =>
+    [0].map(() => bestAvailableLineup(SLOTS, needsDef(), [], FREE_AGENTS, demand)),
+  )[0].streamed.find(s => s.slot === 'DEF')!.projectedPoints;
+  assert.ok(values[0] < solo, 'and less than a team streaming uncontested');
+});
+
+test('an upgrade records the player it replaces; filling an empty slot does not', () => {
+  const upgraded = solidStarters();
+  upgraded[3] = player('sadiq', 'TE', 4);
+  const up = bestAvailableLineup(SLOTS, upgraded, [], FREE_AGENTS)
+    .streamed.find(s => s.slot === 'TE');
+  assert.equal(up?.replaces?.playerId, 'sadiq');
+  assert.equal(up?.replaces?.projectedPoints, 4);
+
+  const empty = solidStarters();
+  empty[5] = null;
+  const fill = bestAvailableLineup(SLOTS, empty, [], FREE_AGENTS)
+    .streamed.find(s => s.slot === 'K');
+  assert.equal(fill?.replaces, undefined, 'an empty slot replaces nobody');
 });
 
 test('a slot with nothing available anywhere is reported unfilled, not silently zero', () => {

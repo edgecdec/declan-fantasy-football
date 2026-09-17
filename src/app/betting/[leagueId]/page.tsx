@@ -35,9 +35,15 @@ import { useBettingAuth } from '@/context/BettingAuthContext';
 /** Live scores move every few minutes; matches the matchup cache TTL. */
 const POLL_INTERVAL_MS = 20_000;
 
+/** Mirrors SideDetail in lib/betting/pricing.ts, which is server-only and cannot be imported here. */
 type SideDetail = {
   promotions: { name: string; projectedPoints: number }[];
-  streams: { slot: string; projectedPoints: number }[];
+  streams: {
+    slot: string;
+    projectedPoints: number;
+    /** Set when the pickup is an upgrade; absent when the slot was empty. */
+    replacesProjectedPoints?: number;
+  }[];
   unfilledSlots: string[];
   playersRemaining: number;
 };
@@ -176,16 +182,29 @@ function BetDialog({ target, balanceCents, onClose, onPlaced }: {
 function SideNotes({ detail }: { detail: SideDetail }) {
   const bits: React.ReactNode[] = [];
   for (const s of detail.streams) {
+    /*
+     * An empty slot and an upgrade are different claims and must not read the same. Labelling an
+     * upgrade "streamed" made it look like we had lost track of a defence the roster plainly has.
+     */
+    const held = s.replacesProjectedPoints;
     bits.push(
       <Tooltip
         key={`s-${s.slot}`}
-        title="No rostered player for this slot, so we assume they pick one up before kickoff — averaged across the best available options rather than naming one."
+        title={
+          held === undefined
+            ? 'No rostered player for this slot, so we assume they pick one up before kickoff — averaged across the best available options rather than naming one.'
+            : `Waivers project clearly better than the ${held.toFixed(1)} they have in this slot, so we assume the upgrade. Averaged across the best available options rather than naming one, and thinned out by how many other teams want the same position.`
+        }
       >
         <Chip
           size="small"
           variant="outlined"
           color="info"
-          label={`streamed ${s.slot} ${s.projectedPoints.toFixed(1)}`}
+          label={
+            held === undefined
+              ? `streamed ${s.slot} ${s.projectedPoints.toFixed(1)}`
+              : `upgrade ${s.slot} ${held.toFixed(1)} → ${s.projectedPoints.toFixed(1)}`
+          }
           sx={{ height: 18, fontSize: 10 }}
         />
       </Tooltip>,

@@ -1,7 +1,12 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
 import { defenceCorrection } from '@/services/betting/defenseBrackets';
-import { bestAvailableLineup, LineupCandidate, StreamedSlot } from '@/services/betting/bestLineup';
+import {
+  bestAvailableLineup,
+  priceWithStreamContention,
+  LineupCandidate,
+  StreamedSlot,
+} from '@/services/betting/bestLineup';
 import { BENCH_SLOTS } from '@/services/stats/lineupSlots';
 import playerData from '../../../data/sleeper_players.json';
 import {
@@ -83,6 +88,11 @@ export type MarketSide = {
     projectedPoints: number;
     spread: number;
     optionNames: string[];
+    /**
+     * The rostered player the pickup is assumed to replace, when there was one. Absent
+     * means the slot was empty, which is a different claim and reads differently.
+     */
+    replaces?: { name: string; projectedPoints: number };
   }[];
   /** Slots nobody could fill, which genuinely score nothing. */
   unfilledSlots: string[];
@@ -352,9 +362,23 @@ export async function buildMatchupMarkets(
   }
 
   const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, gamesRes);
-  // Shared across every side in the league: each successive team needing the same
-  // position averages a tier one place further down the waiver board.
-  const streamsByPosition = new Map<string, number>();
+
+  /*
+   * Every side is built together, repeatedly, until waiver contention settles — how thin the
+   * tier is depends on how many teams in the LEAGUE want that position, so no side can be
+   * priced in isolation. Doing it one matchup at a time with a running counter made the
+   * answer depend on the order Sleeper returned the matchups.
+   */
+  const playablePairs = [...pairs.entries()].filter(([, sides]) => sides.length === 2);
+  const orderedSides = playablePairs.flatMap(([, sides]) => sides);
+  const lineups = priceWithStreamContention(demand =>
+    orderedSides.map(m =>
+      buildStarters(
+        m, rosterPositions, projections, scoringSettings, gamesRes, liveStats, freeAgents, demand,
+      ),
+    ),
+  );
+  const lineupByRoster = new Map(orderedSides.map((m, i) => [m.roster_id, lineups[i]]));
 
   const buildSide = (
     m: SleeperMatchup,
@@ -385,6 +409,14 @@ export async function buildMatchupMarkets(
         projectedPoints: s.projectedPoints,
         spread: s.spread,
         optionNames: s.options.map(o => playerName(o.playerId)),
+        ...(s.replaces
+          ? {
+              replaces: {
+                name: playerName(s.replaces.playerId),
+                projectedPoints: s.replaces.projectedPoints,
+              },
+            }
+          : {}),
       })),
       unfilledSlots,
     };
@@ -392,11 +424,9 @@ export async function buildMatchupMarkets(
 
   const markets: MatchupMarket[] = [];
 
-  for (const [matchupId, sides] of pairs) {
-    if (sides.length !== 2) continue; // byes and odd league shapes have no market
-
-    const lineupA = buildStarters(sides[0], rosterPositions, projections, scoringSettings, gamesRes, liveStats, freeAgents, streamsByPosition);
-    const lineupB = buildStarters(sides[1], rosterPositions, projections, scoringSettings, gamesRes, liveStats, freeAgents, streamsByPosition);
+  for (const [matchupId, sides] of playablePairs) {
+    const lineupA = lineupByRoster.get(sides[0].roster_id)!;
+    const lineupB = lineupByRoster.get(sides[1].roster_id)!;
     const startersA = lineupA.starters;
     const startersB = lineupB.starters;
 
