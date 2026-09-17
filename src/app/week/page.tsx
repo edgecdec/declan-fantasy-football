@@ -231,23 +231,85 @@ function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
   );
 }
 
-function MatchupsView({ data }: { data: WeeklyOutlook }) {
-  /*
-   * Which formats to show. Held here rather than in the page so switching tabs does not reset it,
-   * and defaulted to every format PRESENT rather than to a hardcoded list — an account with no
-   * keeper league should not be offered a Keeper chip that blanks the table.
-   */
-  const present = React.useMemo(() => {
-    const seen = new Set<LeagueFormat>(data.matchups.map(m => leagueFormat(m.league)));
-    return LEAGUE_FORMATS.filter(f => seen.has(f));
-  }, [data.matchups]);
-  const [formats, setFormats] = React.useState<LeagueFormat[]>([]);
-  const active = formats.length === 0 ? present : formats;
-  const rows = React.useMemo(
-    () => data.matchups.filter(m => active.includes(leagueFormat(m.league))),
-    [data.matchups, active],
-  );
+/**
+ * The formats this account actually plays this week, in display order.
+ *
+ * Derived rather than hardcoded: an account with no keeper league should not be offered a Keeper
+ * chip that blanks the table.
+ *
+ * Elimination leagues must be counted from `eliminations`, NOT from the matchups. They have no
+ * head-to-head pairing so they never appear in the matchup list at all — reading formats from
+ * matchups alone left `chopped` permanently out of the selection, which silently filtered the
+ * expected-eliminations figure to nothing.
+ */
+function presentFormats(data: WeeklyOutlook): LeagueFormat[] {
+  const seen = new Set<LeagueFormat>(data.matchups.map(m => leagueFormat(m.league)));
+  for (const e of data.eliminations) seen.add(e.format);
+  return LEAGUE_FORMATS.filter(f => seen.has(f));
+}
 
+/**
+ * Format filter chips.
+ *
+ * Rendered in the header beside the projected record, not above the table, BECAUSE the record
+ * responds to them. A control that silently changes a headline number two inches above itself,
+ * while sitting under a tab, is a control nobody connects to the number.
+ */
+function FormatFilter({
+  present,
+  active,
+  isAll,
+  counts,
+  onChange,
+}: {
+  present: LeagueFormat[];
+  active: LeagueFormat[];
+  /** True when nothing is explicitly selected, so every format is showing by default. */
+  isAll: boolean;
+  counts: Record<string, number>;
+  onChange: (next: LeagueFormat[]) => void;
+}) {
+  if (present.length <= 1) return null;
+  return (
+    <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Typography variant="caption" color="text.secondary">Format</Typography>
+      {present.map(f => {
+        const on = active.includes(f);
+        return (
+          <Chip
+            key={f}
+            size="small"
+            label={`${LEAGUE_FORMAT_LABEL[f]} ${counts[f] ?? 0}`}
+            color={on ? 'primary' : 'default'}
+            variant={on ? 'filled' : 'outlined'}
+            onClick={() => {
+              /*
+               * From the default "everything", clicking one format ISOLATES it — that is what
+               * clicking "Dynasty" is asking for. Toggling it off instead (the literal reading of
+               * every chip being lit) means the one click anybody makes first does the opposite of
+               * what they wanted.
+               *
+               * Once a real subset exists, clicking adds or removes, and landing back on the full
+               * set collapses to "all" so there is always a way home.
+               */
+              if (isAll) {
+                onChange([f]);
+                return;
+              }
+              const next = active.includes(f) ? active.filter(x => x !== f) : [...active, f];
+              onChange(next.length === present.length ? [] : next);
+            }}
+          />
+        );
+      })}
+      {active.length !== present.length && (
+        <Chip size="small" label="All" variant="outlined" onClick={() => onChange([])} />
+      )}
+    </Box>
+  );
+}
+
+function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOutlook[] }) {
   if (data.matchups.length === 0) {
     return <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>;
   }
@@ -385,49 +447,17 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
   ];
 
   return (
-    <>
-      {present.length > 1 && (
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
-          <Typography variant="caption" color="text.secondary">Format</Typography>
-          {present.map(f => {
-            const on = active.includes(f);
-            const count = data.matchups.filter(m => leagueFormat(m.league) === f).length;
-            return (
-              <Chip
-                key={f}
-                size="small"
-                label={`${LEAGUE_FORMAT_LABEL[f]} ${count}`}
-                color={on ? 'primary' : 'default'}
-                variant={on ? 'filled' : 'outlined'}
-                onClick={() =>
-                  setFormats(prev => {
-                    // An empty selection means "all", so deselecting the last chip reads as a
-                    // reset rather than leaving an empty table with no way back.
-                    const base = prev.length === 0 ? present : prev;
-                    const next = base.includes(f) ? base.filter(x => x !== f) : [...base, f];
-                    return next.length === present.length ? [] : next;
-                  })
-                }
-              />
-            );
-          })}
-          {formats.length > 0 && (
-            <Chip size="small" label="All" variant="outlined" onClick={() => setFormats([])} />
-          )}
-        </Box>
-      )}
-      <DataTable
-        data={rows}
-        columns={columns}
-        keyField={r => r.leagueId}
-        defaultSortBy="closeness"
-        defaultSortOrder="asc"
-        defaultRowsPerPage={25}
-        rowsPerPageOptions={[10, 25, 50]}
-        noDataMessage="No matchups this week."
-        renderDetailPanel={r => <MatchupDetail row={r} />}
-      />
-    </>
+    <DataTable
+      data={rows}
+      columns={columns}
+      keyField={r => r.leagueId}
+      defaultSortBy="closeness"
+      defaultSortOrder="asc"
+      defaultRowsPerPage={25}
+      rowsPerPageOptions={[10, 25, 50]}
+      noDataMessage="No matchups in the selected formats."
+      renderDetailPanel={r => <MatchupDetail row={r} />}
+    />
   );
 }
 
@@ -720,18 +750,55 @@ export default function WeekPage() {
     return () => clearInterval(id);
   }, [data, anyLive, username, season, week, load]);
 
-  const expectedWins = data
-    ? data.matchups.reduce((s, m) => s + m.winProbability, 0)
-    : 0;
-  const played = data?.matchups.length ?? 0;
+  /*
+   * Format filter, held at PAGE level rather than inside the matchups table.
+   *
+   * The projected record is computed from it, so the state cannot live in the table — and the
+   * chips are rendered in the header next to the record for the same reason. An empty array means
+   * "all", so a newly loaded week is never accidentally filtered to nothing.
+   */
+  const [formats, setFormats] = React.useState<LeagueFormat[]>([]);
+  const present = React.useMemo(
+    () => (data ? presentFormats(data) : []),
+    [data],
+  );
+  // An empty explicit selection is impossible to act on, so it collapses back to "all".
+  const active = formats.length === 0 ? present : formats;
+  const formatCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of data?.matchups ?? []) {
+      const f = leagueFormat(m.league);
+      counts[f] = (counts[f] ?? 0) + 1;
+    }
+    // Elimination leagues have no matchup row, so they would otherwise show a count of 0.
+    for (const e of data?.eliminations ?? []) counts[e.format] = (counts[e.format] ?? 0) + 1;
+    return counts;
+  }, [data]);
+  const shownMatchups = React.useMemo(
+    () => (data ? data.matchups.filter(m => active.includes(leagueFormat(m.league))) : []),
+    [data, active],
+  );
+
+  /*
+   * Every matchup-derived headline reads the FILTERED set, not all of them.
+   *
+   * The record, the live count and the rating bar are the same win probabilities shown three
+   * ways, so filtering one and not the others would have them contradict each other in the same
+   * panel — "across 4 matchups" above a bar totalling 16.
+   */
+  const expectedWins = shownMatchups.reduce((s, m) => s + m.winProbability, 0);
+  const played = shownMatchups.length;
+  const liveNow = shownMatchups.filter(m => m.status === 'live').length;
   /*
    * Summed probabilities, so this is a COUNT of leagues, not a percentage: 1.0 means going out of
    * one league on average. With two chopped leagues it sits around a tenth, which is why it is
    * shown to two decimals rather than rounded to a whole number.
    */
-  const expectedEliminations = data
-    ? data.eliminations.reduce((s, e) => s + e.probability, 0)
-    : 0;
+  const shownEliminations = React.useMemo(
+    () => (data ? data.eliminations.filter(e => active.includes(e.format)) : []),
+    [data, active],
+  );
+  const expectedEliminations = shownEliminations.reduce((s, e) => s + e.probability, 0);
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
@@ -781,7 +848,7 @@ export default function WeekPage() {
                   across {played} matchup{played === 1 ? '' : 's'}
                 </Typography>
               </Box>
-              {data.eliminations.length > 0 && (
+              {shownEliminations.length > 0 && (
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
                     Expected eliminations
@@ -792,7 +859,7 @@ export default function WeekPage() {
                       <Box component="span">
                         Chance of being chopped this week, summed across elimination leagues — so
                         1.0 means going out of one league on average. Usually a tenth or two.
-                        {data.eliminations.map(e => (
+                        {shownEliminations.map(e => (
                           <Box component="span" key={e.leagueId} sx={{ display: 'block', mt: 0.5 }}>
                             {e.leagueName}:{' '}
                             {e.eliminated
@@ -808,16 +875,14 @@ export default function WeekPage() {
                     </Typography>
                   </Tooltip>
                   <Typography variant="caption" color="text.secondary">
-                    across {data.eliminations.length} elimination league
-                    {data.eliminations.length === 1 ? '' : 's'}
+                    across {shownEliminations.length} elimination league
+                    {shownEliminations.length === 1 ? '' : 's'}
                   </Typography>
                 </Box>
               )}
               <Box>
                 <Typography variant="caption" color="text.secondary" display="block">Live now</Typography>
-                <Typography variant="h6">
-                  {data.matchups.filter(m => m.status === 'live').length}
-                </Typography>
+                <Typography variant="h6">{liveNow}</Typography>
               </Box>
               {updatedAt && (
                 <Box sx={{ ml: 'auto' }}>
@@ -827,17 +892,26 @@ export default function WeekPage() {
                 </Box>
               )}
             </Box>
+            <Box sx={{ mt: 2 }}>
+              <FormatFilter
+                present={present}
+                active={active}
+                isAll={formats.length === 0}
+                counts={formatCounts}
+                onChange={setFormats}
+              />
+            </Box>
             <Divider sx={{ my: 2 }} />
-            <RatingBreakdown probabilities={data.matchups.map(m => m.winProbability)} />
+            <RatingBreakdown probabilities={shownMatchups.map(m => m.winProbability)} />
           </Paper>
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-            <Tab label={`Matchups (${data.matchups.length})`} />
+            <Tab label={`Matchups (${shownMatchups.length})`} />
             <Tab label={`Rooting interest (${data.rooting.length})`} />
             <Tab label="The Zone" />
           </Tabs>
 
-          {tab === 0 && <MatchupsView data={data} />}
+          {tab === 0 && <MatchupsView data={data} rows={shownMatchups} />}
           {tab === 1 && <RootingView rows={data.rooting} />}
           {/* Takes the week from this page rather than owning a picker, so the tab can never
               disagree with the header about which week it is showing. */}
