@@ -35,6 +35,11 @@ def main() -> int:
     ap.add_argument('--cookie', action='append', default=[], help='name=value, repeatable')
     ap.add_argument('--shot', action='append', required=True, help='PATH:NAME[:TAB]')
     ap.add_argument(
+        '--full-page', action='store_true',
+        help='Capture the whole scrollable page, not just the viewport. Needed for anything below '
+             'the fold, such as the skipped-leagues list at the bottom of /week.',
+    )
+    ap.add_argument(
         '--pre', action='append', default=[],
         help='Step run on every page before shooting: fill=<value> types into the first '
              'combobox, click=<name> clicks a button by its accessible name, tab=<name> '
@@ -80,6 +85,13 @@ def main() -> int:
                 elif verb == 'check':
                     # A MUI Switch is a checkbox, not a button, so it needs its own step.
                     page.get_by_label(value).click()
+                elif verb == 'select':
+                    # A MUI Select is a combobox that opens a listbox — NOT a native <select>, so
+                    # select_option() does not work on it. The last combobox on a page is the one
+                    # that is not the username autocomplete.
+                    page.get_by_role('combobox').last.click()
+                    page.wait_for_timeout(500)
+                    page.get_by_role('option', name=value, exact=True).click()
                 else:
                     raise SystemExit(f'unknown --pre step: {step}')
                 page.wait_for_timeout(1500)
@@ -88,7 +100,8 @@ def main() -> int:
                 page.get_by_role('tab', name=rest[0]).click()
                 page.wait_for_timeout(args.settle)
             target = out / f'{name}.png'
-            page.screenshot(path=str(target), animations='disabled', timeout=90_000)
+            page.screenshot(path=str(target), animations='disabled', timeout=90_000,
+                            full_page=args.full_page)
 
             tables = page.evaluate("""() => [...document.querySelectorAll('table')].map(t => ({
               headers: [...t.querySelectorAll('th')].map(e => e.innerText.trim()).filter(Boolean),

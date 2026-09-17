@@ -4,7 +4,20 @@ import {
   buildMatchupMarkets,
   playerName,
 } from '@/services/betting/matchupMarkets';
-import { REGULATION_MINUTES, SideDistribution } from '@/services/betting/liveOdds';
+import {
+  REGULATION_MINUTES,
+  SideDistribution,
+  StarterInput,
+  sideDistribution,
+} from '@/services/betting/liveOdds';
+import { defenceCorrection } from '@/services/betting/defenseBrackets';
+import {
+  CHOPPED_LEAGUE_TYPE,
+  LeagueFormat,
+  hasNoHeadToHead,
+  leagueFormat,
+} from '@/services/week/leagueFormat';
+import { RosterScore, eliminationProbabilities } from '@/services/week/choppedRisk';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
 import type { NflGamesResponse } from '@/app/api/betting/nfl-games/route';
 import playerData from '../../../data/sleeper_players.json';
@@ -23,7 +36,15 @@ import playerData from '../../../data/sleeper_players.json';
  * week or it does not, and the ones that do not simply drop out on their own.
  */
 
-export type MatchupStatus = 'not_started' | 'live' | 'final';
+/**
+ * Where a matchup stands.
+ *
+ * `live` means a starter is ON THE FIELD right now, not merely that the week is unfinished.
+ * The distinction needs its own value for the gap between slates — after Thursday night, or
+ * between the Sunday and Monday games, points are banked and minutes remain but nobody is
+ * playing. Calling that `live` was wrong, and calling it `not_started` would be worse.
+ */
+export type MatchupStatus = 'not_started' | 'live' | 'between' | 'final';
 
 export type LeagueWeekOutlook = {
   leagueId: string;
@@ -118,10 +139,32 @@ export type RootingRow = {
   netLeagues: number;
 };
 
+/** What is at stake in a league that eliminates its lowest scorer. */
+export type EliminationRisk = {
+  leagueId: string;
+  leagueName: string;
+  format: LeagueFormat;
+  /** My chance of posting the lowest score and going out this week. Zero once eliminated. */
+  probability: number;
+  /** Rosters still alive, me included. */
+  activeRosters: number;
+  /** True when I am already out of this league. */
+  eliminated: boolean;
+};
+
 export type WeeklyOutlook = {
   week: number;
   season: string;
   matchups: LeagueWeekOutlook[];
+  /**
+   * Per-league elimination risk, for the formats that have it.
+   *
+   * Summed, this is the EXPECTED ELIMINATIONS for the week: 1.0 means going out of one league on
+   * average. It reads low by nature — two chopped leagues of 17 and 15 live rosters put the
+   * floor around 0.12 — and that is the point. It is a count of leagues, not a percentage, so it
+   * is directly comparable to the expected-wins figure beside it.
+   */
+  eliminations: EliminationRisk[];
   /**
    * Leagues where I have a lineup but no opponent (guillotine, chopped). They produce no
    * matchup row, but the players in them are absolutely still worth rooting for — which is
@@ -182,9 +225,16 @@ export function remainingProjection(starter: {
   return Math.max(0, starter.projectedPoints) * fraction;
 }
 
-function statusFor(remainingMinutes: number, anyPointsScored: boolean): MatchupStatus {
+function statusFor(
+  remainingMinutes: number,
+  anyPointsScored: boolean,
+  anyPlaying: boolean,
+): MatchupStatus {
   if (remainingMinutes <= 0) return 'final';
-  return anyPointsScored ? 'live' : 'not_started';
+  // Banked points used to be enough to call it live, which meant a matchup stayed "live" all
+  // week once Thursday night had happened. Only a game actually in progress counts.
+  if (anyPlaying) return 'live';
+  return anyPointsScored ? 'between' : 'not_started';
 }
 
 /**
@@ -202,7 +252,16 @@ export async function buildWeeklyOutlook(
 
   // One scoreboard for every league. Fetched here and passed down, because it is the same
   // answer for all of them and buildMatchupMarkets would otherwise request it per league.
-  const games = await fetch('/api/betting/nfl-games')
+  /*
+   * The scoreboard for the week BEING VIEWED, not the current one.
+   *
+   * Asking without the week returns whatever week the NFL is on now, so loading a finished week
+   * priced its starters against this week's games: every one of them mapped to a fixture that
+   * had not kicked off, so 60 minutes were "remaining" and week 1 sat there reading live with
+   * live win probabilities all through week 2. Same failure as the ESPN calendar lag fixed in
+   * the betting pricing path — this call site was simply missed.
+   */
+  const games = await fetch(`/api/betting/nfl-games?season=${season}&week=${week}`)
     .then(r => r.json() as Promise<NflGamesResponse>)
     .catch(() => null);
 
@@ -221,9 +280,24 @@ export async function buildWeeklyOutlook(
   );
 
   // Leagues with no head-to-head pairing, which still have a lineup worth rooting for.
-  const noOpponent: { leagueId: string; leagueName: string }[] = [];
+  const noOpponent: { leagueId: string; leagueName: string; league: SleeperLeague }[] = [];
 
   for (const { league, priced } of results) {
+    /*
+     * A league that has not drafted has no lineup to price and never will for this week. Saying
+     * so beats letting it fall through to the generic "no lineup set" — that reason is true of a
+     * pre-draft league but tells the reader nothing about what to do, and these two sit at the
+     * bottom of the page every single week.
+     */
+    if (league.status === 'pre_draft' || league.status === 'drafting') {
+      skipped.push({
+        leagueId: league.league_id,
+        leagueName: league.name,
+        reason: league.status === 'drafting' ? 'draft in progress' : "hasn't drafted yet",
+      });
+      continue;
+    }
+
     const mine = priced?.markets.find(
       m => m.a.ownerId === userId || m.b.ownerId === userId,
     );
@@ -232,7 +306,7 @@ export async function buildWeeklyOutlook(
       // Guillotine, chopped and survivor formats give every roster its own matchup_id, so
       // there is no pair to price — but the starters are still playing, so collect them
       // rather than discarding the league.
-      noOpponent.push({ leagueId: league.league_id, leagueName: league.name });
+      noOpponent.push({ leagueId: league.league_id, leagueName: league.name, league });
       continue;
     }
 
@@ -248,6 +322,7 @@ export async function buildWeeklyOutlook(
      */
     const winProbability = iAmA ? mine.probA : 1 - mine.probA;
     const scored = me.distribution.banked > 0 || opponent.distribution.banked > 0;
+    const anyPlaying = [...me.starters, ...opponent.starters].some(s => s.gameState === 'in');
 
     matchups.push({
       leagueId: league.league_id,
@@ -258,7 +333,7 @@ export async function buildWeeklyOutlook(
       opponent,
       winProbability,
       remainingMinutes: mine.remainingMinutes,
-      status: statusFor(mine.remainingMinutes, scored),
+      status: statusFor(mine.remainingMinutes, scored, anyPlaying),
     });
   }
 
@@ -271,7 +346,7 @@ export async function buildWeeklyOutlook(
   const lineupOnlyResults = await Promise.all(
     noOpponent.map(async lg => {
       try {
-        return await buildLineupOnly(lg.leagueId, lg.leagueName, season, week, userId, games);
+        return await buildNoOpponentLeague(lg.leagueId, lg.leagueName, season, week, userId, games);
       } catch {
         return null;
       }
@@ -279,15 +354,24 @@ export async function buildWeeklyOutlook(
   );
 
   const lineupOnly: LineupOnlyLeague[] = [];
+  const eliminations: EliminationRisk[] = [];
   noOpponent.forEach((lg, i) => {
-    const built = lineupOnlyResults[i];
+    const result = lineupOnlyResults[i];
+    if (result?.elimination) eliminations.push(result.elimination);
+    const built = result?.lineup ?? null;
     if (built) lineupOnly.push(built);
     else {
-      // Listed rather than silently dropped: usually a league that has not drafted yet.
+      /*
+       * Listed rather than silently dropped. A pre-draft league has already been filtered out
+       * above, so reaching here means the league is under way but produced no lineup — an
+       * eliminated guillotine roster is the common case, and it is worth naming, since "no
+       * lineup" on a league you have been knocked out of reads like a fault otherwise.
+       */
+      const eliminated = lg.league.settings?.type === CHOPPED_LEAGUE_TYPE;
       skipped.push({
         leagueId: lg.leagueId,
         leagueName: lg.leagueName,
-        reason: 'no lineup set for this week yet',
+        reason: eliminated ? 'eliminated — no roster left' : 'no lineup set for this week yet',
       });
     }
   });
@@ -298,6 +382,7 @@ export async function buildWeeklyOutlook(
     matchups,
     lineupOnly,
     rooting: buildRootingRows(matchups, games, lineupOnly),
+    eliminations,
     skipped,
   };
 }
@@ -431,45 +516,153 @@ export function buildRootingRows(
  * Uses the starters as literally set, with no best-lineup substitution. That machinery
  * exists to price a matchup fairly; here it would be inventing players to root for.
  */
-async function buildLineupOnly(
+/**
+ * A league with no head-to-head opponent: my lineup, and what is at stake in it.
+ *
+ * Both come from one set of fetches because they need exactly the same data — the league's
+ * scoring, this week's matchup entries and the week's projections. Splitting them into two
+ * functions meant fetching all of it twice for the same league.
+ */
+async function buildNoOpponentLeague(
   leagueId: string,
   leagueName: string,
   season: string,
   week: number,
   userId: string,
   games: NflGamesResponse | null,
-): Promise<LineupOnlyLeague | null> {
+): Promise<{ lineup: LineupOnlyLeague | null; elimination: EliminationRisk | null }> {
+  const nothing = { lineup: null, elimination: null };
   const [league, rosters, matchups] = await Promise.all([
     SleeperService.getLeague(leagueId),
     SleeperService.getRosters(leagueId),
     SleeperService.getMatchups(leagueId, week, { skipCache: true }),
   ]);
   const scoring = league?.scoring_settings;
-  if (!scoring) return null;
+  if (!scoring || !league) return nothing;
 
   const myRoster = rosters.find(r => r.owner_id === userId);
-  if (!myRoster) return null;
-  const mine = matchups.find(m => m.roster_id === myRoster.roster_id);
-  const starterIds = (mine?.starters ?? []).filter(p => p && p !== '0');
-  if (starterIds.length === 0) return null;
+  if (!myRoster) return nothing;
 
   const projections = await SleeperService.getWeeklyProjections(season, week);
 
-  return {
+  /** One roster's starters, as the odds model wants them. */
+  const startersOf = (m: (typeof matchups)[number]): StarterInput[] => {
+    const ids = m.starters ?? [];
+    const points = m.starters_points ?? [];
+    return ids
+      .map((pid, i) => ({ pid, actual: points[i] ?? 0 }))
+      .filter(({ pid }) => pid && pid !== '0')
+      .map(({ pid, actual }) => {
+        const team = espnTeamOf(pid);
+        const gameId = team && games ? games.teamToGame[team] : undefined;
+        const game = gameId && games ? games.games.find(g => g.id === gameId) : undefined;
+        const raw = projections[pid];
+        const base: StarterInput = {
+          playerId: pid,
+          position: POSITIONS[pid]?.position ?? null,
+          actualPoints: actual,
+          projectedPoints: calculateProjectedPoints(raw, scoring),
+          gameState: game ? game.state : 'unknown',
+          remainingMinutes: game ? game.remainingMinutes : 0,
+        };
+        /*
+         * Same defence correction the head-to-head path applies. Without it a live defence
+         * carries a points-allowed bracket it has not earned, and here that feeds straight into
+         * an elimination probability rather than just a projection.
+         */
+        const fix = defenceCorrection(
+          { ...base, position: base.position ?? null },
+          scoring,
+          undefined,
+          raw,
+        );
+        if (!fix) return base;
+        return {
+          ...base,
+          projectedPoints: base.projectedPoints - fix.projectedBracket,
+          meanAdjustment: (base.meanAdjustment ?? 0) + fix.meanAdjustment,
+          extraVariance: (base.extraVariance ?? 0) + fix.variance,
+        };
+      });
+  };
+
+  const mine = matchups.find(m => m.roster_id === myRoster.roster_id);
+  const myStarters = mine ? startersOf(mine) : [];
+
+  const lineup: LineupOnlyLeague | null = myStarters.length
+    ? {
+        leagueId,
+        leagueName,
+        starters: myStarters.map(s => ({
+          playerId: s.playerId,
+          position: s.position ?? null,
+          projectedPoints: s.projectedPoints,
+          gameState: s.gameState,
+          remainingMinutes: s.remainingMinutes,
+        })),
+      }
+    : null;
+
+  const elimination = buildEliminationRisk({
+    league,
     leagueId,
     leagueName,
-    starters: starterIds.map(pid => {
-      const team = espnTeamOf(pid);
-      const gameId = team && games ? games.teamToGame[team] : undefined;
-      const game = gameId && games ? games.games.find(g => g.id === gameId) : undefined;
-      return {
-        playerId: pid,
-        position: POSITIONS[pid]?.position ?? null,
-        projectedPoints: calculateProjectedPoints(projections[pid], scoring),
-        gameState: game ? game.state : 'unknown',
-        remainingMinutes: game ? game.remainingMinutes : 0,
-      };
-    }),
+    matchups,
+    myRosterId: myRoster.roster_id,
+    startersOf,
+    eliminatedHere: myStarters.length === 0,
+  });
+
+  return { lineup, elimination };
+}
+
+/**
+ * My chance of being chopped this week, or null when the format cannot eliminate anyone.
+ *
+ * Gated on the BEHAVIOUR — every roster holding its own `matchup_id` — rather than on
+ * `settings.type`, which is undocumented for these formats. A league that turns elimination off
+ * (`disable_elimination`) has lineups and no stakes, so it gets no number rather than a wrong one.
+ */
+function buildEliminationRisk(args: {
+  league: SleeperLeague;
+  leagueId: string;
+  leagueName: string;
+  matchups: { roster_id: number; matchup_id: number | null; starters: string[] | null }[];
+  myRosterId: number;
+  startersOf: (m: never) => StarterInput[];
+  eliminatedHere: boolean;
+}): EliminationRisk | null {
+  const { league, leagueId, leagueName, matchups, myRosterId, eliminatedHere } = args;
+  if (!hasNoHeadToHead(matchups.map(m => m.matchup_id))) return null;
+  if (league.settings?.disable_elimination) return null;
+
+  const base = {
+    leagueId,
+    leagueName,
+    format: leagueFormat(league),
+    eliminated: eliminatedHere,
+  };
+
+  // An eliminated roster cannot be eliminated again, and must be kept out of the field below —
+  // it has no lineup, so it would otherwise be a certain minimum.
+  const alive = matchups.filter(m => (m.starters ?? []).some(p => p && p !== '0'));
+  if (eliminatedHere) return { ...base, probability: 0, activeRosters: alive.length };
+
+  const field: RosterScore[] = alive.map(m => {
+    const dist = sideDistribution(args.startersOf(m as never));
+    return {
+      rosterId: m.roster_id,
+      banked: dist.banked,
+      mean: dist.mean,
+      sd: Math.sqrt(dist.variance),
+    };
+  });
+
+  const probabilities = eliminationProbabilities(field);
+  return {
+    ...base,
+    probability: probabilities.get(myRosterId) ?? 0,
+    activeRosters: field.length,
   };
 }
 

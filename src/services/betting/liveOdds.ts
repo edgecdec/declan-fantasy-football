@@ -370,7 +370,7 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
 }
 
 /** Standard normal CDF via Abramowitz & Stegun 7.1.26 on erf. */
-function normalCdf(z: number): number {
+export function normalCdf(z: number): number {
   const sign = z < 0 ? -1 : 1;
   const x = Math.abs(z) / Math.SQRT2;
   const t = 1 / (1 + 0.3275911 * x);

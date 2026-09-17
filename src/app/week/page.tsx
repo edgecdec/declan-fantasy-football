@@ -24,6 +24,12 @@ import { getNflStateOrFallback } from '@/services/common/seasonService';
 import {
   LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildWeeklyOutlook,
 } from '@/services/week/weeklyOutlook';
+import {
+  LEAGUE_FORMATS,
+  LEAGUE_FORMAT_LABEL,
+  LeagueFormat,
+  leagueFormat,
+} from '@/services/week/leagueFormat';
 import { leagueUrl } from '@/services/common/leagueLinks';
 import { getPositionColor } from '@/constants/colors';
 import {
@@ -64,10 +70,18 @@ function LeagueLink({ leagueId, name, noWrap }: { leagueId: string; name: string
   );
 }
 
-const STATUS_LABEL: Record<string, { label: string; color: 'default' | 'success' | 'warning' }> = {
-  not_started: { label: 'Not started', color: 'default' },
-  live: { label: 'Live', color: 'success' },
-  final: { label: 'Final', color: 'warning' },
+/**
+ * `rank` orders the Status column: what you want to watch first, then what has not started, then
+ * what is over. Sorting on the label alphabetically would put Final above Live.
+ */
+const STATUS_LABEL: Record<
+  string,
+  { label: string; color: 'default' | 'success' | 'warning' | 'info'; rank: number }
+> = {
+  live: { label: 'Live', color: 'success', rank: 0 },
+  between: { label: 'Between games', color: 'info', rank: 1 },
+  not_started: { label: 'Not started', color: 'default', rank: 2 },
+  final: { label: 'Final', color: 'warning', rank: 3 },
 };
 
 /**
@@ -218,6 +232,22 @@ function MatchupDetail({ row }: { row: LeagueWeekOutlook }) {
 }
 
 function MatchupsView({ data }: { data: WeeklyOutlook }) {
+  /*
+   * Which formats to show. Held here rather than in the page so switching tabs does not reset it,
+   * and defaulted to every format PRESENT rather than to a hardcoded list — an account with no
+   * keeper league should not be offered a Keeper chip that blanks the table.
+   */
+  const present = React.useMemo(() => {
+    const seen = new Set<LeagueFormat>(data.matchups.map(m => leagueFormat(m.league)));
+    return LEAGUE_FORMATS.filter(f => seen.has(f));
+  }, [data.matchups]);
+  const [formats, setFormats] = React.useState<LeagueFormat[]>([]);
+  const active = formats.length === 0 ? present : formats;
+  const rows = React.useMemo(
+    () => data.matchups.filter(m => active.includes(leagueFormat(m.league))),
+    [data.matchups, active],
+  );
+
   if (data.matchups.length === 0) {
     return <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>;
   }
@@ -227,10 +257,19 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
       id: 'leagueName',
       label: 'League',
       width: 180,
+      // The format rides in this cell rather than taking a column of its own. This table is
+      // already wider than a laptop viewport, and Status — the thing you now want to sort on —
+      // was falling off the right edge. Filtering by format is the chips above; this is just the
+      // label, so it costs nothing to put it here.
       render: r => (
-        <Typography variant="body2" component="div" noWrap>
-          <LeagueLink leagueId={r.leagueId} name={r.leagueName} noWrap />
-        </Typography>
+        <Box>
+          <Typography variant="body2" component="div" noWrap>
+            <LeagueLink leagueId={r.leagueId} name={r.leagueName} noWrap />
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 10 }}>
+            {LEAGUE_FORMAT_LABEL[leagueFormat(r.league)]}
+          </Typography>
+        </Box>
       ),
     },
     {
@@ -334,6 +373,10 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
     {
       id: 'status',
       label: 'Status',
+      tooltip: 'Live means a starter is on the field right now. Sort to bring those to the top.',
+      // Without a sortValue this column has no backing field, so the comparator would read
+      // undefined for every row and sorting would silently do nothing.
+      sortValue: r => (STATUS_LABEL[r.status] ?? STATUS_LABEL.not_started).rank,
       render: r => {
         const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.not_started;
         return <Chip label={s.label} color={s.color} size="small" variant="outlined" />;
@@ -342,17 +385,49 @@ function MatchupsView({ data }: { data: WeeklyOutlook }) {
   ];
 
   return (
-    <DataTable
-      data={data.matchups}
-      columns={columns}
-      keyField={r => r.leagueId}
-      defaultSortBy="closeness"
-      defaultSortOrder="asc"
-      defaultRowsPerPage={25}
-      rowsPerPageOptions={[10, 25, 50]}
-      noDataMessage="No matchups this week."
-      renderDetailPanel={r => <MatchupDetail row={r} />}
-    />
+    <>
+      {present.length > 1 && (
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+          <Typography variant="caption" color="text.secondary">Format</Typography>
+          {present.map(f => {
+            const on = active.includes(f);
+            const count = data.matchups.filter(m => leagueFormat(m.league) === f).length;
+            return (
+              <Chip
+                key={f}
+                size="small"
+                label={`${LEAGUE_FORMAT_LABEL[f]} ${count}`}
+                color={on ? 'primary' : 'default'}
+                variant={on ? 'filled' : 'outlined'}
+                onClick={() =>
+                  setFormats(prev => {
+                    // An empty selection means "all", so deselecting the last chip reads as a
+                    // reset rather than leaving an empty table with no way back.
+                    const base = prev.length === 0 ? present : prev;
+                    const next = base.includes(f) ? base.filter(x => x !== f) : [...base, f];
+                    return next.length === present.length ? [] : next;
+                  })
+                }
+              />
+            );
+          })}
+          {formats.length > 0 && (
+            <Chip size="small" label="All" variant="outlined" onClick={() => setFormats([])} />
+          )}
+        </Box>
+      )}
+      <DataTable
+        data={rows}
+        columns={columns}
+        keyField={r => r.leagueId}
+        defaultSortBy="closeness"
+        defaultSortOrder="asc"
+        defaultRowsPerPage={25}
+        rowsPerPageOptions={[10, 25, 50]}
+        noDataMessage="No matchups this week."
+        renderDetailPanel={r => <MatchupDetail row={r} />}
+      />
+    </>
   );
 }
 
@@ -649,6 +724,14 @@ export default function WeekPage() {
     ? data.matchups.reduce((s, m) => s + m.winProbability, 0)
     : 0;
   const played = data?.matchups.length ?? 0;
+  /*
+   * Summed probabilities, so this is a COUNT of leagues, not a percentage: 1.0 means going out of
+   * one league on average. With two chopped leagues it sits around a tenth, which is why it is
+   * shown to two decimals rather than rounded to a whole number.
+   */
+  const expectedEliminations = data
+    ? data.eliminations.reduce((s, e) => s + e.probability, 0)
+    : 0;
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
@@ -698,6 +781,38 @@ export default function WeekPage() {
                   across {played} matchup{played === 1 ? '' : 's'}
                 </Typography>
               </Box>
+              {data.eliminations.length > 0 && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Expected eliminations
+                  </Typography>
+                  <Tooltip
+                    arrow
+                    title={
+                      <Box component="span">
+                        Chance of being chopped this week, summed across elimination leagues — so
+                        1.0 means going out of one league on average. Usually a tenth or two.
+                        {data.eliminations.map(e => (
+                          <Box component="span" key={e.leagueId} sx={{ display: 'block', mt: 0.5 }}>
+                            {e.leagueName}:{' '}
+                            {e.eliminated
+                              ? 'already out'
+                              : `${(e.probability * 100).toFixed(1)}% of ${e.activeRosters} left`}
+                          </Box>
+                        ))}
+                      </Box>
+                    }
+                  >
+                    <Typography variant="h4" sx={{ lineHeight: 1.2, cursor: 'help' }}>
+                      {expectedEliminations.toFixed(2)}
+                    </Typography>
+                  </Tooltip>
+                  <Typography variant="caption" color="text.secondary">
+                    across {data.eliminations.length} elimination league
+                    {data.eliminations.length === 1 ? '' : 's'}
+                  </Typography>
+                </Box>
+              )}
               <Box>
                 <Typography variant="caption" color="text.secondary" display="block">Live now</Typography>
                 <Typography variant="h6">
@@ -741,19 +856,28 @@ export default function WeekPage() {
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {/* The reason is IN the label, not only in a tooltip. A tooltip you have to go
+                    hunting for does not answer "why is this league missing" at a glance, and on a
+                    touch screen it answers it not at all. */}
                 {data.skipped.map(s => (
-                  <Tooltip key={s.leagueId} title={s.reason}>
-                    <Chip
-                      label={s.leagueName}
-                      size="small"
-                      variant="outlined"
-                      component="a"
-                      clickable
-                      href={leagueUrl(s.leagueId)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    />
-                  </Tooltip>
+                  <Chip
+                    key={s.leagueId}
+                    label={
+                      <Box component="span">
+                        {s.leagueName}
+                        <Box component="span" sx={{ color: 'text.secondary', ml: 0.6 }}>
+                          — {s.reason}
+                        </Box>
+                      </Box>
+                    }
+                    size="small"
+                    variant="outlined"
+                    component="a"
+                    clickable
+                    href={leagueUrl(s.leagueId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
                 ))}
               </Box>
             </Paper>
