@@ -65,6 +65,15 @@ export async function GET(request: Request) {
   const startersOnly = params.get('startersOnly') === '1';
   const bigPlaysOnly = params.get('bigPlaysOnly') === '1';
   const includeAllPlays = params.get('allPlays') === '1';
+  /*
+   * Restrict scoring to these league ids. Absent means every league the user is in.
+   *
+   * The Zone is a tab on a page with a league-format filter, and the filter has to reach it or
+   * the page contradicts itself — "Dynasty only" above a feed pricing all eighteen leagues.
+   */
+  const onlyLeagues = new Set(
+    (params.get('leagues') ?? '').split(',').map(id => id.trim()).filter(Boolean),
+  );
   const numeric = (name: string): number | undefined => {
     const raw = Number(params.get(name));
     return Number.isFinite(raw) && raw > 0 ? raw : undefined;
@@ -83,9 +92,11 @@ export async function GET(request: Request) {
   // Not awaited: the feed must render from stored plays whether or not this sweep succeeds.
   void pollQuietly();
 
+  // The league scope is part of the key: without it, a filtered request would be served a
+  // cached unfiltered feed, and vice versa.
   const cacheKey =
     `${username}|${season}|${week}|${limit}|${startersOnly}|${bigPlaysOnly}|${includeAllPlays}`
-    + `|${after ?? ''}|${before ?? ''}`;
+    + `|${after ?? ''}|${before ?? ''}|${[...onlyLeagues].sort().join(',')}`;
   const stored = playCount(season, week);
   const cached = feedCache.get(cacheKey);
   // Invalidated by a new play as well as by age, so a touchdown is never held back by the
@@ -99,7 +110,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: `No Sleeper user "${username}".` }, { status: 404 });
   }
 
-  const { leagues, failed } = await buildLeagueContexts(userId, season, week);
+  const all = await buildLeagueContexts(userId, season, week);
+  const { failed } = all;
+  const leagues = onlyLeagues.size
+    ? all.leagues.filter(l => onlyLeagues.has(l.leagueId))
+    : all.leagues;
   const plays = playsForWeek(season, week);
   // Filtering happens inside buildPlayFeed, not here: `limit` has to apply to what survives, or
   // asking for big plays only would return the big plays within the last 100 rather than the

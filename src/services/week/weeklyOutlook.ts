@@ -76,6 +76,8 @@ export type RootingLeagueRef = {
 export type LineupOnlyLeague = {
   leagueId: string;
   leagueName: string;
+  /** So a format filter can reach these leagues; they have no matchup row to read it from. */
+  format: LeagueFormat;
   starters: { playerId: string; position: string | null; projectedPoints: number; gameState: string; remainingMinutes: number }[];
 };
 
@@ -172,6 +174,13 @@ export type WeeklyOutlook = {
    */
   lineupOnly: LineupOnlyLeague[];
   rooting: RootingRow[];
+  /**
+   * The scoreboard these numbers were built against.
+   *
+   * Kept on the result so the page can RE-DERIVE rooting rows for a subset of leagues without
+   * refetching anything — buildRootingRows needs it, and it is the same answer for every league.
+   */
+  games: NflGamesResponse | null;
   /** Leagues that returned nothing usable, so the UI can say so rather than hide them. */
   skipped: { leagueId: string; leagueName: string; reason: string }[];
 };
@@ -382,6 +391,7 @@ export async function buildWeeklyOutlook(
     matchups,
     lineupOnly,
     rooting: buildRootingRows(matchups, games, lineupOnly),
+    games,
     eliminations,
     skipped,
   };
@@ -593,6 +603,7 @@ async function buildNoOpponentLeague(
     ? {
         leagueId,
         leagueName,
+        format: leagueFormat(league),
         starters: myStarters.map(s => ({
           playerId: s.playerId,
           position: s.position ?? null,

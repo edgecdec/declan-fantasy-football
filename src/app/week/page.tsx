@@ -22,7 +22,8 @@ import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { getNflStateOrFallback } from '@/services/common/seasonService';
 import {
-  LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildWeeklyOutlook,
+  LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildRootingRows,
+  buildWeeklyOutlook,
 } from '@/services/week/weeklyOutlook';
 import {
   LEAGUE_FORMATS,
@@ -794,6 +795,33 @@ export default function WeekPage() {
    * one league on average. With two chopped leagues it sits around a tenth, which is why it is
    * shown to two decimals rather than rounded to a whole number.
    */
+  /*
+   * Leagues in scope, for anything that is not a matchup row.
+   *
+   * Elimination leagues have no matchup, so they contribute their ids from `lineupOnly`. The Zone
+   * takes this list, and rooting is rebuilt from it below.
+   */
+  const shownLineupOnly = React.useMemo(
+    () => (data ? data.lineupOnly.filter(l => active.includes(l.format)) : []),
+    [data, active],
+  );
+  const shownLeagueIds = React.useMemo(
+    () => [...shownMatchups.map(m => m.leagueId), ...shownLineupOnly.map(l => l.leagueId)],
+    [shownMatchups, shownLineupOnly],
+  );
+  /*
+   * Rooting is RE-DERIVED for the filtered leagues rather than filtered row by row.
+   *
+   * A rooting row is a net across leagues — the same player can be for me in one and against me
+   * in another — so dropping leagues has to recompute the netting, not hide rows. buildRootingRows
+   * is pure and the scoreboard rides along on the result, so this needs no refetch.
+   */
+  const shownRooting = React.useMemo(() => {
+    if (!data) return [];
+    if (active.length === present.length) return data.rooting;
+    return buildRootingRows(shownMatchups, data.games, shownLineupOnly);
+  }, [data, active, present, shownMatchups, shownLineupOnly]);
+
   const shownEliminations = React.useMemo(
     () => (data ? data.eliminations.filter(e => active.includes(e.format)) : []),
     [data, active],
@@ -892,31 +920,40 @@ export default function WeekPage() {
                 </Box>
               )}
             </Box>
-            <Box sx={{ mt: 2 }}>
-              <FormatFilter
-                present={present}
-                active={active}
-                isAll={formats.length === 0}
-                counts={formatCounts}
-                onChange={setFormats}
-              />
-            </Box>
             <Divider sx={{ my: 2 }} />
             <RatingBreakdown probabilities={shownMatchups.map(m => m.winProbability)} />
           </Paper>
 
+          {/* Above the tabs, because it scopes ALL of them — the matchup table, the rooting
+              netting and the Zone's play scoring — as well as the numbers above. Inside a tab it
+              would look like it only applied to that tab. */}
+          <Box sx={{ mb: 1.5 }}>
+            <FormatFilter
+              present={present}
+              active={active}
+              isAll={formats.length === 0}
+              counts={formatCounts}
+              onChange={setFormats}
+            />
+          </Box>
+
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
             <Tab label={`Matchups (${shownMatchups.length})`} />
-            <Tab label={`Rooting interest (${data.rooting.length})`} />
+            <Tab label={`Rooting interest (${shownRooting.length})`} />
             <Tab label="The Zone" />
           </Tabs>
 
           {tab === 0 && <MatchupsView data={data} rows={shownMatchups} />}
-          {tab === 1 && <RootingView rows={data.rooting} />}
+          {tab === 1 && <RootingView rows={shownRooting} />}
           {/* Takes the week from this page rather than owning a picker, so the tab can never
               disagree with the header about which week it is showing. */}
           {tab === 2 && week != null && (
-            <PlayFeed username={username} season={season} week={week} />
+            <PlayFeed
+              username={username}
+              season={season}
+              week={week}
+              leagueIds={active.length === present.length ? undefined : shownLeagueIds}
+            />
           )}
 
           {/* Not on the Zone tab: those leagues are skipped for MATCHUP pricing, but the play

@@ -152,7 +152,7 @@ test('netSwing is expected WINS, so it may exceed 1.0 across many leagues', () =
 
 /** A guillotine/chopped league: a real lineup, no opponent. */
 function lineupOnly(name: string, starters: ReturnType<typeof starter>[]): LineupOnlyLeague {
-  return { leagueId: name, leagueName: name, starters };
+  return { leagueId: name, leagueName: name, format: 'chopped', starters };
 }
 
 test('a league with no opponent still contributes rooting interest', () => {

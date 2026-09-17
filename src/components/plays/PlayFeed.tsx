@@ -74,8 +74,20 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export default function PlayFeed({
-  username, season, week,
-}: { username: string; season: string; week: number }) {
+  username, season, week, leagueIds,
+}: {
+  username: string;
+  season: string;
+  week: number;
+  /**
+   * Score only these leagues. Undefined means all of them.
+   *
+   * Comes from the page's format filter, so the feed cannot disagree with the header about which
+   * leagues are in scope — the same reason this component takes its season and week from the page
+   * rather than owning its own pickers.
+   */
+  leagueIds?: string[];
+}) {
   const [startersOnly, setStartersOnly] = React.useState(true);
   /*
    * ONE scope choice, not two switches that can contradict each other.
@@ -95,6 +107,11 @@ export default function PlayFeed({
    * IMPACTS shown on a play, not which plays qualify, and that question is live in all three scopes.
    */
   const [scope, setScope] = React.useState<'big' | 'lineups' | 'all'>('lineups');
+  /*
+   * Sorted and joined so the value is stable: an array prop rebuilt each render would change
+   * identity every time and re-trigger every fetch that depends on it.
+   */
+  const leagueScope = leagueIds ? [...leagueIds].sort().join(',') : '';
   const bigPlaysOnly = scope === 'big';
   const allPlays = scope === 'all';
 
@@ -111,9 +128,10 @@ export default function PlayFeed({
       ...(startersOnly ? { startersOnly: '1' } : {}),
       ...(bigPlaysOnly ? { bigPlaysOnly: '1' } : {}),
       ...(allPlays ? { allPlays: '1' } : {}),
+      ...(leagueScope ? { leagues: leagueScope } : {}),
       ...extra,
     }).toString(),
-    [username, season, week, startersOnly, bigPlaysOnly, allPlays],
+    [username, season, week, startersOnly, bigPlaysOnly, allPlays, leagueScope],
   );
 
   /** A full first page. Also the reset when a filter changes, since the window shifts. */
