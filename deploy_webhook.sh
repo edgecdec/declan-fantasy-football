@@ -72,13 +72,56 @@ fi
 # kill. Measured on this box: both 1024 and 1536 complete the build in about 28s, so a
 # smaller ceiling is strictly better here — it makes V8 do the collecting instead of the
 # kernel doing the killing.
-export NODE_OPTIONS='--max-old-space-size=1536'
+#
+# 768, DOWN FROM 1536, because 1536 did not fit and a real deploy proved it. On 2026-09-16 a
+# build was 36 seconds in when the kernel logged
+#   Out of memory: Killed process (node /var/www/SuperConnections/server.js)
+# and this build died with it, mid "Generating static pages", leaving no error in this log at
+# all — just a truncated block. The site kept serving the old build (the atomic swap working as
+# intended) but the deploy was silently lost, and the collateral damage was ANOTHER app.
+#
+# The number was then MEASURED on this box rather than reasoned about, and the obvious theory
+# turned out to be wrong. Lowering the cap does NOT lower peak RSS, because most of the build's
+# footprint is Turbopack's native memory, which lives outside V8's JS heap and ignores this flag:
+#
+#   cap    build   wall    peak RSS   swap displaced
+#   1024   ok      33.4s   1203MB     +472MB
+#    768   ok      33.4s   1244MB      +15MB
+#    640   ok      32.2s   1272MB       -2MB
+#
+# Peak RSS is flat-to-slightly-worse as the cap falls; what collapses is how much the build
+# pushes OUT of RAM into the (already half-full) 2GB swapfile, and that displacement is what
+# precedes the kernel picking a victim. 768 buys it for free — same wall time, and it keeps more
+# headroom against a genuine V8 "heap out of memory" than 640 does as this codebase grows.
+#
+# Context for the sizing: 1919MB physical, other pm2 apps holding ~772MB resident, of which
+# SuperConnections alone is 477MB. That app is the real ceiling here — capping ITS memory would
+# buy more than any further tuning of this flag.
+export NODE_OPTIONS='--max-old-space-size=768'
 
 rm -rf .next.new .next.old
-if ! NEXT_DIST_DIR=.next.new npm run build; then
-  echo "BUILD FAILED -- keeping the existing build; the site is untouched."
+
+# Peak RSS in the log, every deploy. The 2026-09-16 kill took a while to diagnose precisely
+# because nothing recorded how close the build actually came to the limit; a one-line
+# measurement means the next person can see the trend instead of re-deriving it.
+build_once() {
   rm -rf .next.new
-  exit 1
+  NEXT_DIST_DIR=.next.new /usr/bin/time -f 'build: peak RSS %M kB, wall %E' npm run build
+}
+
+# Retried ONCE, because the failure this guards against is transient memory pressure from the
+# other apps rather than anything wrong with the commit — the same commit built fine 19 minutes
+# later. A retry turns "the deploy vanished, push an empty commit to try again" into something
+# that heals itself. It cannot help when bash itself is the process killed, since SIGKILL runs
+# no traps; it covers the far commoner case of the build child dying.
+if ! build_once; then
+  echo "BUILD FAILED -- letting memory settle, then retrying once."
+  sleep 20
+  if ! build_once; then
+    echo "BUILD FAILED TWICE -- keeping the existing build; the site is untouched."
+    rm -rf .next.new
+    exit 1
+  fi
 fi
 
 if [ ! -f .next.new/BUILD_ID ]; then
