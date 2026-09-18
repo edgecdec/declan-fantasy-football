@@ -2,33 +2,30 @@
 
 import * as React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
-import MatchupMeter from '@/components/betting/MatchupMeter';
 import { MARKET_SIDE_COLORS } from '@/constants/colors';
 import { formatProjection, formatScore, formatWinProbability } from '@/services/common/formatPoints';
 
 /**
- * A chopped/guillotine league, drawn to read like a head-to-head row.
+ * A chopped/guillotine league: one score, and how safe it is.
  *
- * There is no opponent in this format — the lowest score in the league goes out — so the obvious
- * rendering would be a lone number, which tells you nothing about whether it is a good one. But
- * the survival question genuinely IS two-sided: you are safe exactly as long as somebody else is
- * below you. So the roster most likely to be chopped stands in as the other side, and SAFETY plays
- * the part win probability plays in a real matchup.
+ * There is no opponent in this format — the lowest score of the whole league goes out — so this
+ * deliberately does NOT borrow the head-to-head layout. An earlier version did: it nominated the
+ * roster nearest the chop and drew it as the other side, which read as a matchup that does not
+ * exist and invited the wrong conclusion, that beating that one roster is the thing to do. It
+ * isn't; you have to beat all sixteen of them.
  *
- * Deliberately the same anatomy as MatchupScoreboard — names flanking centred scores, meter
- * beneath spanning the same width, percentages and yet-to-play underneath — so a reader who can
- * read one row can read this one without being taught anything. The differences are only the ones
- * that carry meaning:
- *
- *  - the right-hand side is a rival you are not playing, so it is labelled with the field size
- *  - the bar is safe-versus-chopped, not win-versus-lose
- *  - beating this one rival is necessary but not sufficient, which is why the safety figure comes
- *    from the whole field rather than from the pair. The two are shown together on purpose: the
- *    gap between "ahead of them" and "safe" is the rest of the league.
+ * So the bar is a single fill to your SAFETY, not a split between two sides, and the field lives
+ * in the expanded row where it can be shown properly. The anatomy still lines up with a matchup
+ * row — score above, bar across the same width, percentages beneath — so the table stays scannable
+ * without claiming an opponent.
  */
 
+const BAR_HEIGHT_PX = 10;
+const ROUNDED_PX = 4;
+/** A near-certain elimination must still show a sliver of safety, and vice versa. */
+const MIN_VISIBLE_PCT = 1.5;
+
 type Props = {
-  /** Points banked and projected final, for me. */
   banked: number;
   projected: number;
   /** Probability I do NOT post the lowest score. */
@@ -36,137 +33,65 @@ type Props = {
   /** Live rosters including me. */
   activeRosters: number;
   playersRemaining: number;
-  /** The roster most likely to be chopped, other than me. */
-  rival: {
-    name: string;
-    banked: number;
-    projected: number;
-    playersRemaining: number;
-  } | null;
   final?: boolean;
 };
 
-function SideName({
-  name, side, leading, color,
-}: {
-  name: string; side: 'left' | 'right'; leading: boolean; color: string;
-}) {
-  const swatch = (
-    <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: color, flexShrink: 0 }} />
-  );
-  const label = (
-    <Typography
-      variant="body2"
-      noWrap
-      title={name}
-      sx={{
-        fontWeight: leading ? 700 : 400,
-        color: leading ? 'text.primary' : 'text.secondary',
-        overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
-      }}
-    >
-      {name}
-    </Typography>
-  );
-  return (
-    <Box
-      sx={{
-        display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0,
-        justifyContent: side === 'left' ? 'flex-end' : 'flex-start',
-      }}
-    >
-      {side === 'left' ? <>{label}{swatch}</> : <>{swatch}{label}</>}
-    </Box>
-  );
-}
-
 export default function ChoppedScoreboard({
-  banked, projected, safeProbability, activeRosters, playersRemaining, rival, final = false,
+  banked, projected, safeProbability, activeRosters, playersRemaining, final = false,
 }: Props) {
-  // No rival at all means one roster left standing. Nothing to compare against, so say so rather
-  // than drawing a bar against an empty side.
-  if (!rival) {
-    return (
-      <Box sx={{ minWidth: 300, maxWidth: 400, mx: 'auto', textAlign: 'center' }}>
-        <Typography variant="body1" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {formatScore(banked)}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          last roster standing
-        </Typography>
-      </Box>
-    );
-  }
-
-  const ahead = banked - rival.banked;
+  const safePct = Math.max(MIN_VISIBLE_PCT, Math.min(100 - MIN_VISIBLE_PCT, safeProbability * 100));
 
   return (
     <Box sx={{ opacity: final ? 0.7 : 1, minWidth: 300, maxWidth: 400, mx: 'auto' }}>
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 104px minmax(0, 1fr)',
-          alignItems: 'center',
-          columnGap: 1,
-        }}
-      >
-        <SideName name="You" side="left" leading={ahead > 0} color={MARKET_SIDE_COLORS.a} />
-
-        <Box sx={{ textAlign: 'center', lineHeight: 1.15 }}>
-          <Typography component="div" variant="body1" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-            <Box component="span" sx={{ fontWeight: ahead > 0 ? 700 : 500 }}>
-              {formatScore(banked)}
-            </Box>
-            <Box component="span" sx={{ color: 'text.disabled', mx: 0.6 }}>–</Box>
-            <Box component="span" sx={{ fontWeight: ahead < 0 ? 700 : 500 }}>
-              {formatScore(rival.banked)}
-            </Box>
+      <Box sx={{ textAlign: 'center', lineHeight: 1.15 }}>
+        <Typography component="div" variant="body1" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+          {formatScore(banked)}
+        </Typography>
+        <Tooltip title="Your projected final score. There is no opponent — the lowest score in the league is eliminated.">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {formatProjection(projected)} proj · lowest of {activeRosters} is out
           </Typography>
-          <Tooltip title="Projected final score for you and for the roster most likely to be chopped">
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {formatProjection(projected)} – {formatProjection(rival.projected)} proj
-            </Typography>
-          </Tooltip>
+        </Tooltip>
+      </Box>
+
+      <Tooltip
+        arrow
+        title={`${formatWinProbability(safeProbability, final)} safe, ${formatWinProbability(1 - safeProbability, final)} chopped. Open the row to see the whole field.`}
+      >
+        <Box sx={{ display: 'flex', width: '100%', height: BAR_HEIGHT_PX, mt: 0.6 }}>
+          <Box
+            sx={{
+              width: `${safePct}%`,
+              bgcolor: MARKET_SIDE_COLORS.a,
+              opacity: final ? 0.55 : 1,
+              borderRadius: `${ROUNDED_PX}px 0 0 ${ROUNDED_PX}px`,
+            }}
+          />
+          <Box
+            sx={{
+              width: `${100 - safePct}%`,
+              bgcolor: MARKET_SIDE_COLORS.b,
+              opacity: final ? 0.55 : 1,
+              borderRadius: `0 ${ROUNDED_PX}px ${ROUNDED_PX}px 0`,
+            }}
+          />
         </Box>
-
-        <SideName
-          name={rival.name}
-          side="right"
-          leading={ahead < 0}
-          color={MARKET_SIDE_COLORS.b}
-        />
-      </Box>
-
-      <Box sx={{ mt: 0.6 }}>
-        <MatchupMeter
-          probA={safeProbability}
-          nameA="Safe"
-          nameB="Chopped"
-          muted={final}
-          showLabels={false}
-        />
-      </Box>
+      </Tooltip>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', columnGap: 1, mt: 0.3 }}>
-        <Tooltip title={`Chance you are NOT the lowest score of the ${activeRosters} still alive`}>
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
-            {formatWinProbability(safeProbability, final)} safe
-          </Typography>
-        </Tooltip>
-        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-          {final
-            ? 'final'
-            : `${playersRemaining} v ${rival.playersRemaining} left · ${activeRosters} alive`}
+        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+          {formatWinProbability(safeProbability, final)} safe
         </Typography>
-        <Tooltip title="Chance you post the lowest score and are chopped this week">
-          <Typography variant="caption" color="text.secondary">
-            {formatWinProbability(1 - safeProbability, final)} out
-          </Typography>
-        </Tooltip>
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+          {final ? 'final' : `${playersRemaining} left to play`}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatWinProbability(1 - safeProbability, final)} out
+        </Typography>
       </Box>
     </Box>
   );

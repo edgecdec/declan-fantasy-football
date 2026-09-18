@@ -51,6 +51,12 @@ interface DataTableProps<T> {
   defaultRowsPerPage?: number;
   onRowClick?: (row: T) => void;
   noDataMessage?: string;
+  /**
+   * Minimum table width in px. Defaults to 750, which suits a full-width table and is wrong for a
+   * narrow one placed beside another: two DataTables side by side need 1500px before either has any
+   * content, which no laptop viewport has. Lower it for a table of three or four slim columns.
+   */
+  minWidth?: number;
   renderDetailPanel?: (row: T) => React.ReactNode; // New prop for expansion
 }
 
@@ -148,6 +154,7 @@ export default function DataTable<T>({
   rowsPerPageOptions = [25, 50, 100, 250],
   defaultRowsPerPage = 25,
   noDataMessage = "No data found.",
+  minWidth = 750,
   renderDetailPanel
 }: DataTableProps<T>) {
   const [order, setOrder] = React.useState<Order>(defaultSortOrder);
@@ -194,7 +201,7 @@ export default function DataTable<T>({
   return (
     <Paper sx={{ width: '100%', mb: 2 }}>
       <TableContainer>
-        <Table sx={{ minWidth: 750 }} size="small">
+        <Table sx={{ minWidth }} size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: 'background.default' }}>
               {renderDetailPanel && <TableCell width={50} />}

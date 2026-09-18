@@ -23,8 +23,8 @@ import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { getNflStateOrFallback } from '@/services/common/seasonService';
 import {
-  EliminationRisk, LeagueWeekOutlook, MatchupStatus, RootingLeagueRef, RootingRow, WeeklyOutlook,
-  buildRootingRows, buildWeeklyOutlook,
+  EliminationRisk, LeagueWeekOutlook, LineupOnlyLeague, MatchupStatus, RootingLeagueRef, RootingRow,
+  WeeklyOutlook, buildRootingRows, buildWeeklyOutlook, playerName,
 } from '@/services/week/weeklyOutlook';
 import {
   LEAGUE_FORMATS,
@@ -315,6 +315,176 @@ function FormatFilter({
 }
 
 /**
+ * The expanded chopped-league row: my lineup on the left, the whole field on the right.
+ *
+ * This is where the format's real question gets answered. The collapsed row can only carry one
+ * number (how safe am I); the thing you actually want to know is WHO is below you and by how much,
+ * because that is what decides whether a bad afternoon matters. Two tables side by side, both
+ * DataTables so they sort like everything else on the site.
+ *
+ * The field is ordered most-at-risk first rather than by score, since those are different
+ * questions late in a week — a roster 20 points behind with its lineup intact is in less trouble
+ * than one 5 points behind that has finished.
+ */
+function ChoppedDetail({
+  risk,
+  lineup,
+}: {
+  risk: EliminationRisk;
+  lineup: LineupOnlyLeague | null;
+}) {
+  type Slot = {
+    playerId: string;
+    name: string;
+    position: string | null;
+    points: number;
+    projectedPoints: number;
+    gameState: string;
+  };
+  const slots: Slot[] = (lineup?.starters ?? []).map(s => ({
+    playerId: s.playerId,
+    name: playerName(s.playerId),
+    position: s.position,
+    points: s.points,
+    projectedPoints: s.projectedPoints,
+    gameState: s.gameState,
+  }));
+
+  const lineupColumns: Column<Slot>[] = [
+    {
+      id: 'name',
+      label: 'Your starter',
+      render: r => <PlayerCell name={r.name} position={r.position} state={r.gameState} />,
+    },
+    {
+      id: 'points',
+      label: 'Pts',
+      numeric: true,
+      width: 72,
+      render: r => (
+        <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+          {formatScore(r.points)}
+        </Box>
+      ),
+    },
+    {
+      id: 'projectedPoints',
+      label: 'Proj',
+      numeric: true,
+      width: 72,
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+          {formatProjection(r.projectedPoints)}
+        </Box>
+      ),
+    },
+  ];
+
+  type FieldRow = EliminationRisk['field'][number];
+  const fieldColumns: Column<FieldRow>[] = [
+    {
+      id: 'name',
+      label: 'Manager',
+      render: r => (
+        <Box component="span" sx={{ fontWeight: r.isMe ? 700 : 400 }}>
+          {r.isMe ? 'You' : r.name}
+        </Box>
+      ),
+    },
+    {
+      id: 'banked',
+      label: 'Pts',
+      numeric: true,
+      width: 72,
+      render: r => (
+        <Box component="span" sx={{
+          fontVariantNumeric: 'tabular-nums',
+          fontWeight: r.isMe ? 700 : 400,
+        }}>
+          {formatScore(r.banked)}
+        </Box>
+      ),
+    },
+    {
+      id: 'projected',
+      label: 'Proj',
+      numeric: true,
+      width: 72,
+      tooltip: 'Projected final score. The gap from Pts is what this roster still has to come.',
+      render: r => (
+        <Box component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+          {formatProjection(r.projected)}
+        </Box>
+      ),
+    },
+    {
+      id: 'probability',
+      label: 'Out %',
+      numeric: true,
+      width: 78,
+      tooltip: 'Chance this roster posts the lowest score and is chopped. Sums to 100% across the field — somebody goes.',
+      render: r => (
+        <Box component="span" sx={{
+          fontWeight: r.isMe ? 700 : 500,
+          fontVariantNumeric: 'tabular-nums',
+          // Coloured on the RISK, so the bottom of the table reads as danger at a glance.
+          color: r.probability >= 0.15 ? 'error.main' : r.probability >= 0.08 ? 'warning.main' : 'text.secondary',
+        }}>
+          {(r.probability * 100).toFixed(1)}%
+        </Box>
+      ),
+    },
+  ];
+
+  return (
+    <Box sx={{
+      display: 'grid',
+      gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 0.8fr) minmax(0, 1.2fr)' },
+      gap: 2,
+      p: 1,
+      /*
+       * Capped, because the detail cell spans every column of a table that is itself wider than a
+       * laptop viewport. Left to fill that width the field table ended up around x=1700 — present
+       * and correct, but only reachable by scrolling sideways, which nobody does to read a panel
+       * they just opened.
+       */
+      maxWidth: 1080,
+    }}>
+      <Box>
+        {slots.length === 0
+          ? <Alert severity="info">No lineup for this week.</Alert>
+          : (
+            <DataTable
+              data={slots}
+              columns={lineupColumns}
+              keyField={r => r.playerId}
+              defaultSortBy="projectedPoints"
+              defaultSortOrder="desc"
+              defaultRowsPerPage={25}
+              rowsPerPageOptions={[25]}
+              noDataMessage="No lineup available."
+              minWidth={330}
+            />
+          )}
+      </Box>
+      <Box>
+        <DataTable
+          data={risk.field}
+          columns={fieldColumns}
+          keyField={r => String(r.rosterId)}
+          defaultSortBy="probability"
+          defaultSortOrder="desc"
+          defaultRowsPerPage={25}
+          rowsPerPageOptions={[10, 25, 50]}
+          noDataMessage="No live rosters."
+          minWidth={420}
+        />
+      </Box>
+    </Box>
+  );
+}
+
+/**
  * One row of the week table: a head-to-head matchup, or an elimination league.
  *
  * Normalised to ONE shape so the columns do not each branch on kind, and so both sorts and the
@@ -334,12 +504,16 @@ type WeekRow = {
   status: MatchupStatus;
   h2h: LeagueWeekOutlook | null;
   chop: EliminationRisk | null;
+  /** My starters, for an elimination league's expanded row. */
+  lineup: LineupOnlyLeague | null;
 };
 
 function toWeekRows(
   matchups: LeagueWeekOutlook[],
   eliminations: EliminationRisk[],
+  lineupOnly: LineupOnlyLeague[] = [],
 ): WeekRow[] {
+  const lineupByLeague = new Map(lineupOnly.map(l => [l.leagueId, l]));
   const rows: WeekRow[] = matchups.map(m => ({
     leagueId: m.leagueId,
     leagueName: m.leagueName,
@@ -351,6 +525,7 @@ function toWeekRows(
     status: m.status,
     h2h: m,
     chop: null,
+    lineup: null,
   }));
 
   for (const e of eliminations) {
@@ -361,12 +536,22 @@ function toWeekRows(
       // Safety, not risk, so bigger is better here exactly as it is for a win probability. A row
       // mixing the two conventions would sort and rate backwards half the time.
       probability: e.eliminated ? 0 : 1 - e.probability,
-      margin: e.closestRival ? e.banked - e.closestRival.banked : null,
+      /*
+       * Cushion above the lowest score currently posted, which is the closest thing to a margin
+       * this format has. Nobody is named — that was the mistake in the first version — but the
+       * number itself is real and worth sorting on.
+       */
+      margin: (() => {
+        const others = e.field.filter(f => !f.isMe);
+        if (others.length === 0) return null;
+        return e.banked - Math.min(...others.map(f => f.banked));
+      })(),
       playersRemaining: e.playersRemaining,
-      otherRemaining: e.closestRival?.playersRemaining ?? null,
+      otherRemaining: null,
       status: e.status,
       h2h: null,
       chop: e,
+      lineup: lineupByLeague.get(e.leagueId) ?? null,
     });
   }
   return rows;
@@ -416,7 +601,6 @@ function MatchupsView({ rows }: { rows: WeekRow[] }) {
               safeProbability={r.probability}
               activeRosters={r.chop.activeRosters}
               playersRemaining={r.chop.playersRemaining}
-              rival={r.chop.closestRival}
               final={r.status === 'final'}
             />
           );
@@ -540,7 +724,11 @@ function MatchupsView({ rows }: { rows: WeekRow[] }) {
       defaultRowsPerPage={25}
       rowsPerPageOptions={[10, 25, 50]}
       noDataMessage="No matchups in the selected formats."
-      renderDetailPanel={r => (r.h2h ? <MatchupDetail row={r.h2h} /> : null)}
+      renderDetailPanel={r =>
+        r.chop
+          ? <ChoppedDetail risk={r.chop} lineup={r.lineup} />
+          : r.h2h ? <MatchupDetail row={r.h2h} /> : null
+      }
     />
   );
 }
@@ -923,8 +1111,8 @@ export default function WeekPage() {
    * same sort and read with the same anatomy as everything else.
    */
   const weekRows = React.useMemo(
-    () => toWeekRows(shownMatchups, shownEliminations),
-    [shownMatchups, shownEliminations],
+    () => toWeekRows(shownMatchups, shownEliminations, shownLineupOnly),
+    [shownMatchups, shownEliminations, shownLineupOnly],
   );
   const liveNow = weekRows.filter(r => r.status === 'live').length;
 

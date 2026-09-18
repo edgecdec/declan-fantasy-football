@@ -78,7 +78,15 @@ export type LineupOnlyLeague = {
   leagueName: string;
   /** So a format filter can reach these leagues; they have no matchup row to read it from. */
   format: LeagueFormat;
-  starters: { playerId: string; position: string | null; projectedPoints: number; gameState: string; remainingMinutes: number }[];
+  starters: {
+    playerId: string;
+    position: string | null;
+    /** Points scored so far. */
+    points: number;
+    projectedPoints: number;
+    gameState: string;
+    remainingMinutes: number;
+  }[];
 };
 
 export type RootingRow = {
@@ -144,10 +152,9 @@ export type RootingRow = {
 /**
  * What is at stake in a league that eliminates its lowest scorer.
  *
- * Carries enough to render a row that LOOKS like a head-to-head row, because the useful framing
- * of "am I getting chopped" really is a two-sided one: I am safe exactly as long as somebody else
- * is below me. So the closest live rival is surfaced as the other side, and safety plays the part
- * win probability plays elsewhere.
+ * There is no opponent: the lowest score of the whole league goes out. So the headline is a single
+ * SAFETY figure rather than anything two-sided, and the detail is where you stand against the
+ * entire field — see `field`.
  */
 export type EliminationRisk = {
   leagueId: string;
@@ -166,19 +173,23 @@ export type EliminationRisk = {
   playersRemaining: number;
   status: MatchupStatus;
   /**
-   * The live roster closest to being chopped, other than me — the one I need to stay above.
+   * Every live roster, me included, most at risk first.
    *
-   * Chosen on ELIMINATION PROBABILITY rather than on the lowest score, because they are not the
-   * same question late in a week: a roster 20 points below me with its whole lineup left is a far
-   * bigger threat than one 5 points below me that has finished.
+   * The whole field rather than a single nominated rival. An earlier version picked the roster
+   * nearest the chop and drew it as an opponent, which read as a head-to-head that does not exist
+   * — you are not playing anybody, you are trying not to finish last of seventeen. The standing
+   * against the field is the real answer, so it belongs here and in the expanded row.
    */
-  closestRival: {
+  field: {
+    rosterId: number;
     name: string;
+    isMe: boolean;
     banked: number;
     projected: number;
-    probability: number;
     playersRemaining: number;
-  } | null;
+    /** Chance this roster posts the lowest score. */
+    probability: number;
+  }[];
 };
 
 export type WeeklyOutlook = {
@@ -635,6 +646,7 @@ async function buildNoOpponentLeague(
         starters: myStarters.map(s => ({
           playerId: s.playerId,
           position: s.position ?? null,
+          points: s.actualPoints,
           projectedPoints: s.projectedPoints,
           gameState: s.gameState,
           remainingMinutes: s.remainingMinutes,
@@ -702,7 +714,7 @@ function buildEliminationRisk(args: {
       projected: 0,
       playersRemaining: 0,
       status: 'final',
-      closestRival: null,
+      field: [],
     };
   }
 
@@ -727,11 +739,6 @@ function buildEliminationRisk(args: {
   const remaining = (starters: StarterInput[]) =>
     starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length;
 
-  const rivals = scored
-    .filter(s => s.rosterId !== myRosterId)
-    .sort((a, b) => (probabilities.get(b.rosterId) ?? 0) - (probabilities.get(a.rosterId) ?? 0));
-  const rival = rivals[0];
-
   const anyPlaying = scored.some(s => s.starters.some(st => st.gameState === 'in'));
   const minutesLeft = scored.some(s =>
     s.starters.some(st => st.gameState === 'pre' || st.gameState === 'in'),
@@ -745,15 +752,17 @@ function buildEliminationRisk(args: {
     projected: me?.dist.mean ?? 0,
     playersRemaining: me ? remaining(me.starters) : 0,
     status: statusFor(minutesLeft ? 1 : 0, (me?.dist.banked ?? 0) > 0, anyPlaying),
-    closestRival: rival
-      ? {
-          name: nameByRoster.get(rival.rosterId) ?? `Roster ${rival.rosterId}`,
-          banked: rival.dist.banked,
-          projected: rival.dist.mean,
-          probability: probabilities.get(rival.rosterId) ?? 0,
-          playersRemaining: remaining(rival.starters),
-        }
-      : null,
+    field: scored
+      .map(sc => ({
+        rosterId: sc.rosterId,
+        name: nameByRoster.get(sc.rosterId) ?? `Roster ${sc.rosterId}`,
+        isMe: sc.rosterId === myRosterId,
+        banked: sc.dist.banked,
+        projected: sc.dist.mean,
+        playersRemaining: remaining(sc.starters),
+        probability: probabilities.get(sc.rosterId) ?? 0,
+      }))
+      .sort((a, b) => b.probability - a.probability),
   };
 }
 
