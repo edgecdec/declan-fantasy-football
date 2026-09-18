@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import {
-  Alert, Box, Button, Chip, Container, Divider, FormControlLabel, LinearProgress, MenuItem,
-  Paper, Select, Switch, Tab, Tabs, Tooltip, Typography,
+  Alert, Box, Button, Checkbox, Chip, Container, Divider, FormControlLabel, LinearProgress,
+  ListItemText, MenuItem, Paper, Select, Switch, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import MuiLink from '@mui/material/Link';
 import DataTable, { Column } from '@/components/common/DataTable';
@@ -12,6 +12,7 @@ import PageHeader from '@/components/common/PageHeader';
 import UserSearchInput from '@/components/common/UserSearchInput';
 import NetLeaguesBar from '@/components/week/NetLeaguesBar';
 import MatchupScoreboard from '@/components/week/MatchupScoreboard';
+import ChoppedScoreboard from '@/components/week/ChoppedScoreboard';
 import WinRatingScale from '@/components/week/WinRatingScale';
 import RatingBreakdown from '@/components/week/RatingBreakdown';
 import PlayFeed from '@/components/plays/PlayFeed';
@@ -22,8 +23,8 @@ import { useUser } from '@/context/UserContext';
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { getNflStateOrFallback } from '@/services/common/seasonService';
 import {
-  LeagueWeekOutlook, RootingLeagueRef, RootingRow, WeeklyOutlook, buildRootingRows,
-  buildWeeklyOutlook,
+  EliminationRisk, LeagueWeekOutlook, MatchupStatus, RootingLeagueRef, RootingRow, WeeklyOutlook,
+  buildRootingRows, buildWeeklyOutlook,
 } from '@/services/week/weeklyOutlook';
 import {
   LEAGUE_FORMATS,
@@ -250,87 +251,149 @@ function presentFormats(data: WeeklyOutlook): LeagueFormat[] {
 }
 
 /**
- * Format filter chips.
+ * Format filter, as a multiselect.
  *
- * Rendered in the header beside the projected record, not above the table, BECAUSE the record
- * responds to them. A control that silently changes a headline number two inches above itself,
- * while sitting under a tab, is a control nobody connects to the number.
+ * Chips were the first attempt and they were the wrong control. This is a SELECTION, not a set of
+ * independent toggles: chips gave every format its own lit/unlit state with no single place saying
+ * what the current scope is, so "all on" and "all explicitly selected" looked identical, and the
+ * first click had to guess whether you meant isolate or exclude. A dropdown has one summary line
+ * that always states the scope, and multi-select semantics people already know.
+ *
+ * Lives in the header and scopes the whole page — the projected record, the rating bar, the rooting
+ * netting and the Zone's play scoring all read it.
  */
 function FormatFilter({
   present,
   active,
-  isAll,
   counts,
   onChange,
 }: {
   present: LeagueFormat[];
   active: LeagueFormat[];
-  /** True when nothing is explicitly selected, so every format is showing by default. */
-  isAll: boolean;
   counts: Record<string, number>;
   onChange: (next: LeagueFormat[]) => void;
 }) {
   if (present.length <= 1) return null;
+  const allSelected = active.length === present.length;
   return (
-    <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
-      <Typography variant="caption" color="text.secondary">Format</Typography>
-      {present.map(f => {
-        const on = active.includes(f);
-        return (
-          <Chip
-            key={f}
-            size="small"
-            label={`${LEAGUE_FORMAT_LABEL[f]} ${counts[f] ?? 0}`}
-            color={on ? 'primary' : 'default'}
-            variant={on ? 'filled' : 'outlined'}
-            onClick={() => {
-              /*
-               * From the default "everything", clicking one format ISOLATES it — that is what
-               * clicking "Dynasty" is asking for. Toggling it off instead (the literal reading of
-               * every chip being lit) means the one click anybody makes first does the opposite of
-               * what they wanted.
-               *
-               * Once a real subset exists, clicking adds or removes, and landing back on the full
-               * set collapses to "all" so there is always a way home.
-               */
-              if (isAll) {
-                onChange([f]);
-                return;
-              }
-              const next = active.includes(f) ? active.filter(x => x !== f) : [...active, f];
-              onChange(next.length === present.length ? [] : next);
-            }}
-          />
-        );
-      })}
-      {active.length !== present.length && (
-        <Chip size="small" label="All" variant="outlined" onClick={() => onChange([])} />
-      )}
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography variant="caption" color="text.secondary">Leagues</Typography>
+      <Select
+        multiple
+        size="small"
+        value={active}
+        onChange={e => {
+          const next = (typeof e.target.value === 'string'
+            ? e.target.value.split(',')
+            : e.target.value) as LeagueFormat[];
+          // Deselecting everything cannot be acted on, so it reads as a reset to all rather than
+          // an empty page with no way back.
+          onChange(next.length === 0 || next.length === present.length ? [] : next);
+        }}
+        renderValue={sel => {
+          const chosen = sel as LeagueFormat[];
+          const total = chosen.reduce((n, f) => n + (counts[f] ?? 0), 0);
+          // The summary always states the scope, which is the whole point of using a dropdown.
+          if (allSelected) return `All formats · ${total} leagues`;
+          return `${chosen.map(f => LEAGUE_FORMAT_LABEL[f]).join(', ')} · ${total} leagues`;
+        }}
+        sx={{ minWidth: 260 }}
+      >
+        {present.map(f => (
+          <MenuItem key={f} value={f}>
+            <Checkbox checked={active.includes(f)} size="small" sx={{ py: 0, mr: 0.5 }} />
+            <ListItemText
+              primary={LEAGUE_FORMAT_LABEL[f]}
+              secondary={`${counts[f] ?? 0} league${(counts[f] ?? 0) === 1 ? '' : 's'}`}
+              sx={{ my: 0 }}
+            />
+          </MenuItem>
+        ))}
+      </Select>
     </Box>
   );
 }
 
-function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOutlook[] }) {
-  if (data.matchups.length === 0) {
-    return <Alert severity="info">No head-to-head matchups found for week {data.week}.</Alert>;
+/**
+ * One row of the week table: a head-to-head matchup, or an elimination league.
+ *
+ * Normalised to ONE shape so the columns do not each branch on kind, and so both sorts and the
+ * rating scale work across the whole table. `probability` is win% for a matchup and safe% for an
+ * elimination league: the same question — how likely is this to go my way — measured the only way
+ * each format allows. That is what makes it honest to rate and sort them together.
+ */
+type WeekRow = {
+  leagueId: string;
+  leagueName: string;
+  format: LeagueFormat;
+  probability: number;
+  /** Points ahead of the side that matters: the opponent, or the roster nearest the chop. */
+  margin: number | null;
+  playersRemaining: number;
+  otherRemaining: number | null;
+  status: MatchupStatus;
+  h2h: LeagueWeekOutlook | null;
+  chop: EliminationRisk | null;
+};
+
+function toWeekRows(
+  matchups: LeagueWeekOutlook[],
+  eliminations: EliminationRisk[],
+): WeekRow[] {
+  const rows: WeekRow[] = matchups.map(m => ({
+    leagueId: m.leagueId,
+    leagueName: m.leagueName,
+    format: leagueFormat(m.league),
+    probability: m.winProbability,
+    margin: m.opponent ? m.me.distribution.banked - m.opponent.distribution.banked : null,
+    playersRemaining: m.me.playersRemaining,
+    otherRemaining: m.opponent?.playersRemaining ?? null,
+    status: m.status,
+    h2h: m,
+    chop: null,
+  }));
+
+  for (const e of eliminations) {
+    rows.push({
+      leagueId: e.leagueId,
+      leagueName: e.leagueName,
+      format: e.format,
+      // Safety, not risk, so bigger is better here exactly as it is for a win probability. A row
+      // mixing the two conventions would sort and rate backwards half the time.
+      probability: e.eliminated ? 0 : 1 - e.probability,
+      margin: e.closestRival ? e.banked - e.closestRival.banked : null,
+      playersRemaining: e.playersRemaining,
+      otherRemaining: e.closestRival?.playersRemaining ?? null,
+      status: e.status,
+      h2h: null,
+      chop: e,
+    });
+  }
+  return rows;
+}
+
+function MatchupsView({ rows }: { rows: WeekRow[] }) {
+  if (rows.length === 0) {
+    return <Alert severity="info">No matchups in the selected formats.</Alert>;
   }
 
-  const columns: Column<LeagueWeekOutlook>[] = [
+  const columns: Column<WeekRow>[] = [
     {
       id: 'leagueName',
       label: 'League',
       width: 180,
       // The format rides in this cell rather than taking a column of its own. This table is
       // already wider than a laptop viewport, and Status — the thing you now want to sort on —
-      // was falling off the right edge. Filtering by format is the chips above; this is just the
-      // label, so it costs nothing to put it here.
+      // was falling off the right edge.
       render: r => (
         <Box>
           <Typography variant="body2" component="div" noWrap>
             <LeagueLink leagueId={r.leagueId} name={r.leagueName} noWrap />
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 10 }}>
-            {LEAGUE_FORMAT_LABEL[leagueFormat(r.league)]}
+            {LEAGUE_FORMAT_LABEL[r.format]}
+            {r.chop && !r.chop.eliminated && ' · lowest is out'}
+            {r.chop?.eliminated && ' · eliminated'}
           </Typography>
         </Box>
       ),
@@ -341,34 +404,51 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
       sortable: false,
       // Not sortable itself: it presents four numbers at once, so there is no single
       // ordering it could mean. The numbers worth sorting on get their own columns below.
-      render: r => (
-        r.opponent ? (
+      render: r => {
+        if (r.chop) {
+          if (r.chop.eliminated) {
+            return <Box component="span" sx={{ color: 'text.disabled' }}>eliminated — no roster left</Box>;
+          }
+          return (
+            <ChoppedScoreboard
+              banked={r.chop.banked}
+              projected={r.chop.projected}
+              safeProbability={r.probability}
+              activeRosters={r.chop.activeRosters}
+              playersRemaining={r.chop.playersRemaining}
+              rival={r.chop.closestRival}
+              final={r.status === 'final'}
+            />
+          );
+        }
+        const m = r.h2h!;
+        return m.opponent ? (
           <MatchupScoreboard
             leftName="You"
             leftIsYou
-            rightName={r.opponent.displayName}
-            leftScore={r.me.distribution.banked}
-            rightScore={r.opponent.distribution.banked}
-            leftProjected={r.me.distribution.mean}
-            rightProjected={r.opponent.distribution.mean}
-            leftWinProbability={r.winProbability}
-            leftToPlay={r.me.playersRemaining}
-            rightToPlay={r.opponent.playersRemaining}
-            final={r.status === 'final'}
+            rightName={m.opponent.displayName}
+            leftScore={m.me.distribution.banked}
+            rightScore={m.opponent.distribution.banked}
+            leftProjected={m.me.distribution.mean}
+            rightProjected={m.opponent.distribution.mean}
+            leftWinProbability={m.winProbability}
+            leftToPlay={m.me.playersRemaining}
+            rightToPlay={m.opponent.playersRemaining}
+            final={m.status === 'final'}
           />
-        ) : <Box component="span" sx={{ color: 'text.disabled' }}>no opponent this week</Box>
-      ),
+        ) : <Box component="span" sx={{ color: 'text.disabled' }}>no opponent this week</Box>;
+      },
     },
     {
       id: 'margin',
       label: 'Margin',
       numeric: true,
       width: 90,
-      tooltip: 'Points you are ahead right now. Sort ascending to find the games you are losing.',
-      sortValue: r => (r.opponent ? r.me.distribution.banked - r.opponent.distribution.banked : null),
+      tooltip: 'Points you are ahead right now — of your opponent, or of the roster nearest the chop. Sort ascending to find where you are behind.',
+      sortValue: r => r.margin,
       render: r => {
-        if (!r.opponent) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>;
-        const m = r.me.distribution.banked - r.opponent.distribution.banked;
+        if (r.margin == null) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>;
+        const m = r.margin;
         return (
           <Box component="span" sx={{
             fontWeight: 600,
@@ -382,13 +462,14 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
     },
     {
       id: 'winProbability',
-      label: 'Win %',
+      label: 'Win / safe %',
       numeric: true,
-      width: 84,
-      tooltip: 'Chance you win this matchup. The bar in the Matchup column is the same number.',
+      width: 96,
+      tooltip: 'Chance you win the matchup — or, in an elimination league, the chance you are not the lowest score and survive. The bar in the Matchup column is the same number.',
+      sortValue: r => r.probability,
       render: r => (
         <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-          {formatWinProbability(r.winProbability, r.status === 'final')}
+          {formatWinProbability(r.probability, r.status === 'final')}
         </Box>
       ),
     },
@@ -399,11 +480,11 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
       tooltip: 'Forecast-style rating, Solid you through Toss-up to Solid them. Thresholds checked against 650 predictions from 325 real completed matchups. Sorts from most-favoured to least.',
       // Sorts along the scale rather than by the raw probability, so equal ratings group
       // together and the ordering matches what the reader sees.
-      sortValue: r => rateWinProbability(r.winProbability).index,
+      sortValue: r => rateWinProbability(r.probability).index,
       render: r => (
-        r.opponent
-          ? <WinRatingScale probability={r.winProbability} muted={r.status === 'final'} />
-          : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+        r.h2h && !r.h2h.opponent
+          ? <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>
+          : <WinRatingScale probability={r.probability} muted={r.status === 'final'} />
       ),
     },
     {
@@ -412,10 +493,10 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
       numeric: true,
       width: 104,
       tooltip: 'Distance from a coin flip. Sort ascending to put the matchups actually in the balance at the top — this is the default.',
-      sortValue: r => Math.abs(r.winProbability - 0.5),
+      sortValue: r => Math.abs(r.probability - 0.5),
       render: r => (
         <Box component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-          ±{(Math.abs(r.winProbability - 0.5) * 100).toFixed(0)}
+          ±{(Math.abs(r.probability - 0.5) * 100).toFixed(0)}
         </Box>
       ),
     },
@@ -425,11 +506,13 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
       numeric: true,
       width: 96,
       tooltip: 'Your starters who can still score. A lead with nobody left is safe; the same lead with eight to play is not.',
-      sortValue: r => r.me.playersRemaining,
+      sortValue: r => r.playersRemaining,
       render: r => (
         <Box component="span" sx={{ color: 'text.secondary' }}>
-          {r.me.playersRemaining}
-          {r.opponent && <Box component="span" sx={{ color: 'text.disabled' }}> / {r.opponent.playersRemaining}</Box>}
+          {r.playersRemaining}
+          {r.otherRemaining != null && (
+            <Box component="span" sx={{ color: 'text.disabled' }}> / {r.otherRemaining}</Box>
+          )}
         </Box>
       ),
     },
@@ -457,11 +540,10 @@ function MatchupsView({ data, rows }: { data: WeeklyOutlook; rows: LeagueWeekOut
       defaultRowsPerPage={25}
       rowsPerPageOptions={[10, 25, 50]}
       noDataMessage="No matchups in the selected formats."
-      renderDetailPanel={r => <MatchupDetail row={r} />}
+      renderDetailPanel={r => (r.h2h ? <MatchupDetail row={r.h2h} /> : null)}
     />
   );
 }
-
 /** Which leagues a player is starting in, each one a link. */
 function LeagueRefList({ label, refs, color }: { label: string; refs: RootingLeagueRef[]; color: string }) {
   if (refs.length === 0) return null;
@@ -787,9 +869,14 @@ export default function WeekPage() {
    * ways, so filtering one and not the others would have them contradict each other in the same
    * panel — "across 4 matchups" above a bar totalling 16.
    */
+  /*
+   * The RECORD counts head-to-head matchups only, because an elimination league has no win to
+   * project — surviving is not a win. `liveNow` and the rating strip DO include them, because
+   * those describe rows on the page and elimination rows carry a rating and a status like any
+   * other. Each label says what it counts, which is what keeps the asymmetry honest.
+   */
   const expectedWins = shownMatchups.reduce((s, m) => s + m.winProbability, 0);
   const played = shownMatchups.length;
-  const liveNow = shownMatchups.filter(m => m.status === 'live').length;
   /*
    * Summed probabilities, so this is a COUNT of leagues, not a percentage: 1.0 means going out of
    * one league on average. With two chopped leagues it sits around a tenth, which is why it is
@@ -827,6 +914,19 @@ export default function WeekPage() {
     [data, active],
   );
   const expectedEliminations = shownEliminations.reduce((s, e) => s + e.probability, 0);
+
+  /*
+   * Matchups and elimination leagues in one table.
+   *
+   * Elimination leagues used to appear only inside a tooltip on the header figure, which is a poor
+   * place for a league you are one bad week from being knocked out of. As a row they sit in the
+   * same sort and read with the same anatomy as everything else.
+   */
+  const weekRows = React.useMemo(
+    () => toWeekRows(shownMatchups, shownEliminations),
+    [shownMatchups, shownEliminations],
+  );
+  const liveNow = weekRows.filter(r => r.status === 'live').length;
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
@@ -921,7 +1021,8 @@ export default function WeekPage() {
               )}
             </Box>
             <Divider sx={{ my: 2 }} />
-            <RatingBreakdown probabilities={shownMatchups.map(m => m.winProbability)} />
+            {/* weekRows, so the strip counts the same rows the Rating column rates. */}
+            <RatingBreakdown probabilities={weekRows.map(r => r.probability)} />
           </Paper>
 
           {/* Above the tabs, because it scopes ALL of them — the matchup table, the rooting
@@ -931,19 +1032,20 @@ export default function WeekPage() {
             <FormatFilter
               present={present}
               active={active}
-              isAll={formats.length === 0}
               counts={formatCounts}
               onChange={setFormats}
             />
           </Box>
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-            <Tab label={`Matchups (${shownMatchups.length})`} />
+            {/* weekRows, not shownMatchups: elimination leagues are rows in this table too, and a
+                count that excluded them disagreed with the table right below it. */}
+            <Tab label={`Matchups (${weekRows.length})`} />
             <Tab label={`Rooting interest (${shownRooting.length})`} />
             <Tab label="The Zone" />
           </Tabs>
 
-          {tab === 0 && <MatchupsView data={data} rows={shownMatchups} />}
+          {tab === 0 && <MatchupsView rows={weekRows} />}
           {tab === 1 && <RootingView rows={shownRooting} />}
           {/* Takes the week from this page rather than owning a picker, so the tab can never
               disagree with the header about which week it is showing. */}

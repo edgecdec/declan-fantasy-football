@@ -141,7 +141,14 @@ export type RootingRow = {
   netLeagues: number;
 };
 
-/** What is at stake in a league that eliminates its lowest scorer. */
+/**
+ * What is at stake in a league that eliminates its lowest scorer.
+ *
+ * Carries enough to render a row that LOOKS like a head-to-head row, because the useful framing
+ * of "am I getting chopped" really is a two-sided one: I am safe exactly as long as somebody else
+ * is below me. So the closest live rival is surfaced as the other side, and safety plays the part
+ * win probability plays elsewhere.
+ */
 export type EliminationRisk = {
   leagueId: string;
   leagueName: string;
@@ -152,6 +159,26 @@ export type EliminationRisk = {
   activeRosters: number;
   /** True when I am already out of this league. */
   eliminated: boolean;
+  /** My points so far and my projected final. */
+  banked: number;
+  projected: number;
+  /** Starters of mine who can still score. */
+  playersRemaining: number;
+  status: MatchupStatus;
+  /**
+   * The live roster closest to being chopped, other than me — the one I need to stay above.
+   *
+   * Chosen on ELIMINATION PROBABILITY rather than on the lowest score, because they are not the
+   * same question late in a week: a roster 20 points below me with its whole lineup left is a far
+   * bigger threat than one 5 points below me that has finished.
+   */
+  closestRival: {
+    name: string;
+    banked: number;
+    projected: number;
+    probability: number;
+    playersRemaining: number;
+  } | null;
 };
 
 export type WeeklyOutlook = {
@@ -542,10 +569,11 @@ async function buildNoOpponentLeague(
   games: NflGamesResponse | null,
 ): Promise<{ lineup: LineupOnlyLeague | null; elimination: EliminationRisk | null }> {
   const nothing = { lineup: null, elimination: null };
-  const [league, rosters, matchups] = await Promise.all([
+  const [league, rosters, matchups, users] = await Promise.all([
     SleeperService.getLeague(leagueId),
     SleeperService.getRosters(leagueId),
     SleeperService.getMatchups(leagueId, week, { skipCache: true }),
+    SleeperService.getLeagueUsers(leagueId),
   ]);
   const scoring = league?.scoring_settings;
   if (!scoring || !league) return nothing;
@@ -614,6 +642,12 @@ async function buildNoOpponentLeague(
       }
     : null;
 
+  const nameByRoster = new Map<number, string>();
+  for (const r of rosters) {
+    const user = users.find(u => u.user_id === r.owner_id);
+    nameByRoster.set(r.roster_id, user?.display_name ?? `Roster ${r.roster_id}`);
+  }
+
   const elimination = buildEliminationRisk({
     league,
     leagueId,
@@ -621,6 +655,7 @@ async function buildNoOpponentLeague(
     matchups,
     myRosterId: myRoster.roster_id,
     startersOf,
+    nameByRoster,
     eliminatedHere: myStarters.length === 0,
   });
 
@@ -641,9 +676,10 @@ function buildEliminationRisk(args: {
   matchups: { roster_id: number; matchup_id: number | null; starters: string[] | null }[];
   myRosterId: number;
   startersOf: (m: never) => StarterInput[];
+  nameByRoster: Map<number, string>;
   eliminatedHere: boolean;
 }): EliminationRisk | null {
-  const { league, leagueId, leagueName, matchups, myRosterId, eliminatedHere } = args;
+  const { league, leagueId, leagueName, matchups, myRosterId, nameByRoster, eliminatedHere } = args;
   if (!hasNoHeadToHead(matchups.map(m => m.matchup_id))) return null;
   if (league.settings?.disable_elimination) return null;
 
@@ -657,23 +693,67 @@ function buildEliminationRisk(args: {
   // An eliminated roster cannot be eliminated again, and must be kept out of the field below —
   // it has no lineup, so it would otherwise be a certain minimum.
   const alive = matchups.filter(m => (m.starters ?? []).some(p => p && p !== '0'));
-  if (eliminatedHere) return { ...base, probability: 0, activeRosters: alive.length };
+  if (eliminatedHere) {
+    return {
+      ...base,
+      probability: 0,
+      activeRosters: alive.length,
+      banked: 0,
+      projected: 0,
+      playersRemaining: 0,
+      status: 'final',
+      closestRival: null,
+    };
+  }
 
-  const field: RosterScore[] = alive.map(m => {
-    const dist = sideDistribution(args.startersOf(m as never));
+  const scored = alive.map(m => {
+    const starters = args.startersOf(m as never);
+    const dist = sideDistribution(starters);
     return {
       rosterId: m.roster_id,
-      banked: dist.banked,
-      mean: dist.mean,
-      sd: Math.sqrt(dist.variance),
+      starters,
+      dist,
+      score: {
+        rosterId: m.roster_id,
+        banked: dist.banked,
+        mean: dist.mean,
+        sd: Math.sqrt(dist.variance),
+      } satisfies RosterScore,
     };
   });
 
-  const probabilities = eliminationProbabilities(field);
+  const probabilities = eliminationProbabilities(scored.map(s => s.score));
+  const me = scored.find(s => s.rosterId === myRosterId);
+  const remaining = (starters: StarterInput[]) =>
+    starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length;
+
+  const rivals = scored
+    .filter(s => s.rosterId !== myRosterId)
+    .sort((a, b) => (probabilities.get(b.rosterId) ?? 0) - (probabilities.get(a.rosterId) ?? 0));
+  const rival = rivals[0];
+
+  const anyPlaying = scored.some(s => s.starters.some(st => st.gameState === 'in'));
+  const minutesLeft = scored.some(s =>
+    s.starters.some(st => st.gameState === 'pre' || st.gameState === 'in'),
+  );
+
   return {
     ...base,
     probability: probabilities.get(myRosterId) ?? 0,
-    activeRosters: field.length,
+    activeRosters: scored.length,
+    banked: me?.dist.banked ?? 0,
+    projected: me?.dist.mean ?? 0,
+    playersRemaining: me ? remaining(me.starters) : 0,
+    status: statusFor(minutesLeft ? 1 : 0, (me?.dist.banked ?? 0) > 0, anyPlaying),
+    closestRival: rival
+      ? {
+          name: nameByRoster.get(rival.rosterId) ?? `Roster ${rival.rosterId}`,
+          banked: rival.dist.banked,
+          projected: rival.dist.mean,
+          probability: probabilities.get(rival.rosterId) ?? 0,
+          playersRemaining: remaining(rival.starters),
+        }
+      : null,
   };
 }
 
