@@ -187,6 +187,27 @@ export function subscriptionsForGuild(guildId: string): Subscription[] {
 }
 
 /**
+ * Bindings whose channel is the one being typed in.
+ *
+ * The channel is a better scope than the guild for a read command. A guild may bind Graham's to
+ * #graham and Silverback to #silverback, and running /markets in #graham plainly means Graham's —
+ * asking "which league did you mean" there would be obtuse.
+ *
+ * Callers fall back to the guild when the current channel has no binding of its own.
+ */
+export function subscriptionsForChannel(guildId: string, channelId: string): Subscription[] {
+  const rows = getBotDb()
+    .prepare(
+      `SELECT * FROM guild_subscriptions
+       WHERE guild_id = ? AND channel_id = ?
+       ORDER BY league_name, league_id`,
+    )
+    .all(guildId, channelId) as Row[];
+  return rows.map(hydrate);
+}
+
+
+/**
  * Every binding across every guild — what the poller iterates.
  *
  * Note this is the ONLY place that crosses guild boundaries, and it exists because polling is

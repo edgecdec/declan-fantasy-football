@@ -108,6 +108,30 @@ export function fetchLeaderboard(
   return call<LeaderboardResponse>(`/api/bot/leaderboard?${params}`);
 }
 
+export type MarketRow = {
+  marketId: string;
+  matchupId: number;
+  nameA: string | null;
+  nameB: string | null;
+  probA: number;
+  priceA: number;
+  priceB: number;
+  status: string;
+  remainingMinutes: number;
+};
+
+export type MarketsResponse = {
+  league: { leagueId: string; season: string; label: string };
+  week: number;
+  markets: MarketRow[];
+};
+
+export function fetchMarkets(leagueId: string, week?: number): Promise<SiteResult<MarketsResponse>> {
+  const params = new URLSearchParams({ leagueId });
+  if (week) params.set('week', String(week));
+  return call<MarketsResponse>(`/api/bot/markets?${params}`);
+}
+
 export type MeResponse = {
   user: { username: string; displayName: string; isAdmin: boolean; discordUserId: string | null };
   leagues: {

@@ -36,6 +36,20 @@ export function percent(p: number | null | undefined, digits = 0): string {
  * one — which means the padding is ours to do, and a name longer than the column would otherwise
  * break every row below it.
  */
+/**
+ * A two-tone probability bar, mirroring the site's matchup meter.
+ *
+ * Kept SHORT (12 cells). It lives inside an embed field beside a percentage, and a long bar is what
+ * pushed the first version of the markets board past an embed's usable width on mobile.
+ *
+ * Clamped to at least one cell on each side so a near-certain market still reads as a bar rather
+ * than a solid block with no indication of which way it points.
+ */
+export function meter(probability: number, cells = 12): string {
+  const filled = Math.max(1, Math.min(cells - 1, Math.round(probability * cells)));
+  return '█'.repeat(filled) + '░'.repeat(cells - filled);
+}
+
 export function pad(value: string, width: number): string {
   if (value.length >= width) return value.slice(0, width);
   return value + ' '.repeat(width - value.length);

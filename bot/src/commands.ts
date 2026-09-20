@@ -1,5 +1,6 @@
 import {
   SlashCommandBuilder,
+  type APIEmbed,
   type ChatInputCommandInteraction,
   type TextBasedChannel,
 } from 'discord.js';
@@ -10,6 +11,7 @@ import {
   TRANSACTION_TYPES,
   setEventTypes,
   setPingRole,
+  subscriptionsForChannel,
   setIncludeFailed,
   setMinFaab,
   subscription,
@@ -18,8 +20,15 @@ import {
   watchLeague,
   type TransactionType,
 } from './subscriptions';
-import { adminLink, adminWhois, fetchLeaderboard, fetchMe } from './siteApi';
-import { money, padLeft, pad, percent, signedMoney } from './format';
+import {
+  adminLink,
+  adminWhois,
+  fetchLeaderboard,
+  fetchMarkets,
+  fetchMe,
+  type LeaderboardStanding,
+} from './siteApi';
+import { americanOdds, meter, money, pad, padLeft, percent } from './format';
 
 /**
  * Slash commands.
@@ -50,6 +59,13 @@ export const commandDefinitions = [
   new SlashCommandBuilder()
     .setName('slips')
     .setDescription('Your open wagers, valued at the current line'),
+  new SlashCommandBuilder()
+    .setName('markets')
+    .setDescription('Priced betting board for the league this channel watches')
+    .addIntegerOption(o => o.setName('week').setDescription('Defaults to the current week'))
+    .addStringOption(o =>
+      o.setName('league').setDescription('League id, if this channel watches more than one'),
+    ),
   new SlashCommandBuilder()
     .setName('standings')
     .setDescription('Fantasy win-loss standings for a league this server watches')
@@ -153,30 +169,36 @@ export const commandDefinitions = [
 ].map(c => c.toJSON());
 
 /**
- * Resolves which league a read command is about.
+ * Which leagues a read command covers, scoped to THIS CHANNEL first.
  *
- * An explicit option must still be one this guild watches — otherwise passing an arbitrary id would
- * read any league's balances from any server, which is precisely the leak the binding model exists
- * to prevent.
+ * A guild may bind Graham's to #graham and Silverback to #silverback; running a command in #graham
+ * plainly means Graham's, and asking "which did you mean" there would be obtuse. Only when the
+ * current channel has no binding does it fall back to everything the guild watches.
+ *
+ * Returns a LIST rather than one league, so a command can render each in its own pane instead of
+ * refusing when there are several. An explicit option must still be something this guild watches —
+ * otherwise passing an arbitrary id would read any league from any server, which is exactly the leak
+ * the binding model exists to prevent.
  */
-function resolveLeague(
+function resolveLeagues(
   guildId: string,
+  channelId: string | null,
   explicit: string | null,
-): { leagueId: string; leagueName: string | null } | { error: string } {
-  const subs = subscriptionsForGuild(guildId);
-  if (subs.length === 0) {
+): { leagueId: string; leagueName: string | null }[] | { error: string } {
+  const guildSubs = subscriptionsForGuild(guildId);
+  if (guildSubs.length === 0) {
     return { error: 'This server is not watching any leagues yet. An admin can run `/admin watch`.' };
   }
+
   if (explicit) {
-    const match = subs.find(s => s.leagueId === explicit);
+    const match = guildSubs.find(s => s.leagueId === explicit);
     if (!match) return { error: 'This server is not watching that league.' };
-    return { leagueId: match.leagueId, leagueName: match.leagueName };
+    return [{ leagueId: match.leagueId, leagueName: match.leagueName }];
   }
-  if (subs.length > 1) {
-    const list = subs.map(s => `\`${s.leagueId}\`${s.leagueName ? ` — ${s.leagueName}` : ''}`);
-    return { error: `This server watches several leagues. Pick one:\n${list.join('\n')}` };
-  }
-  return { leagueId: subs[0].leagueId, leagueName: subs[0].leagueName };
+
+  const here = channelId ? subscriptionsForChannel(guildId, channelId) : [];
+  const chosen = here.length > 0 ? here : guildSubs;
+  return chosen.map(s => ({ leagueId: s.leagueId, leagueName: s.leagueName }));
 }
 
 function parseTypes(raw: string): TransactionType[] | null {
@@ -193,39 +215,110 @@ function parseTypes(raw: string): TransactionType[] | null {
 }
 
 async function handleBalances(i: ChatInputCommandInteraction): Promise<void> {
-  const resolved = resolveLeague(i.guildId!, i.options.getString('league'));
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
   if ('error' in resolved) {
     await i.editReply(resolved.error);
     return;
   }
 
-  const res = await fetchLeaderboard(resolved.leagueId, i.user.id);
-  if (!res.ok) {
-    // A league with no betting enabled is the common case here, and worth saying plainly.
-    await i.editReply(
-      res.status === 404
-        ? 'That league does not have Declan Dollars enabled.'
-        : `Could not read standings: ${res.error}`,
+  const embeds: APIEmbed[] = [];
+  const problems: string[] = [];
+  for (const league of resolved) {
+    const res = await fetchLeaderboard(league.leagueId, i.user.id);
+    if (!res.ok) {
+      // A watched league with no betting enabled is the common case, and is worth naming rather
+      // than failing the whole command.
+      problems.push(
+        `**${league.leagueName ?? league.leagueId}** — `
+        + (res.status === 404 ? 'no Declan Dollars' : res.error),
+      );
+      continue;
+    }
+    const { standings, league: meta } = res.data;
+    /*
+     * Names are kept SHORT here rather than padded to a wide column. The previous attempt aligned
+     * three 12-character money columns and a 16-character name, which is wider than an embed code
+     * block on desktop and far wider on mobile — long names wrapped and destroyed every row below.
+     */
+    const lines = standings.map((s: LeaderboardStanding, n: number) =>
+      `${padLeft(String(n + 1), 2)} ${pad(s.displayName, 14)}`
+      + `${padLeft(money(s.equityCents), 11)}`
+      + (s.openCount ? ` (${s.openCount})` : ''),
     );
-    return;
+    embeds.push({
+      title: `${meta.label} — week worth`,
+      description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
+      color: 0x57f287,
+      footer: { text: 'ranked on live worth · (n) = open bets' },
+    });
   }
 
-  const { standings, league } = res.data;
-  const lines = [
-    `${pad('manager', 16)}${padLeft('worth', 12)}${padLeft('balance', 12)}${padLeft('open', 9)}`,
-  ];
-  for (const s of standings) {
-    lines.push(
-      pad(s.isMe ? `${s.displayName} *` : s.displayName, 16)
-        + padLeft(money(s.equityCents), 12)
-        + padLeft(money(s.balanceCents), 12)
-        + padLeft(s.openCount ? money(s.openStakeCents) : '—', 9),
-    );
+  if (embeds.length === 0) {
+    await i.editReply(problems.join('\n') || 'Nothing to show.');
+    return;
   }
-  // Ranked on live worth, matching the website: a balance alone ranks whoever has bet least
-  // highest mid-slate, because a stake leaves the balance at placement.
-  const body = ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY);
-  await i.editReply(`**${league.label}** — ranked on live worth\n${body}`);
+  await i.editReply({
+    content: problems.length ? problems.join('\n') : undefined,
+    embeds: embeds.slice(0, 10),
+  });
+}
+
+/**
+ * The priced board, one embed per league.
+ *
+ * Rendered as embed FIELDS rather than an aligned monospace table. Discord lays fields out itself,
+ * so a long manager name cannot wrap and break the rows beneath it — which is exactly what happened
+ * to the first version of this, where `KarrasKarras` and `Coldst2EvaDoIt` overflowed the block.
+ */
+async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in resolved) {
+    await i.editReply(resolved.error);
+    return;
+  }
+  const week = i.options.getInteger('week');
+
+  const embeds: APIEmbed[] = [];
+  const problems: string[] = [];
+  for (const league of resolved) {
+    const res = await fetchMarkets(league.leagueId, week ?? undefined);
+    if (!res.ok) {
+      problems.push(
+        `**${league.leagueName ?? league.leagueId}** — `
+        + (res.status === 404 ? 'no Declan Dollars' : res.error),
+      );
+      continue;
+    }
+    const { markets, league: meta, week: shown } = res.data;
+    if (markets.length === 0) {
+      problems.push(`**${meta.label}** — nothing priced for week ${shown} yet.`);
+      continue;
+    }
+
+    embeds.push({
+      title: `${meta.label} — week ${shown}`,
+      // Closest matchups first, as the API returns them.
+      fields: markets.slice(0, 25).map(m => ({
+        name: `${m.nameA ?? 'A'}  vs  ${m.nameB ?? 'B'}`,
+        value:
+          `\`${meter(m.probA)}\`  **${Math.round(m.probA * 100)}%**\n`
+          + `${americanOdds(m.priceA)} / ${americanOdds(m.priceB)}`
+          + (m.status === 'open' ? '' : `  ·  _${m.status}_`),
+        inline: false,
+      })),
+      color: 0x5865f2,
+      footer: { text: 'bar = chance the left side wins · odds include the house vig' },
+    });
+  }
+
+  if (embeds.length === 0) {
+    await i.editReply(problems.join('\n') || 'Nothing to show.');
+    return;
+  }
+  await i.editReply({
+    content: problems.length ? problems.join('\n') : undefined,
+    embeds: embeds.slice(0, 10),
+  });
 }
 
 async function handleBalance(i: ChatInputCommandInteraction): Promise<void> {
@@ -279,11 +372,13 @@ async function handleSlips(i: ChatInputCommandInteraction): Promise<void> {
  * from `rosters[].settings.wins`. A route for it would be a pointless hop.
  */
 async function handleStandings(i: ChatInputCommandInteraction): Promise<void> {
-  const resolved = resolveLeague(i.guildId!, i.options.getString('league'));
-  if ('error' in resolved) {
-    await i.editReply(resolved.error);
+  const leagues = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in leagues) {
+    await i.editReply(leagues.error);
     return;
   }
+  // One league per reply keeps the Sleeper calls bounded; the first is the channel's own binding.
+  const resolved = leagues[0];
 
   try {
     const [rosters, users] = await Promise.all([
@@ -545,6 +640,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'balances': return await handleBalances(i);
       case 'balance': return await handleBalance(i);
       case 'slips': return await handleSlips(i);
+      case 'markets': return await handleMarkets(i);
       case 'standings': return await handleStandings(i);
       case 'watching': return await handleWatching(i);
       case 'admin': return await handleAdmin(i);
