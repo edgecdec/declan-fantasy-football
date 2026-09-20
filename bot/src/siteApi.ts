@@ -168,6 +168,8 @@ export type BetEvent = {
   refId: string | null;
   payload: Record<string, unknown>;
   createdAt: string;
+  /** Resolved server-side, since the bot has no access to the accounts table. */
+  bettorName: string | null;
 };
 
 export function fetchBetEvents(

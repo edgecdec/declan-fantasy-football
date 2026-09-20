@@ -8,6 +8,8 @@ import {
 import playerIndex from '../../data/player_index.json';
 import { commandDefinitions, handleAutocomplete, handleInteraction } from './commands';
 import { formatTransaction, type ManagerNames, type PlayerLookup } from './formatTransaction';
+import { formatBetEvent } from './betEventStream';
+import { fetchBetEvents, fetchLatestEventId } from './siteApi';
 import { allSubscriptions, leaguesToPoll } from './subscriptions';
 import {
   createStreamState,
@@ -47,6 +49,18 @@ function requireEnv(name: string): string {
 const state = createStreamState();
 let currentWeek = 0;
 let currentSeason = '';
+
+/**
+ * Cursor into the bet outbox.
+ *
+ * Initialised to the CURRENT latest id at startup, never 0. Starting at 0 would replay every bet
+ * ever placed into the channel on each restart — the same class of mistake the transaction seeding
+ * avoids, and the reason /api/bot/events returns nothing at all unless `after` is given explicitly.
+ *
+ * In memory, so a restart drops anything that landed while the bot was down. That is consistent with
+ * how league activity is treated: notifications are a stream, not an archive.
+ */
+let betCursor = -1;
 
 /** Manager names per league, refreshed lazily — rosters change rarely and this saves two calls a tick. */
 const managerCache = new Map<string, { at: number; names: ManagerNames }>();
@@ -174,6 +188,48 @@ async function pollTransactions(client: Client): Promise<void> {
  * The cost is one API call per guild at startup. At this scale that is nothing; if the bot ever runs
  * in hundreds of servers, global registration becomes the right trade instead.
  */
+/**
+ * Posts new bet events to every channel watching that league.
+ *
+ * Fan-out is per SUBSCRIPTION, matching the transaction poller: a league watched by two guilds posts
+ * to both, each in its own channel, and a guild watching nothing hears nothing.
+ *
+ * Bet events deliberately ignore `event_types`, which describes Sleeper TRANSACTION types and has
+ * nothing to say about wagers. If bet announcements ever need muting, that is its own setting rather
+ * than an overload of this one.
+ */
+async function pollBetEvents(client: Client): Promise<void> {
+  if (betCursor < 0) return;
+
+  const res = await fetchBetEvents(betCursor);
+  if (!res.ok) {
+    console.error('[bot] could not read bet events:', res.error);
+    return;
+  }
+  const { events } = res.data;
+  if (events.length === 0) return;
+
+  const subs = allSubscriptions();
+  for (const event of events) {
+    const embed = formatBetEvent(event, event.bettorName);
+    // Advance the cursor whether or not it was posted: a silent event is still handled, and leaving
+    // it behind the cursor would re-fetch it forever.
+    betCursor = Math.max(betCursor, event.id);
+    if (!embed) continue;
+
+    for (const sub of subs.filter(s => s.leagueId === event.leagueId)) {
+      const channel = await client.channels.fetch(sub.channelId).catch(() => null);
+      if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
+      try {
+        await (channel as TextChannel).send({ embeds: [embed] });
+      } catch (err) {
+        console.error('[bot] bet event send failed', err);
+      }
+    }
+  }
+  console.log(`[bot] handled ${events.length} bet event(s), cursor now ${betCursor}`);
+}
+
 async function registerCommandsForGuild(rest: REST, appId: string, guildId: string): Promise<void> {
   try {
     await rest.put(Routes.applicationGuildCommands(appId, guildId), { body: commandDefinitions });
@@ -224,6 +280,12 @@ async function main(): Promise<void> {
 
   await refreshNflState();
   setInterval(() => void refreshNflState(), STATE_REFRESH_MS);
+
+  // Start the cursor at "now" so a restart announces nothing that already happened.
+  const latest = await fetchLatestEventId();
+  betCursor = latest.ok ? latest.data.latest : 0;
+  console.log(`[bot] bet event cursor starts at ${betCursor}`);
+  setInterval(() => void pollBetEvents(client), POLL_INTERVAL_MS);
   // First sweep runs immediately so a restart seeds without waiting a minute, during which a real
   // transaction could land and then be treated as history.
   await pollTransactions(client);
