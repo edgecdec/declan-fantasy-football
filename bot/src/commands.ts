@@ -24,6 +24,7 @@ import {
 import {
   adminLink,
   adminWhois,
+  fetchHistory,
   fetchLeaderboard,
   fetchMarkets,
   fetchMe,
@@ -93,7 +94,28 @@ export const commandDefinitions = [
     ),
   new SlashCommandBuilder()
     .setName('openbets')
-    .setDescription('Everyone’s open bets, biggest stake first')
+    .setDescription('Open bets, biggest stake first')
+    .addUserOption(o => o.setName('user').setDescription('Only this person’s bets'))
+    .addIntegerOption(o =>
+      o.setName('page').setDescription('Page number, 10 per page').setMinValue(1),
+    )
+    .addStringOption(o =>
+      o.setName('league').setDescription('League id, if this channel watches more than one'),
+    ),
+  new SlashCommandBuilder()
+    .setName('bethistory')
+    .setDescription('Settled bets, most recent first')
+    .addStringOption(o =>
+      o
+        .setName('sort')
+        .setDescription('Default is most recent')
+        .addChoices(
+          { name: 'time (most recent first)', value: 'time' },
+          { name: 'user (then amount)', value: 'user' },
+          { name: 'amount (biggest stake first)', value: 'amount' },
+        ),
+    )
+    .addUserOption(o => o.setName('user').setDescription('Only this person’s bets'))
     .addIntegerOption(o =>
       o.setName('page').setDescription('Page number, 10 per page').setMinValue(1),
     )
@@ -267,20 +289,36 @@ async function handleBalances(i: ChatInputCommandInteraction): Promise<void> {
     }
     const { standings, league: meta } = res.data;
     /*
-     * Names are kept SHORT here rather than padded to a wide column. The previous attempt aligned
-     * three 12-character money columns and a 16-character name, which is wider than an embed code
-     * block on desktop and far wider on mobile — long names wrapped and destroyed every row below.
+     * Column widths are the constraint, not the available data. An embed code block is far narrower
+     * than a terminal and narrower still on a phone, so the dollar signs and thousands separators
+     * are dropped inside the table and the units stated in the footer — that alone buys two columns.
+     *
+     * `open` carries count AND stake in one cell ("3/250") because they are read together: three
+     * open bets means something different at $10 than at $250.
      */
-    const lines = standings.map((s: LeaderboardStanding, n: number) =>
-      `${padLeft(String(n + 1), 2)} ${pad(s.displayName, 14)}`
-      + `${padLeft(money(s.equityCents), 11)}`
-      + (s.openCount ? ` (${s.openCount})` : ''),
-    );
+    const bare = (cents: number) => (cents / 100).toFixed(2);
+    const lines = [
+      `${pad('manager', 12)}${padLeft('worth', 9)}${padLeft('open', 9)}${padLeft('net', 8)}  W-L`,
+    ];
+    for (const s of standings as LeaderboardStanding[]) {
+      lines.push(
+        pad(s.isMe ? `${s.displayName}*` : s.displayName, 12)
+        + padLeft(bare(s.equityCents), 9)
+        + padLeft(s.openCount ? `${s.openCount}/${Math.round(s.openStakeCents / 100)}` : '—', 9)
+        + padLeft((s.bettingNetCents >= 0 ? '+' : '') + bare(s.bettingNetCents), 8)
+        + '  ' + `${s.won}-${s.lost}`,
+      );
+    }
+    const totalOpen = standings.reduce((n, s) => n + s.openStakeCents, 0);
     embeds.push({
-      title: `${meta.label} — week worth`,
+      title: `${meta.label} — live worth`,
       description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
       color: 0x57f287,
-      footer: { text: 'ranked on live worth · (n) = open bets' },
+      footer: {
+        text:
+          'Declan Dollars · worth = balance + open bets at the current line · net = settled profit'
+          + ` · ${money(totalOpen)} at risk league-wide`,
+      },
     });
   }
 
@@ -490,7 +528,28 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
     return;
   }
 
-  const all = [...res.data.openPositions].sort((a, b) => b.stakeCents - a.stakeCents);
+  let all = [...res.data.openPositions].sort((a, b) => b.stakeCents - a.stakeCents);
+
+  /*
+   * Filtering by a DISCORD user means resolving them to a Declan Dollars account first — the
+   * positions carry a display name, and a Discord nickname is not it. Done through the same whois
+   * the admin command uses, so there is one definition of "who is this".
+   */
+  const who = i.options.getUser('user');
+  if (who) {
+    const link = await adminWhois(who.id);
+    if (!link.ok || !link.data.linked) {
+      await i.editReply(`<@${who.id}> has not linked a Declan Dollars account.`);
+      return;
+    }
+    const name = link.data.linked.displayName;
+    all = all.filter(p => p.bettor === name);
+    if (all.length === 0) {
+      await i.editReply(`**${name}** has no open bets in ${res.data.league.label}.`);
+      return;
+    }
+  }
+
   if (all.length === 0) {
     await i.editReply(`**${res.data.league.label}** — no open bets right now.`);
     return;
@@ -518,13 +577,113 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
   const atRisk = all.reduce((n, r) => n + r.stakeCents, 0);
   await i.editReply({
     embeds: [{
-      title: `${res.data.league.label} — open bets`,
+      title:
+        `${res.data.league.label} — open bets`
+        + (who ? ` · ${who.displayName}` : ''),
       description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
       color: 0xfee75c,
       footer: {
         text:
           `page ${clamped}/${pages} · ${all.length} open · ${money(atRisk)} at risk`
           + (pages > 1 ? ` · /openbets page:${clamped === pages ? 1 : clamped + 1}` : ''),
+      },
+    }],
+  });
+}
+
+/**
+ * Settled bets — what actually happened.
+ *
+ * A separate command from /openbets rather than a flag on it, because the two answer different
+ * questions and want different columns: an open bet has a potential return, a settled one has a
+ * result. Sharing one command would mean a "win" column that is a projection half the time.
+ */
+async function handleBetHistory(i: ChatInputCommandInteraction): Promise<void> {
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in resolved) {
+    await i.editReply(resolved.error);
+    return;
+  }
+  const league = resolved[0];
+  const sort = i.options.getString('sort') ?? 'time';
+  const page = Math.max(1, i.options.getInteger('page') ?? 1);
+
+  const res = await fetchHistory(league.leagueId, 200);
+  if (!res.ok) {
+    await i.editReply(
+      res.status === 404
+        ? 'That league does not have Declan Dollars enabled.'
+        : `Could not read history: ${res.error}`,
+    );
+    return;
+  }
+
+  let bets = [...res.data.bets];
+
+  const who = i.options.getUser('user');
+  if (who) {
+    const link = await adminWhois(who.id);
+    if (!link.ok || !link.data.linked) {
+      await i.editReply(`<@${who.id}> has not linked a Declan Dollars account.`);
+      return;
+    }
+    bets = bets.filter(b => b.bettor === link.data.linked!.displayName);
+  }
+
+  if (bets.length === 0) {
+    await i.editReply(
+      who
+        ? `No settled bets for <@${who.id}> in ${res.data.league.label}.`
+        : `**${res.data.league.label}** — nothing has settled yet.`,
+    );
+    return;
+  }
+
+  /*
+   * The API already returns newest-first, so 'time' needs no sort at all — re-sorting on a nullable
+   * settled_at would be less reliable than the SQL ordering, which also breaks ties on id.
+   */
+  if (sort === 'amount') {
+    bets.sort((a, b) => b.stakeCents - a.stakeCents);
+  } else if (sort === 'user') {
+    // Grouped by person, then biggest first within each, so one manager's week reads as a block.
+    bets.sort((a, b) => a.bettor.localeCompare(b.bettor) || b.stakeCents - a.stakeCents);
+  }
+
+  const pages = Math.ceil(bets.length / OPEN_BETS_PAGE_SIZE);
+  const clamped = Math.min(page, pages);
+  const rows = bets.slice((clamped - 1) * OPEN_BETS_PAGE_SIZE, clamped * OPEN_BETS_PAGE_SIZE);
+
+  const mark = (status: string) =>
+    status === 'won' ? 'W' : status === 'lost' ? 'L' : status === 'void' ? '—' : '?';
+  const bare = (cents: number) => (cents / 100).toFixed(2);
+
+  const lines = [`${pad('bettor', 12)}${pad('pick', 12)}${padLeft('stake', 8)}${padLeft('net', 8)} `];
+  for (const b of rows) {
+    lines.push(
+      pad(b.bettor, 12)
+      + pad(b.pick, 12)
+      + padLeft(bare(b.stakeCents), 8)
+      + padLeft((b.netCents > 0 ? '+' : '') + bare(b.netCents), 8)
+      + ' ' + mark(b.status),
+    );
+  }
+
+  const net = bets.reduce((n, b) => n + b.netCents, 0);
+  const won = bets.filter(b => b.status === 'won').length;
+  const lost = bets.filter(b => b.status === 'lost').length;
+
+  await i.editReply({
+    embeds: [{
+      title:
+        `${res.data.league.label} — bet history`
+        + (who ? ` · ${who.displayName}` : ''),
+      description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
+      color: 0x99aab5,
+      footer: {
+        text:
+          `page ${clamped}/${pages} · sorted by ${sort} · ${won}-${lost}`
+          + ` · net ${money(net)} · Declan Dollars`,
       },
     }],
   });
@@ -895,6 +1054,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'standings': return await handleStandings(i);
       case 'website': return await handleWebsite(i);
       case 'openbets': return await handleOpenBets(i);
+      case 'bethistory': return await handleBetHistory(i);
       case 'watching': return await handleWatching(i);
       case 'admin': return await handleAdmin(i);
       default:

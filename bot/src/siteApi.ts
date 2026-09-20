@@ -80,6 +80,10 @@ export type LeaderboardStanding = {
   won: number;
   lost: number;
   voided: number;
+  /** Settled profit: what resolved bets actually returned, minus what they staked. */
+  bettingNetCents: number;
+  settledCount: number;
+  totalStakedCents: number;
   roi: number | null;
 };
 
@@ -181,6 +185,27 @@ export function fetchBetEvents(
 /** The starting cursor: "where are we now", so a fresh bot never replays history. */
 export function fetchLatestEventId(): Promise<SiteResult<{ latest: number }>> {
   return call<{ latest: number }>('/api/bot/events');
+}
+
+export type HistoryBet = {
+  wagerId: string;
+  bettor: string;
+  pick: string;
+  opponent: string | null;
+  stakeCents: number;
+  price: number;
+  toWinCents: number;
+  status: string;
+  settledAt: string | null;
+  week: number;
+  netCents: number;
+};
+
+export function fetchHistory(
+  leagueId: string,
+  limit = 100,
+): Promise<SiteResult<{ league: { leagueId: string; label: string }; bets: HistoryBet[] }>> {
+  return call(`/api/bot/history?leagueId=${encodeURIComponent(leagueId)}&limit=${limit}`);
 }
 
 export function placeBet(args: {
