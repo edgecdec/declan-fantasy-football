@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { SleeperTransaction } from '@/services/sleeper/sleeperService';
 import { formatTransaction, type PlayerLookup } from '../bot/src/formatTransaction';
+import { pad } from '../bot/src/format';
 
 /**
  * Rendering a Sleeper transaction for a channel.
@@ -165,4 +166,19 @@ test('an unrecognised transaction type still posts something', () => {
 test('a team defence renders by its team name', () => {
   const msg = fmt({ adds: { SF: 8 } });
   assert.match(msg.lines[0], /San Francisco 49ers/);
+});
+
+test('a truncated column never fuses into the next one', () => {
+  /*
+   * Seen live: "AggressiveIyAvg" filled a 13-wide column exactly, so the row read
+   * "AggressiveIyAegruis" — two values with no separator, unreadable. A truncated value must keep a
+   * trailing space.
+   */
+  const row = pad('AggressiveIyAvg', 13) + pad('egruis', 13);
+  assert.ok(!row.includes('AggressiveIyAegruis'), row);
+  assert.match(row, /AggressiveIy egruis/);
+  // Untruncated values are unaffected.
+  assert.equal(pad('bob', 6), 'bob   ');
+  // And the column is still exactly the width asked for.
+  assert.equal(pad('AggressiveIyAvg', 13).length, 13);
 });

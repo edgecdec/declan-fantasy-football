@@ -92,6 +92,15 @@ export const commandDefinitions = [
       o.setName('league').setDescription('League id, if this server watches more than one'),
     ),
   new SlashCommandBuilder()
+    .setName('openbets')
+    .setDescription('Everyone’s open bets, biggest stake first')
+    .addIntegerOption(o =>
+      o.setName('page').setDescription('Page number, 10 per page').setMinValue(1),
+    )
+    .addStringOption(o =>
+      o.setName('league').setDescription('League id, if this channel watches more than one'),
+    ),
+  new SlashCommandBuilder()
     .setName('website')
     .setDescription('Link to the Declan Dollars betting page for this channel’s league'),
   new SlashCommandBuilder()
@@ -448,6 +457,79 @@ async function handleStandings(i: ChatInputCommandInteraction): Promise<void> {
  * which league you meant. With several leagues bound, all of them are listed rather than one being
  * picked arbitrarily.
  */
+/** Ten rows a page: a code block much longer than this scrolls badly on mobile. */
+const OPEN_BETS_PAGE_SIZE = 10;
+
+/**
+ * Every open bet in the league, biggest stake first.
+ *
+ * Sorted on STAKE rather than potential return, because that is the interesting question — who has
+ * the most riding on this week. Ordering by to-win would put a single longshot above someone with
+ * ten times the money at risk.
+ *
+ * Paginated rather than truncated: a 10-team league mid-week can easily run past 30 open bets, and
+ * silently showing the top ten would misreport the league.
+ */
+async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in resolved) {
+    await i.editReply(resolved.error);
+    return;
+  }
+  // One league per reply: paging across several at once has no sensible page numbering.
+  const league = resolved[0];
+  const page = Math.max(1, i.options.getInteger('page') ?? 1);
+
+  const res = await fetchLeaderboard(league.leagueId, i.user.id);
+  if (!res.ok) {
+    await i.editReply(
+      res.status === 404
+        ? 'That league does not have Declan Dollars enabled.'
+        : `Could not read open bets: ${res.error}`,
+    );
+    return;
+  }
+
+  const all = [...res.data.openPositions].sort((a, b) => b.stakeCents - a.stakeCents);
+  if (all.length === 0) {
+    await i.editReply(`**${res.data.league.label}** — no open bets right now.`);
+    return;
+  }
+
+  const pages = Math.ceil(all.length / OPEN_BETS_PAGE_SIZE);
+  const clamped = Math.min(page, pages);
+  const start = (clamped - 1) * OPEN_BETS_PAGE_SIZE;
+  const rows = all.slice(start, start + OPEN_BETS_PAGE_SIZE);
+
+  /*
+   * Narrow columns on purpose. A wide aligned table is what wrapped and broke the first markets
+   * board — an embed code block is far narrower than a terminal, and narrower still on a phone.
+   */
+  const lines = [`${pad('bettor', 13)}${pad('pick', 13)}${padLeft('stake', 8)}${padLeft('win', 8)}`];
+  for (const r of rows) {
+    lines.push(
+      pad(r.bettor, 13)
+      + pad(r.pick, 13)
+      + padLeft(money(r.stakeCents), 8)
+      + padLeft(money(r.toWinCents), 8),
+    );
+  }
+
+  const atRisk = all.reduce((n, r) => n + r.stakeCents, 0);
+  await i.editReply({
+    embeds: [{
+      title: `${res.data.league.label} — open bets`,
+      description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
+      color: 0xfee75c,
+      footer: {
+        text:
+          `page ${clamped}/${pages} · ${all.length} open · ${money(atRisk)} at risk`
+          + (pages > 1 ? ` · /openbets page:${clamped === pages ? 1 : clamped + 1}` : ''),
+      },
+    }],
+  });
+}
+
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {
   const base = (process.env.SITE_URL ?? 'https://fantasyfootball.edgecdec.com').replace(/\/$/, '');
   const resolved = resolveLeagues(i.guildId!, i.channelId, null);
@@ -812,6 +894,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'bet': return await handleBet(i);
       case 'standings': return await handleStandings(i);
       case 'website': return await handleWebsite(i);
+      case 'openbets': return await handleOpenBets(i);
       case 'watching': return await handleWatching(i);
       case 'admin': return await handleAdmin(i);
       default:

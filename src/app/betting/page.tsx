@@ -32,6 +32,20 @@ const LIVE_VALUE_HINT =
   'Expected value at the current odds, not a cash-out — there is nobody to sell to. '
   + 'A new bet is worth slightly less than its stake because the price included the house edge.';
 
+/**
+ * Where to send someone after they sign in.
+ *
+ * Only a path on this site is ever honoured. Accepting an absolute URL here would make this an open
+ * redirect — a link that signs someone in and then lands them on an attacker's page wearing our
+ * name — and `//evil.test` is a protocol-relative URL that a naive "starts with /" check lets
+ * straight through.
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 function SignInPanel() {
   const { login, error } = useBettingAuth();
   const [username, setUsername] = React.useState('');
@@ -43,6 +57,16 @@ function SignInPanel() {
     setBusy(true);
     try {
       await login(username.trim(), password);
+      /*
+       * Return to wherever they were headed. The Discord /website command deep-links to
+       * /betting/<leagueId>, and without this a visitor without a session signed in and then sat on
+       * the dashboard having to navigate back to the league they clicked.
+       *
+       * A full assignment rather than a router push, so the page remounts and re-fetches with the
+       * new cookie instead of reusing the state it built while unauthenticated.
+       */
+      const next = safeNext(new URLSearchParams(window.location.search).get('next'));
+      if (next) window.location.assign(next);
     } catch {
       // error is surfaced via context
     } finally {

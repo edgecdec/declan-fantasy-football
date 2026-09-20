@@ -51,7 +51,13 @@ export function meter(probability: number, cells = 12): string {
 }
 
 export function pad(value: string, width: number): string {
-  if (value.length >= width) return value.slice(0, width);
+  /*
+   * A truncated value keeps one trailing space, so it can never run into the next column.
+   * Slicing to the full width looks correct until a name is exactly long enough to fill it:
+   * "AggressiveIyAvg" in a 13-wide column produced "AggressiveIyAegruis", two values fused into one
+   * unreadable token.
+   */
+  if (value.length >= width) return value.slice(0, width - 1) + ' ';
   return value + ' '.repeat(width - value.length);
 }
 

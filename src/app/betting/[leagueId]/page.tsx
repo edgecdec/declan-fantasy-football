@@ -376,6 +376,8 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
   const [data, setData] = React.useState<MarketsPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  /** Distinguished from `error`: arriving here without a session is a normal first visit. */
+  const [needsSignIn, setNeedsSignIn] = React.useState(false);
   const [updatedAt, setUpdatedAt] = React.useState<Date | null>(null);
   const [betTarget, setBetTarget] = React.useState<BetTarget | null>(null);
   // A tab rather than another section, so the standings don't add scroll to the
@@ -388,7 +390,19 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
         credentials: 'same-origin',
       });
       const body = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        /*
+         * Not an error to report, a state to handle. This page is linked directly from Discord, so
+         * arriving without a session is a NORMAL first visit — and rendering "Not signed in." as a
+         * dead-end alert left the visitor with no way forward and no clue that /betting was where to
+         * go.
+         */
+        setNeedsSignIn(true);
+        setError(null);
+        return;
+      }
       if (!res.ok) { setError(body.error ?? 'Could not load markets.'); return; }
+      setNeedsSignIn(false);
       setData(body);
       setUpdatedAt(new Date());
       setError(null);
@@ -415,6 +429,29 @@ function MarketsContent({ leagueId }: { leagueId: string }) {
   }, [load]);
 
   if (loading) return <LinearProgress />;
+  /*
+   * Sign-in is offered BEFORE any error, with the destination carried in `next` so signing in
+   * returns here rather than dumping the visitor on the dashboard to navigate back.
+   */
+  if (needsSignIn) {
+    const next = `/betting/${leagueId}`;
+    return (
+      <Alert
+        severity="info"
+        action={
+          <Button
+            size="small"
+            variant="contained"
+            href={`/betting?next=${encodeURIComponent(next)}`}
+          >
+            Sign in
+          </Button>
+        }
+      >
+        Sign in to see this league&apos;s standings and markets.
+      </Alert>
+    );
+  }
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!data) return null;
 
