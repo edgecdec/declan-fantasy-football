@@ -92,6 +92,9 @@ export const commandDefinitions = [
       o.setName('league').setDescription('League id, if this server watches more than one'),
     ),
   new SlashCommandBuilder()
+    .setName('website')
+    .setDescription('Link to the Declan Dollars betting page for this channel’s league'),
+  new SlashCommandBuilder()
     .setName('watching')
     .setDescription('Which leagues this server is watching'),
   new SlashCommandBuilder()
@@ -434,6 +437,41 @@ async function handleStandings(i: ChatInputCommandInteraction): Promise<void> {
   }
 }
 
+/**
+ * The site's betting page, deep-linked to this channel's league.
+ *
+ * Public rather than ephemeral: the point is a link anyone in the channel can use, and an ephemeral
+ * reply would have to be posted again by every person who wanted it.
+ *
+ * Deep-links to /betting/<leagueId> when the channel is bound to exactly one league, because that is
+ * the page with the standings and the markets in it; bare /betting is a dashboard that then asks
+ * which league you meant. With several leagues bound, all of them are listed rather than one being
+ * picked arbitrarily.
+ */
+async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {
+  const base = (process.env.SITE_URL ?? 'https://fantasyfootball.edgecdec.com').replace(/\/$/, '');
+  const resolved = resolveLeagues(i.guildId!, i.channelId, null);
+
+  if ('error' in resolved) {
+    // No bindings at all: the bare page is still useful, so link it rather than refusing.
+    await i.editReply(`**Declan Dollars** — ${base}/betting`);
+    return;
+  }
+
+  if (resolved.length === 1) {
+    const league = resolved[0];
+    await i.editReply(
+      `**${league.leagueName ?? 'Declan Dollars'}** — ${base}/betting/${league.leagueId}`,
+    );
+    return;
+  }
+
+  const lines = resolved.map(
+    l => `**${l.leagueName ?? l.leagueId}** — ${base}/betting/${l.leagueId}`,
+  );
+  await i.editReply(lines.join('\n').slice(0, MAX_BODY));
+}
+
 async function handleWatching(i: ChatInputCommandInteraction): Promise<void> {
   const subs = subscriptionsForGuild(i.guildId!);
   if (subs.length === 0) {
@@ -773,6 +811,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'markets': return await handleMarkets(i);
       case 'bet': return await handleBet(i);
       case 'standings': return await handleStandings(i);
+      case 'website': return await handleWebsite(i);
       case 'watching': return await handleWatching(i);
       case 'admin': return await handleAdmin(i);
       default:
