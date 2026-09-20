@@ -79,7 +79,7 @@ Steps 1–2 are **done** (commit `189b167`).
 | 6 | Two-phase settlement + slip valuation | Grade lost the moment one leg dies |
 | ~~7~~ | ~~`discord_user_id`, `getServiceCaller`, `/api/bot/*`~~ | done |
 | ~~9~~ | ~~Transaction poller + guild subscriptions + ping roles~~ | done, live |
-| ~~10~~ | ~~Read commands~~ | done: `/balances` `/balance` `/slips` `/standings` `/markets` `/watching` `/admin` |
+| ~~10~~ | ~~Read commands~~ | done: `/balances` `/balance` `/slips` `/standings` `/markets` `/openbets` `/bethistory` `/website` `/watching` `/admin` |
 | ~~11~~ | ~~`/bet` + `POST /api/bot/wager`~~ | done. Every guard verified firing through the bot path |
 | 8 | Bot reads the outbox and announces placements/settlements | `/api/bot/events` exists; nothing consumes it yet |
 | 12 | `line_moved` event + coalescing | Highest-volume event; needs a threshold chosen against real movement |
