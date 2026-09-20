@@ -235,7 +235,25 @@ export function placeWager(
         stakeCents,
         toWinCents: toWin,
         balanceCents: after,
-        legs: [{ marketId, side, price, nameA: market.name_a, nameB: market.name_b }],
+        legs: [
+          {
+            marketId,
+            side,
+            price,
+            nameA: market.name_a,
+            nameB: market.name_b,
+            /*
+             * The MODEL's probability for the side backed, not the one implied by the price.
+             *
+             * `price` carries the house vig, so deriving a percentage from it overstates the chance
+             * by roughly half the vig — about 2.4 points. Announcing that as "chance to win" would be
+             * quietly wrong in the house's favour, which is the worst direction for a number in a
+             * betting channel. `prob_a` is the unclamped model figure, frozen here at the price it
+             * was struck against.
+             */
+            probability: side === 'a' ? market.prob_a : 1 - market.prob_a,
+          },
+        ],
       },
     });
 

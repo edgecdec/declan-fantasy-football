@@ -32,7 +32,13 @@ function str(payload: Record<string, unknown>, key: string): string | null {
   return typeof value === 'string' && value ? value : null;
 }
 
-type Leg = { nameA?: unknown; nameB?: unknown; side?: unknown; price?: unknown };
+type Leg = {
+  nameA?: unknown;
+  nameB?: unknown;
+  side?: unknown;
+  price?: unknown;
+  probability?: unknown;
+};
 
 /**
  * The side a wager backed, by name.
@@ -59,6 +65,20 @@ function legPrice(payload: Record<string, unknown>): number | null {
 }
 
 /**
+ * The model's chance for the side backed, when the payload records it.
+ *
+ * Absent on events written before this was stored, and absent is rendered as nothing rather than as
+ * a number derived from the price — the price includes the vig, so a percentage from it would
+ * overstate the chance by about half the vig.
+ */
+function legProbability(payload: Record<string, unknown>): number | null {
+  const legs = payload.legs;
+  if (!Array.isArray(legs) || legs.length === 0) return null;
+  const p = (legs[0] as Leg).probability;
+  return typeof p === 'number' && p > 0 && p < 1 ? p : null;
+}
+
+/**
  * How to announce one event, or null to stay quiet.
  *
  * `bettor` is resolved by the caller from the account id, because the payload deliberately stores
@@ -75,10 +95,12 @@ export function formatBetEvent(event: BetEvent, bettor: string | null): APIEmbed
     if (stake == null || toWin == null) return null;
     const pick = pickName(p);
     const price = legPrice(p);
+    const chance = legProbability(p);
     return {
       title: '🎲 Bet placed',
       description:
         `**${who}** put **${money(stake)}** on ${pick ?? 'a matchup'}`
+        + (chance != null ? ` (${(chance * 100).toFixed(1)}%)` : '')
         + (price != null ? ` at ${americanOdds(price)}` : '')
         + `\nto win **${money(toWin)}**`,
       color: COLOUR.placed,

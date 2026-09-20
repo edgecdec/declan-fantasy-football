@@ -113,3 +113,57 @@ test('a placement with no legs still announces, without inventing a pick', () =>
   assert.match(embed.description!, /\$2\.00/);
   assert.match(embed.description!, /a matchup/);
 });
+
+test('a placement shows the MODEL probability, not the price-implied one', () => {
+  /*
+   * -124 implies 55.4% once the vig is included, but the model said 53.0%. Announcing the implied
+   * figure would overstate the chance by about half the vig — quietly wrong in the house's favour,
+   * which is the worst direction for a number in a betting channel.
+   */
+  const embed = formatBetEvent(
+    event({
+      payload: {
+        accountId: 'a',
+        stakeCents: 10000,
+        toWinCents: 8065,
+        legs: [{ marketId: 'm', side: 'a', price: -124, nameA: 'cemisme', nameB: 'kermason', probability: 0.53 }],
+      },
+    }),
+    'edgecdec',
+  )!;
+  assert.match(embed.description!, /cemisme \(53\.0%\) at -124/);
+  assert.ok(!/55\.4/.test(embed.description!), 'must not show the vigged implied probability');
+});
+
+test('an event written before probabilities were stored omits it rather than inventing one', () => {
+  const embed = formatBetEvent(
+    event({
+      payload: {
+        accountId: 'a',
+        stakeCents: 100,
+        toWinCents: 25,
+        legs: [{ marketId: 'm', side: 'a', price: -393, nameA: 'AggressiveIyAvg', nameB: 'x' }],
+      },
+    }),
+    'edgecdec',
+  )!;
+  assert.match(embed.description!, /AggressiveIyAvg at -393/);
+  assert.ok(!/%/.test(embed.description!), 'no percentage rather than a derived one');
+});
+
+test('a nonsensical stored probability is ignored', () => {
+  for (const bad of [0, 1, 1.5, -0.2, 'half']) {
+    const embed = formatBetEvent(
+      event({
+        payload: {
+          accountId: 'a',
+          stakeCents: 100,
+          toWinCents: 25,
+          legs: [{ marketId: 'm', side: 'a', price: -110, nameA: 'x', nameB: 'y', probability: bad }],
+        },
+      }),
+      'edgecdec',
+    )!;
+    assert.ok(!/%/.test(embed.description!), `should ignore probability=${bad}`);
+  }
+});
