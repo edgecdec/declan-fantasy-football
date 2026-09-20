@@ -6,7 +6,7 @@ import {
   type TextChannel,
 } from 'discord.js';
 import playerIndex from '../../data/player_index.json';
-import { commandDefinitions, handleInteraction } from './commands';
+import { commandDefinitions, handleAutocomplete, handleInteraction } from './commands';
 import { formatTransaction, type ManagerNames, type PlayerLookup } from './formatTransaction';
 import { allSubscriptions, leaguesToPoll } from './subscriptions';
 import {
@@ -206,6 +206,14 @@ async function main(): Promise<void> {
   });
 
   client.on('interactionCreate', async interaction => {
+    // Autocomplete arrives as its own interaction type and must be answered within three seconds,
+    // so it is handled before the command branch rather than inside it.
+    if (interaction.isAutocomplete()) {
+      await handleAutocomplete(interaction).catch(err => {
+        console.error('[bot] autocomplete failed', err);
+      });
+      return;
+    }
     if (!interaction.isChatInputCommand()) return;
     await handleInteraction(interaction);
   });

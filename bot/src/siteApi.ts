@@ -181,6 +181,20 @@ export function fetchLatestEventId(): Promise<SiteResult<{ latest: number }>> {
   return call<{ latest: number }>('/api/bot/events');
 }
 
+export function placeBet(args: {
+  discordUserId: string;
+  marketId: string;
+  side: 'a' | 'b';
+  stakeCents: number;
+}): Promise<SiteResult<{
+  wagerId: string;
+  balanceCents: number;
+  toWinCents: number;
+  account: { username: string; displayName: string };
+}>> {
+  return call('/api/bot/wager', { method: 'POST', body: JSON.stringify(args) });
+}
+
 export function adminLink(args: {
   discordUserId: string;
   username?: string;

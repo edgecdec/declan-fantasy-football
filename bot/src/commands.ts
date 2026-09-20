@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   type APIEmbed,
+  type AutocompleteInteraction,
   type ChatInputCommandInteraction,
   type TextBasedChannel,
 } from 'discord.js';
@@ -26,6 +27,7 @@ import {
   fetchLeaderboard,
   fetchMarkets,
   fetchMe,
+  placeBet,
   type LeaderboardStanding,
 } from './siteApi';
 import { americanOdds, meter, money, pad, padLeft, percent } from './format';
@@ -65,6 +67,23 @@ export const commandDefinitions = [
     .addIntegerOption(o => o.setName('week').setDescription('Defaults to the current week'))
     .addStringOption(o =>
       o.setName('league').setDescription('League id, if this channel watches more than one'),
+    ),
+  new SlashCommandBuilder()
+    .setName('bet')
+    .setDescription('Back one side of a matchup with Declan Dollars')
+    .addStringOption(o =>
+      o
+        .setName('pick')
+        .setDescription('Who you are backing')
+        .setRequired(true)
+        .setAutocomplete(true),
+    )
+    .addNumberOption(o =>
+      o
+        .setName('amount')
+        .setDescription('Dollars to stake, e.g. 25 or 12.50')
+        .setRequired(true)
+        .setMinValue(1),
     ),
   new SlashCommandBuilder()
     .setName('standings')
@@ -621,6 +640,90 @@ async function handleAdmin(i: ChatInputCommandInteraction): Promise<void> {
   await i.editReply('Unknown subcommand.');
 }
 
+/**
+ * Autocomplete for /bet, offering one entry per SIDE of each open market.
+ *
+ * Five matchups become ten choices — "edgecdec (-138) vs bingocss" — with the market id and side
+ * encoded in the value. That is the whole reason this is an autocomplete rather than two options: a
+ * side option would have to say "a" or "b", which means nothing to anybody, and a separate market
+ * option would let someone pick a market and a side that do not go together.
+ *
+ * Only OPEN markets are offered. A closed one would be refused by placeWager anyway, but offering it
+ * invites the refusal rather than preventing it.
+ */
+export async function handleAutocomplete(i: AutocompleteInteraction): Promise<void> {
+  if (i.commandName !== 'bet' || !i.guildId) {
+    await i.respond([]);
+    return;
+  }
+
+  const leagues = resolveLeagues(i.guildId, i.channelId, null);
+  if ('error' in leagues) {
+    await i.respond([]);
+    return;
+  }
+
+  const typed = i.options.getFocused().toLowerCase();
+  const choices: { name: string; value: string }[] = [];
+
+  for (const league of leagues) {
+    const res = await fetchMarkets(league.leagueId);
+    if (!res.ok) continue;
+    for (const m of res.data.markets) {
+      if (m.status !== 'open') continue;
+      const a = m.nameA ?? 'A';
+      const b = m.nameB ?? 'B';
+      for (const [side, mine, theirs, price] of [
+        ['a', a, b, m.priceA],
+        ['b', b, a, m.priceB],
+      ] as const) {
+        const label = `${mine} (${americanOdds(price)}) vs ${theirs}`;
+        if (typed && !label.toLowerCase().includes(typed)) continue;
+        // Discord caps a choice name at 100 characters and allows 25 choices.
+        choices.push({ name: label.slice(0, 100), value: `${m.marketId}:${side}` });
+      }
+    }
+  }
+
+  await i.respond(choices.slice(0, 25));
+}
+
+async function handleBet(i: ChatInputCommandInteraction): Promise<void> {
+  const pick = i.options.getString('pick', true);
+  const dollars = i.options.getNumber('amount', true);
+
+  const [marketId, side] = pick.split(':');
+  if (!marketId || (side !== 'a' && side !== 'b')) {
+    // Someone typed free text instead of choosing from the list.
+    await i.editReply('Pick one of the suggested options rather than typing your own.');
+    return;
+  }
+
+  /*
+   * Rounded to whole cents HERE, before it leaves the bot. Discord hands back a float, and
+   * 12.50 * 100 is 1250.0000000000002 in binary floating point — passing that on would either be
+   * rejected by the route's integer check or, worse, silently become a fractional cent in a ledger
+   * where everything else is an integer.
+   */
+  const stakeCents = Math.round(dollars * 100);
+
+  const res = await placeBet({ discordUserId: i.user.id, marketId, side, stakeCents });
+  if (!res.ok) {
+    await i.editReply(
+      res.status === 404 && res.error === 'not_linked'
+        ? 'You have not linked a Declan Dollars account yet — ask an admin to run `/admin link`.'
+        : `❌ ${res.error}`,
+    );
+    return;
+  }
+
+  const { toWinCents, balanceCents } = res.data;
+  await i.editReply(
+    `✅ **${money(stakeCents)}** on your pick to win **${money(toWinCents)}**.`
+    + `\nBankroll now ${money(balanceCents)}.`,
+  );
+}
+
 export async function handleInteraction(i: ChatInputCommandInteraction): Promise<void> {
   if (!i.guildId) {
     await i.reply({ content: 'Use these commands in a server, not a DM.', ephemeral: true });
@@ -632,7 +735,12 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
    * and several of these make two network calls (site plus Sleeper). Ephemeral for personal money
    * so a channel does not fill with other people's balances.
    */
-  const personal = i.commandName === 'balance' || i.commandName === 'slips';
+  /*
+   * A placed bet replies privately. The public announcement is the outbox's job, so posting here as
+   * well would double up — and a REFUSAL ("stake exceeds your balance") should never be public.
+   */
+  const personal =
+    i.commandName === 'balance' || i.commandName === 'slips' || i.commandName === 'bet';
   await i.deferReply({ ephemeral: personal || i.commandName === 'admin' });
 
   try {
@@ -641,6 +749,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'balance': return await handleBalance(i);
       case 'slips': return await handleSlips(i);
       case 'markets': return await handleMarkets(i);
+      case 'bet': return await handleBet(i);
       case 'standings': return await handleStandings(i);
       case 'watching': return await handleWatching(i);
       case 'admin': return await handleAdmin(i);
