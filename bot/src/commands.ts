@@ -1,7 +1,11 @@
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   SlashCommandBuilder,
   type APIEmbed,
   type AutocompleteInteraction,
+  type ButtonInteraction,
   type ChatInputCommandInteraction,
   type TextBasedChannel,
 } from 'discord.js';
@@ -499,66 +503,97 @@ async function handleStandings(i: ChatInputCommandInteraction): Promise<void> {
 const OPEN_BETS_PAGE_SIZE = 10;
 
 /**
- * Every open bet in the league, biggest stake first.
+ * Paging buttons.
  *
- * Sorted on STAKE rather than potential return, because that is the interesting question — who has
- * the most riding on this week. Ordering by to-win would put a single longshot above someone with
- * ten times the money at risk.
+ * The whole state needed to re-render lives in the customId, because a button click arrives as a
+ * fresh interaction with no memory of the one that produced the message. Keeping it in a Map keyed by
+ * message id would look tidier and break on every restart — the message stays in the channel long
+ * after the process that posted it is gone.
  *
- * Paginated rather than truncated: a 10-team league mid-week can easily run past 30 open bets, and
- * silently showing the top ten would misreport the league.
+ * Discord caps a customId at 100 characters. `ob:<19-digit league>:<page>:<sort>:<19-digit user>` is
+ * around 50, so there is room, but nothing verbose can go in here.
  */
-async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
-  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
-  if ('error' in resolved) {
-    await i.editReply(resolved.error);
-    return;
-  }
-  // One league per reply: paging across several at once has no sensible page numbering.
-  const league = resolved[0];
-  const page = Math.max(1, i.options.getInteger('page') ?? 1);
+type PageKind = 'ob' | 'bh';
 
-  const res = await fetchLeaderboard(league.leagueId, i.user.id);
+function pageRow(
+  kind: PageKind,
+  leagueId: string,
+  page: number,
+  pages: number,
+  sort: string,
+  userId: string | null,
+): ActionRowBuilder<ButtonBuilder> {
+  const id = (p: number) => [kind, leagueId, String(p), sort, userId ?? ''].join(':');
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(id(page - 1))
+      .setLabel('Prev')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 1),
+    new ButtonBuilder()
+      .setCustomId('noop')
+      .setLabel(`${page}/${pages}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(id(page + 1))
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(page >= pages),
+  );
+}
+
+type Rendered = { embeds: APIEmbed[]; components: ActionRowBuilder<ButtonBuilder>[] };
+
+/**
+ * Resolves a Discord user to the display name the betting data uses.
+ *
+ * Through the same whois the admin command uses, so there is one definition of "who is this" — the
+ * positions carry a Declan Dollars display name, and a Discord nickname is not it.
+ */
+async function bettorNameFor(discordUserId: string): Promise<string | null> {
+  const link = await adminWhois(discordUserId);
+  return link.ok && link.data.linked ? link.data.linked.displayName : null;
+}
+
+/**
+ * Open bets for a league, biggest STAKE first.
+ *
+ * Sorted on stake rather than potential return because the interesting question is who has the most
+ * riding on this week; ordering by to-win would put one longshot above someone with ten times the
+ * money at risk.
+ */
+async function renderOpenBets(args: {
+  leagueId: string;
+  page: number;
+  userId: string | null;
+}): Promise<Rendered | { error: string }> {
+  const res = await fetchLeaderboard(args.leagueId, undefined);
   if (!res.ok) {
-    await i.editReply(
-      res.status === 404
-        ? 'That league does not have Declan Dollars enabled.'
-        : `Could not read open bets: ${res.error}`,
-    );
-    return;
+    return {
+      error:
+        res.status === 404
+          ? 'That league does not have Declan Dollars enabled.'
+          : `Could not read open bets: ${res.error}`,
+    };
   }
 
   let all = [...res.data.openPositions].sort((a, b) => b.stakeCents - a.stakeCents);
 
-  /*
-   * Filtering by a DISCORD user means resolving them to a Declan Dollars account first — the
-   * positions carry a display name, and a Discord nickname is not it. Done through the same whois
-   * the admin command uses, so there is one definition of "who is this".
-   */
-  const who = i.options.getUser('user');
-  if (who) {
-    const link = await adminWhois(who.id);
-    if (!link.ok || !link.data.linked) {
-      await i.editReply(`<@${who.id}> has not linked a Declan Dollars account.`);
-      return;
-    }
-    const name = link.data.linked.displayName;
+  if (args.userId) {
+    const name = await bettorNameFor(args.userId);
+    if (!name) return { error: `<@${args.userId}> has not linked a Declan Dollars account.` };
     all = all.filter(p => p.bettor === name);
     if (all.length === 0) {
-      await i.editReply(`**${name}** has no open bets in ${res.data.league.label}.`);
-      return;
+      return { error: `**${name}** has no open bets in ${res.data.league.label}.` };
     }
   }
 
-  if (all.length === 0) {
-    await i.editReply(`**${res.data.league.label}** — no open bets right now.`);
-    return;
-  }
+  if (all.length === 0) return { error: `**${res.data.league.label}** — no open bets right now.` };
 
-  const pages = Math.ceil(all.length / OPEN_BETS_PAGE_SIZE);
-  const clamped = Math.min(page, pages);
-  const start = (clamped - 1) * OPEN_BETS_PAGE_SIZE;
-  const rows = all.slice(start, start + OPEN_BETS_PAGE_SIZE);
+  const pages = Math.max(1, Math.ceil(all.length / OPEN_BETS_PAGE_SIZE));
+  const page = Math.min(Math.max(1, args.page), pages);
+  const rows = all.slice((page - 1) * OPEN_BETS_PAGE_SIZE, page * OPEN_BETS_PAGE_SIZE);
 
   /*
    * Narrow columns on purpose. A wide aligned table is what wrapped and broke the first markets
@@ -576,10 +611,9 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
       + padLeft(bare(r.stakeCents), 8)
       + padLeft(bare(r.toWinCents), 8)
       /*
-       * Mark-to-market value at the CURRENT line, which is the only column here that moves during a
-       * slate — stake and win were both fixed at placement. Null when the market has not been
-       * re-priced since the bet was struck, shown as a dash rather than as the stake, which would
-       * read as "no movement" when the truth is "not known".
+       * Mark-to-market value at the CURRENT line, the only column here that moves during a slate —
+       * stake and win were both fixed at placement. Null shows as a dash rather than the stake, which
+       * would read as "no movement" when the truth is "not known".
        */
       + padLeft(r.valueCents == null ? '—' : bare(r.valueCents), 8),
     );
@@ -587,86 +621,74 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
 
   const atRisk = all.reduce((n, r) => n + r.stakeCents, 0);
   const nowWorth = all.reduce((n, r) => n + (r.valueCents ?? r.stakeCents), 0);
-  await i.editReply({
+
+  return {
     embeds: [{
-      title:
-        `${res.data.league.label} — open bets`
-        + (who ? ` · ${who.displayName}` : ''),
+      title: `${res.data.league.label} — open bets`,
       description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
       color: 0xfee75c,
       footer: {
         text:
-          `page ${clamped}/${pages} · ${all.length} open · ${money(atRisk)} staked`
-          + ` · now worth ${money(nowWorth)}`
-          + ' · Declan Dollars · now = value at the current line'
-          + (pages > 1 ? ` · /openbets page:${clamped === pages ? 1 : clamped + 1}` : ''),
+          `${all.length} open · ${money(atRisk)} staked · now worth ${money(nowWorth)}`
+          + ' · Declan Dollars · now = value at the current line',
       },
     }],
-  });
+    components: [pageRow('ob', args.leagueId, page, pages, 'stake', args.userId)],
+  };
 }
 
 /**
- * Settled bets — what actually happened.
+ * Settled bets.
  *
- * A separate command from /openbets rather than a flag on it, because the two answer different
- * questions and want different columns: an open bet has a potential return, a settled one has a
- * result. Sharing one command would mean a "win" column that is a projection half the time.
+ * A separate view from open bets rather than a flag on it, because the two want different columns: an
+ * open bet has a potential return, a settled one has a result.
  */
-async function handleBetHistory(i: ChatInputCommandInteraction): Promise<void> {
-  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
-  if ('error' in resolved) {
-    await i.editReply(resolved.error);
-    return;
-  }
-  const league = resolved[0];
-  const sort = i.options.getString('sort') ?? 'time';
-  const page = Math.max(1, i.options.getInteger('page') ?? 1);
-
-  const res = await fetchHistory(league.leagueId, 200);
+async function renderBetHistory(args: {
+  leagueId: string;
+  page: number;
+  sort: string;
+  userId: string | null;
+}): Promise<Rendered | { error: string }> {
+  const res = await fetchHistory(args.leagueId, 200);
   if (!res.ok) {
-    await i.editReply(
-      res.status === 404
-        ? 'That league does not have Declan Dollars enabled.'
-        : `Could not read history: ${res.error}`,
-    );
-    return;
+    return {
+      error:
+        res.status === 404
+          ? 'That league does not have Declan Dollars enabled.'
+          : `Could not read history: ${res.error}`,
+    };
   }
 
   let bets = [...res.data.bets];
-
-  const who = i.options.getUser('user');
-  if (who) {
-    const link = await adminWhois(who.id);
-    if (!link.ok || !link.data.linked) {
-      await i.editReply(`<@${who.id}> has not linked a Declan Dollars account.`);
-      return;
-    }
-    bets = bets.filter(b => b.bettor === link.data.linked!.displayName);
+  let whoName: string | null = null;
+  if (args.userId) {
+    whoName = await bettorNameFor(args.userId);
+    if (!whoName) return { error: `<@${args.userId}> has not linked a Declan Dollars account.` };
+    bets = bets.filter(b => b.bettor === whoName);
   }
 
   if (bets.length === 0) {
-    await i.editReply(
-      who
-        ? `No settled bets for <@${who.id}> in ${res.data.league.label}.`
+    return {
+      error: whoName
+        ? `No settled bets for **${whoName}** in ${res.data.league.label}.`
         : `**${res.data.league.label}** — nothing has settled yet.`,
-    );
-    return;
+    };
   }
 
   /*
-   * The API already returns newest-first, so 'time' needs no sort at all — re-sorting on a nullable
-   * settled_at would be less reliable than the SQL ordering, which also breaks ties on id.
+   * 'time' does no sort at all — the SQL already returns newest-first and breaks ties on id, which is
+   * more reliable than re-sorting a nullable settled_at.
    */
-  if (sort === 'amount') {
+  if (args.sort === 'amount') {
     bets.sort((a, b) => b.stakeCents - a.stakeCents);
-  } else if (sort === 'user') {
-    // Grouped by person, then biggest first within each, so one manager's week reads as a block.
+  } else if (args.sort === 'user') {
+    // Grouped by person, biggest first within each, so one manager's week reads as a block.
     bets.sort((a, b) => a.bettor.localeCompare(b.bettor) || b.stakeCents - a.stakeCents);
   }
 
-  const pages = Math.ceil(bets.length / OPEN_BETS_PAGE_SIZE);
-  const clamped = Math.min(page, pages);
-  const rows = bets.slice((clamped - 1) * OPEN_BETS_PAGE_SIZE, clamped * OPEN_BETS_PAGE_SIZE);
+  const pages = Math.max(1, Math.ceil(bets.length / OPEN_BETS_PAGE_SIZE));
+  const page = Math.min(Math.max(1, args.page), pages);
+  const rows = bets.slice((page - 1) * OPEN_BETS_PAGE_SIZE, page * OPEN_BETS_PAGE_SIZE);
 
   const mark = (status: string) =>
     status === 'won' ? 'W' : status === 'lost' ? 'L' : status === 'void' ? '—' : '?';
@@ -687,20 +709,87 @@ async function handleBetHistory(i: ChatInputCommandInteraction): Promise<void> {
   const won = bets.filter(b => b.status === 'won').length;
   const lost = bets.filter(b => b.status === 'lost').length;
 
-  await i.editReply({
+  return {
     embeds: [{
-      title:
-        `${res.data.league.label} — bet history`
-        + (who ? ` · ${who.displayName}` : ''),
+      title: `${res.data.league.label} — bet history` + (whoName ? ` · ${whoName}` : ''),
       description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
       color: 0x99aab5,
       footer: {
-        text:
-          `page ${clamped}/${pages} · sorted by ${sort} · ${won}-${lost}`
-          + ` · net ${money(net)} · Declan Dollars`,
+        text: `sorted by ${args.sort} · ${won}-${lost} · net ${money(net)} · Declan Dollars`,
       },
     }],
+    components: [pageRow('bh', args.leagueId, page, pages, args.sort, args.userId)],
+  };
+}
+
+async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in resolved) {
+    await i.editReply(resolved.error);
+    return;
+  }
+  // One league per reply: paging across several at once has no sensible page numbering.
+  const out = await renderOpenBets({
+    leagueId: resolved[0].leagueId,
+    page: Math.max(1, i.options.getInteger('page') ?? 1),
+    userId: i.options.getUser('user')?.id ?? null,
   });
+  if ('error' in out) {
+    await i.editReply(out.error);
+    return;
+  }
+  await i.editReply(out);
+}
+
+async function handleBetHistory(i: ChatInputCommandInteraction): Promise<void> {
+  const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
+  if ('error' in resolved) {
+    await i.editReply(resolved.error);
+    return;
+  }
+  const out = await renderBetHistory({
+    leagueId: resolved[0].leagueId,
+    page: Math.max(1, i.options.getInteger('page') ?? 1),
+    sort: i.options.getString('sort') ?? 'time',
+    userId: i.options.getUser('user')?.id ?? null,
+  });
+  if ('error' in out) {
+    await i.editReply(out.error);
+    return;
+  }
+  await i.editReply(out);
+}
+
+/**
+ * A paging button was clicked.
+ *
+ * Updates the existing message rather than posting a new one, so a channel does not fill with pages.
+ * Anyone may click: these are public league boards, and restricting them to whoever ran the command
+ * would be more surprising than sharing them.
+ */
+export async function handlePageButton(i: ButtonInteraction): Promise<void> {
+  if (i.customId === 'noop') {
+    await i.deferUpdate();
+    return;
+  }
+  const [kind, leagueId, rawPage, sort, rawUser] = i.customId.split(':');
+  if (kind !== 'ob' && kind !== 'bh') return;
+
+  await i.deferUpdate();
+
+  const page = Number(rawPage);
+  const userId = rawUser || null;
+  const out =
+    kind === 'ob'
+      ? await renderOpenBets({ leagueId, page, userId })
+      : await renderBetHistory({ leagueId, page, sort: sort || 'time', userId });
+
+  if ('error' in out) {
+    // Ephemeral, so a transient failure does not overwrite a board other people are reading.
+    await i.followUp({ content: out.error, ephemeral: true }).catch(() => undefined);
+    return;
+  }
+  await i.editReply(out).catch(err => console.error('[bot] page update failed', err));
 }
 
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {

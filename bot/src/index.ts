@@ -6,7 +6,12 @@ import {
   type TextChannel,
 } from 'discord.js';
 import playerIndex from '../../data/player_index.json';
-import { commandDefinitions, handleAutocomplete, handleInteraction } from './commands';
+import {
+  commandDefinitions,
+  handleAutocomplete,
+  handleInteraction,
+  handlePageButton,
+} from './commands';
 import { formatTransaction, type ManagerNames, type PlayerLookup } from './formatTransaction';
 import { formatBetEvent } from './betEventStream';
 import { fetchBetEvents, fetchLatestEventId } from './siteApi';
@@ -279,6 +284,14 @@ async function main(): Promise<void> {
     if (interaction.isAutocomplete()) {
       await handleAutocomplete(interaction).catch(err => {
         console.error('[bot] autocomplete failed', err);
+      });
+      return;
+    }
+    // Paging buttons arrive as their own interaction type, and must be acknowledged within three
+    // seconds or Discord shows "This interaction failed" regardless of what happens after.
+    if (interaction.isButton()) {
+      await handlePageButton(interaction).catch(err => {
+        console.error('[bot] button failed', err);
       });
       return;
     }
