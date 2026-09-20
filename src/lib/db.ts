@@ -158,6 +158,40 @@ function initDb(database: Database.Database): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    /*
+     * Append-only outbox of things that HAPPENED to a bet, for anything watching from outside.
+     *
+     * A watcher (the Discord bot) must not poll wagers and diff it. Diffing cannot distinguish
+     * "this wager just settled" from "this wager settled an hour ago while I was restarting", and
+     * it cannot see an event that was superseded before the next poll. An event row written inside
+     * the SAME transaction as the state change is exactly consistent with it: if the wager exists,
+     * so does its event, and a reader with a cursor can never miss one.
+     *
+     * INTEGER PRIMARY KEY AUTOINCREMENT here, against the UUID convention used everywhere else in
+     * this file, because this is the one table where MONOTONIC ORDERING is the point -- it is what
+     * a cursor reads against. A UUID gives no ordering, so a reader could not ask for "everything
+     * after 41" without a separate sequence column doing the same job less well.
+     *
+     * discord_message_id lets settlement EDIT the original placement message rather than posting a
+     * second one, so a bet's whole lifecycle stays in one place in the channel.
+     */
+    CREATE TABLE IF NOT EXISTS bet_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      -- wager_placed | market_settled | wager_won | wager_lost | wager_void | line_moved
+      type TEXT NOT NULL,
+      league_id TEXT NOT NULL,
+      season INTEGER NOT NULL,
+      week INTEGER NOT NULL,
+      -- The wager or market this is about, so a reader can join back without parsing payload.
+      ref_id TEXT,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      discord_message_id TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bet_events_cursor ON bet_events(id);
+    CREATE INDEX IF NOT EXISTS idx_bet_events_ref ON bet_events(ref_id);
+
     CREATE INDEX IF NOT EXISTS idx_plays_week ON nfl_plays(season, week, sequence);
     CREATE INDEX IF NOT EXISTS idx_plays_game ON nfl_plays(game_id, sequence);
     CREATE INDEX IF NOT EXISTS idx_plays_seen ON nfl_plays(first_seen_at);

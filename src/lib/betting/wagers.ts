@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
+import { recordBetEvent } from '@/lib/betting/events';
 import { NEGATIVE_OPEN_EXPOSURE_CAP_CENTS } from '@/lib/betting/constants';
 import {
   MARKET_CLOSE_MINUTES, outcomeInDoubt, profitForStake,
@@ -24,6 +25,13 @@ export type MarketRow = {
   status: string;
   winner: string | null;
   remaining_minutes: number;
+  /**
+   * Manager names frozen at pricing time. Added to the table by addColumnIfMissing, so they are
+   * nullable for any row written before that migration — every SELECT * returns them, and leaving
+   * them off this type is why an event payload could not name the sides.
+   */
+  name_a: string | null;
+  name_b: string | null;
 };
 
 export type WagerRow = {
@@ -211,6 +219,26 @@ export function placeWager(
         .get(accountId, market.league_id) as { balance_cents: number }
     ).balance_cents;
 
+    /*
+     * Inside this transaction on purpose. If the ledger write above rolls back, the event rolls
+     * back with it, so a watcher can never announce a bet that does not exist. Writing it after
+     * the transaction committed would be the same race the outbox pattern exists to avoid.
+     */
+    recordBetEvent(db, {
+      type: 'wager_placed',
+      leagueId: market.league_id,
+      season: market.season,
+      week: market.week,
+      refId: wagerId,
+      payload: {
+        accountId,
+        stakeCents,
+        toWinCents: toWin,
+        balanceCents: after,
+        legs: [{ marketId, side, price, nameA: market.name_a, nameB: market.name_b }],
+      },
+    });
+
     return { ok: true, wagerId, balanceCents: after, toWinCents: toWin };
   });
 
@@ -259,6 +287,21 @@ export function settleFinishedMarkets(
       ).run(winner, score.a, score.b, market.id);
       settled++;
 
+      recordBetEvent(db, {
+        type: 'market_settled',
+        leagueId: market.league_id,
+        season: market.season,
+        week: market.week,
+        refId: market.id,
+        payload: {
+          winner,
+          finalA: score.a,
+          finalB: score.b,
+          nameA: market.name_a,
+          nameB: market.name_b,
+        },
+      });
+
       const wagers = db
         .prepare(`SELECT * FROM wagers WHERE market_id = ? AND status = 'open'`)
         .all(market.id) as WagerRow[];
@@ -270,6 +313,20 @@ export function settleFinishedMarkets(
           ).run(w.id);
           credit(db, w.account_id, market.league_id, w.stake_cents, 'wager_void', w.id);
           paid += w.stake_cents;
+          recordBetEvent(db, {
+            type: 'wager_void',
+            leagueId: market.league_id,
+            season: market.season,
+            week: market.week,
+            refId: w.id,
+            payload: {
+              accountId: w.account_id,
+              marketId: market.id,
+              stakeCents: w.stake_cents,
+              refundedCents: w.stake_cents,
+              reason: 'tie',
+            },
+          });
           continue;
         }
         if (w.side === winner) {
@@ -279,12 +336,40 @@ export function settleFinishedMarkets(
           ).run(w.id);
           credit(db, w.account_id, market.league_id, payout, 'wager_win', w.id);
           paid += payout;
+          recordBetEvent(db, {
+            type: 'wager_won',
+            leagueId: market.league_id,
+            season: market.season,
+            week: market.week,
+            refId: w.id,
+            payload: {
+              accountId: w.account_id,
+              marketId: market.id,
+              stakeCents: w.stake_cents,
+              payoutCents: payout,
+              profitCents: w.to_win_cents,
+              side: w.side,
+            },
+          });
         } else {
           // The stake already left the balance at placement, so a loss is just a
           // status change — no second debit, or it would be charged twice.
           db.prepare(
             `UPDATE wagers SET status = 'lost', settled_at = datetime('now') WHERE id = ?`,
           ).run(w.id);
+          recordBetEvent(db, {
+            type: 'wager_lost',
+            leagueId: market.league_id,
+            season: market.season,
+            week: market.week,
+            refId: w.id,
+            payload: {
+              accountId: w.account_id,
+              marketId: market.id,
+              stakeCents: w.stake_cents,
+              side: w.side,
+            },
+          });
         }
       }
     }
