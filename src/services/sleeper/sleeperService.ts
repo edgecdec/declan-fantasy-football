@@ -213,6 +213,59 @@ export type SleeperTransaction = {
   } | null;
 };
 
+/**
+ * In-flight requests for whole-week data, keyed by cache key.
+ *
+ * The stats and projections endpoints return EVERY player for a week — a megabyte or two each — and
+ * they are the same response for every league. The cache alone does not help, because it is checked
+ * before the fetch and nothing populates it until a fetch finishes: twenty leagues priced
+ * concurrently all miss, and all issue their own request.
+ *
+ * Measured on a real /week load before this: 146 Sleeper calls, of which 39 were the SAME stats URL
+ * and 20 the same projections URL, totalling 17 MB. Firefox eventually gave up on them with
+ * "NetworkError when attempting to fetch resource", which is what left the page stuck on LOADING.
+ *
+ * Sharing the PROMISE rather than the result is the fix: the second caller through the door awaits
+ * the first one's request instead of starting another.
+ */
+const inFlightWeekFetches = new Map<string, Promise<SleeperWeeklyProjections>>();
+
+async function sharedWeekFetch(
+  cacheKey: string,
+  url: string,
+  ttlMs: number,
+  label: string,
+): Promise<SleeperWeeklyProjections> {
+  const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');
+  if (cached) return cached;
+
+  const existing = inFlightWeekFetches.get(cacheKey);
+  if (existing) return existing;
+
+  const request = (async (): Promise<SleeperWeeklyProjections> => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return {};
+      const data: Record<string, SleeperProjection> = await res.json();
+      CacheService.set(cacheKey, data, { storage: 'session', ttl: ttlMs });
+      return data;
+    } catch (e) {
+      console.error(`Error fetching ${label}`, e);
+      return {};
+    } finally {
+      /*
+       * Cleared whatever happened. Leaving a settled promise here would make a FAILED fetch
+       * permanent for the life of the page — every later caller would get the same empty object and
+       * no retry would ever be attempted.
+       */
+      inFlightWeekFetches.delete(cacheKey);
+    }
+  })();
+
+  inFlightWeekFetches.set(cacheKey, request);
+  return request;
+}
+
 export const SleeperService = {
   async getNflState(): Promise<SleeperNflState | null> {
     const cacheKey = 'nfl_state';
@@ -721,37 +774,22 @@ export const SleeperService = {
    * would freeze a defence's correction mid-slate.
    */
   async getWeeklyStats(season: string, week: number): Promise<SleeperWeeklyProjections> {
-    const cacheKey = `stats_${season}_${week}`;
-    const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');
-    if (cached) return cached;
-
-    try {
-      const res = await fetch(`${BASE_URL}/stats/nfl/regular/${season}/${week}`);
-      if (!res.ok) return {};
-      const data: Record<string, SleeperProjection> = await res.json();
-      CacheService.set(cacheKey, data, { storage: 'session', ttl: 1000 * 60 });
-      return data;
-    } catch (e) {
-      console.error(`Error fetching stats for ${season} week ${week}`, e);
-      return {};
-    }
+    return sharedWeekFetch(
+      `stats_${season}_${week}`,
+      `${BASE_URL}/stats/nfl/regular/${season}/${week}`,
+      // 60s, not the hour projections get: this is live in-game data, and a stale value here would
+      // freeze a defence's correction mid-slate.
+      1000 * 60,
+      `stats for ${season} week ${week}`,
+    );
   },
 
   async getWeeklyProjections(season: string, week: number): Promise<SleeperWeeklyProjections> {
-    const cacheKey = `projections_${season}_${week}`;
-    const cached = CacheService.get<SleeperWeeklyProjections>(cacheKey, 'session');
-    if (cached) return cached;
-
-    try {
-      const res = await fetch(`${BASE_URL}/projections/nfl/regular/${season}/${week}`);
-      if (!res.ok) return {};
-      const data: Record<string, SleeperProjection> = await res.json();
-      // API returns { player_id: { stat: value, ... } } directly
-      CacheService.set(cacheKey, data, { storage: 'session', ttl: 1000 * 60 * 60 });
-      return data;
-    } catch (e) {
-      console.error(`Error fetching projections for ${season} week ${week}`, e);
-      return {};
-    }
+    return sharedWeekFetch(
+      `projections_${season}_${week}`,
+      `${BASE_URL}/projections/nfl/regular/${season}/${week}`,
+      1000 * 60 * 60,
+      `projections for ${season} week ${week}`,
+    );
   }
 };
