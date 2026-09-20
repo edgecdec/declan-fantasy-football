@@ -16,6 +16,7 @@ import {
   pruneToWeek,
   seed,
   takeNew,
+  pingRoleFor,
   wantsTransaction,
 } from './transactionStream';
 
@@ -133,9 +134,21 @@ async function pollTransactions(client: Client): Promise<void> {
       }
       for (const tx of wanted) {
         const msg = formatTransaction(tx, names, PLAYERS, sub.leagueName);
+        const pingRole = pingRoleFor(sub, tx);
         try {
           await (channel as TextChannel).send({
+            content: pingRole ? `<@&${pingRole}>` : undefined,
             embeds: [{ title: msg.title, description: msg.lines.join('\n'), color: msg.colour }],
+            /*
+             * allowed_mentions is set explicitly, and set NARROWLY. Default behaviour would honour
+             * any mention the message happens to contain; naming exactly the one role means a
+             * league name or player name that looks like a mention can never notify anybody.
+             *
+             * Note this permits rather than guarantees: Discord still requires either the role to be
+             * mentionable or the bot to hold Mention Everyone. /admin pingrole checks and says so,
+             * because a ping that silently fails to notify is worse than no ping.
+             */
+            allowedMentions: pingRole ? { roles: [pingRole] } : { parse: [] },
           });
         } catch (err) {
           console.error('[bot] send failed', err);

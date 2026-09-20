@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getBotDb } from '../bot/src/botDb';
 import {
   DEFAULT_EVENT_TYPES,
   allSubscriptions,
+  clearPingRoles,
+  setPingRole,
   leaguesToPoll,
   setEventTypes,
   setIncludeFailed,
@@ -111,4 +114,52 @@ test('a negative FAAB floor is clamped, not stored', () => {
   watchLeague({ guildId: 'guild-f', channelId: 'c', leagueId: 'league-f' });
   setMinFaab('guild-f', 'league-f', -5);
   assert.equal(subscription('guild-f', 'league-f')!.minFaab, 0);
+});
+
+test('a ping role is stored per event type, and cleared independently', () => {
+  watchLeague({ guildId: 'guild-p', channelId: 'c', leagueId: 'league-p' });
+
+  setPingRole('guild-p', 'league-p', 'trade', 'role-trade');
+  setPingRole('guild-p', 'league-p', 'chopped', 'role-chop');
+  assert.deepEqual(subscription('guild-p', 'league-p')!.pingRoles, {
+    trade: 'role-trade',
+    chopped: 'role-chop',
+  });
+
+  // Clearing one leaves the other alone — the whole point of a per-type map.
+  setPingRole('guild-p', 'league-p', 'trade', null);
+  assert.deepEqual(subscription('guild-p', 'league-p')!.pingRoles, { chopped: 'role-chop' });
+
+  clearPingRoles('guild-p', 'league-p');
+  assert.deepEqual(subscription('guild-p', 'league-p')!.pingRoles, {});
+});
+
+test('setting a ping role on an unwatched league fails rather than creating one', () => {
+  assert.equal(setPingRole('guild-p', 'league-nonexistent', 'trade', 'r'), false);
+});
+
+test('a new binding pings nobody until asked', () => {
+  const sub = watchLeague({ guildId: 'guild-q', channelId: 'c', leagueId: 'league-q' });
+  assert.deepEqual(sub.pingRoles, {}, 'silence is the default');
+});
+
+test('ping roles survive a channel move', () => {
+  watchLeague({ guildId: 'guild-r', channelId: 'c1', leagueId: 'league-r' });
+  setPingRole('guild-r', 'league-r', 'trade', 'role-keep');
+  watchLeague({ guildId: 'guild-r', channelId: 'c2', leagueId: 'league-r' });
+
+  const sub = subscription('guild-r', 'league-r')!;
+  assert.equal(sub.channelId, 'c2');
+  assert.deepEqual(sub.pingRoles, { trade: 'role-keep' }, 'moving a channel is not a reset');
+});
+
+test('an unknown type in a stored ping map is ignored', () => {
+  watchLeague({ guildId: 'guild-s', channelId: 'c', leagueId: 'league-s' });
+  setPingRole('guild-s', 'league-s', 'trade', 'role-ok');
+  // Simulates a map written by a future build that knew a type this one does not.
+  getBotDb()
+    .prepare('UPDATE guild_subscriptions SET ping_roles = ? WHERE guild_id = ? AND league_id = ?')
+    .run(JSON.stringify({ trade: 'role-ok', teleport: 'role-bad' }), 'guild-s', 'league-s');
+
+  assert.deepEqual(subscription('guild-s', 'league-s')!.pingRoles, { trade: 'role-ok' });
 });

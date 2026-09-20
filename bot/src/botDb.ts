@@ -72,6 +72,32 @@ function initBotDb(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_subs_league ON guild_subscriptions(league_id);
   `);
+
+  /*
+   * Additive migrations, same approach as src/lib/db.ts. CREATE TABLE IF NOT EXISTS does nothing to
+   * a table that already exists, so a new column on a live binding has to be added explicitly or it
+   * silently will not be there.
+   */
+  /*
+   * JSON map of transaction type -> role id, so a league can ping one role for trades and a
+   * different one (or nobody) for waivers. A single role column plus a list of types could not
+   * express that, and "one role per league-event-type combo" is the actual requirement.
+   *
+   * A map rather than its own table: it is at most five entries, it is never queried BY role, and it
+   * is read and written whole alongside the rest of the binding.
+   */
+  addColumnIfMissing(database, 'guild_subscriptions', 'ping_roles', 'TEXT');
+}
+
+function addColumnIfMissing(
+  database: Database.Database,
+  table: string,
+  column: string,
+  type: string,
+): void {
+  const cols = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (cols.some(c => c.name === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 /** Test seam: drops the handle so a fresh path is picked up. */

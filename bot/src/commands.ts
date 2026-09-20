@@ -6,8 +6,10 @@ import {
 import { adminRefusalReason, canAdminGuild } from './permissions';
 import {
   DEFAULT_EVENT_TYPES,
+  SUGGESTED_PING_TYPES,
   TRANSACTION_TYPES,
   setEventTypes,
+  setPingRole,
   setIncludeFailed,
   setMinFaab,
   subscription,
@@ -98,6 +100,34 @@ export const commandDefinitions = [
         .setDescription('Hide waiver claims under this FAAB amount')
         .addStringOption(o => o.setName('league').setDescription('Sleeper league id').setRequired(true))
         .addIntegerOption(o => o.setName('amount').setDescription('0 posts everything').setRequired(true)),
+    )
+    .addSubcommand(s =>
+      s
+        .setName('pingrole')
+        .setDescription('Mention one of your existing roles when an event happens')
+        .addStringOption(o => o.setName('league').setDescription('Sleeper league id').setRequired(true))
+        .addStringOption(o =>
+          o
+            .setName('type')
+            .setDescription('Which event pings this role')
+            .setRequired(true)
+            .addChoices(
+              { name: 'trade', value: 'trade' },
+              { name: 'waiver', value: 'waiver' },
+              { name: 'free_agent (add/drop)', value: 'free_agent' },
+              { name: 'commissioner', value: 'commissioner' },
+              { name: 'chopped (elimination)', value: 'chopped' },
+            ),
+        )
+        .addRoleOption(o =>
+          o.setName('role').setDescription('An existing role — leave empty to stop pinging'),
+        ),
+    )
+    .addSubcommand(s =>
+      s
+        .setName('pings')
+        .setDescription('Show which roles get pinged for what')
+        .addStringOption(o => o.setName('league').setDescription('Sleeper league id').setRequired(true)),
     )
     .addSubcommand(s =>
       s
@@ -296,11 +326,17 @@ async function handleWatching(i: ChatInputCommandInteraction): Promise<void> {
     await i.editReply('Not watching any leagues. An admin can run `/admin watch`.');
     return;
   }
-  const lines = subs.map(s =>
-    `<#${s.channelId}> ← \`${s.leagueId}\`${s.leagueName ? ` (${s.leagueName})` : ''}`
-    + `\n   types: ${s.eventTypes.join(', ')}`
-    + `${s.includeFailed ? ' · incl. failed' : ''}${s.minFaab ? ` · min $${s.minFaab}` : ''}`,
-  );
+  const lines = subs.map(s => {
+    const pings = Object.entries(s.pingRoles);
+    return `<#${s.channelId}> ← \`${s.leagueId}\`${s.leagueName ? ` (${s.leagueName})` : ''}`
+      + `\n   types: ${s.eventTypes.join(', ')}`
+      + `${s.includeFailed ? ' · incl. failed' : ''}${s.minFaab ? ` · min $${s.minFaab}` : ''}`
+      // Shown here as well as in /admin pings, because "why did nobody get pinged" is answered by
+      // seeing at a glance that nothing is configured.
+      + (pings.length
+        ? `\n   pings: ${pings.map(([t, r]) => `${t} → <@&${r}>`).join(', ')}`
+        : '\n   pings: none');
+  });
   await i.editReply(lines.join('\n').slice(0, MAX_BODY));
 }
 
@@ -392,6 +428,63 @@ async function handleAdmin(i: ChatInputCommandInteraction): Promise<void> {
       setMinFaab(guildId, leagueId, amount)
         ? `Hiding waiver claims under $${Math.max(0, amount)} for \`${leagueId}\`.`
         : `This server is not watching \`${leagueId}\`.`,
+    );
+    return;
+  }
+
+  if (sub === 'pingrole') {
+    const leagueId = i.options.getString('league', true).trim();
+    const type = i.options.getString('type', true) as TransactionType;
+    // A role OPTION, so Discord shows a picker of roles that already exist in the server. The bot
+    // never creates or manages roles — it only mentions the one it is pointed at.
+    const role = i.options.getRole('role');
+
+    if (!setPingRole(guildId, leagueId, type, role?.id ?? null)) {
+      await i.editReply(`This server is not watching \`${leagueId}\`.`);
+      return;
+    }
+    if (!role) {
+      await i.editReply(`No longer pinging anyone for **${type}**.`);
+      return;
+    }
+
+    /*
+     * Warn when the ping would post but not notify. Discord only delivers a role mention from a bot
+     * if the role is mentionable or the bot holds Mention Everyone, and our invite deliberately does
+     * not include that permission. A ping that silently fails to notify is worse than no ping,
+     * because nobody finds out until they miss a trade.
+     */
+    const mentionable = 'mentionable' in role ? Boolean(role.mentionable) : false;
+    const botCanMentionAll = i.guild?.members.me?.permissions.has('MentionEveryone') ?? false;
+    const willNotify = mentionable || botCanMentionAll;
+
+    await i.editReply(
+      `Pinging <@&${role.id}> for **${type}** in \`${leagueId}\`.`
+      + (willNotify
+        ? ''
+        : `\n\n⚠️ That role is **not mentionable**, so the mention will appear but nobody will be`
+          + ` notified. Either tick *Allow anyone to @mention this role* in the role settings, or`
+          + ` give me the *Mention @everyone, @here and All Roles* permission.`)
+      + (type === 'free_agent' || type === 'waiver'
+        ? `\n\nNote: that type fired ~34 times per league-week in real data. Expect a lot of pings.`
+        : ''),
+    );
+    return;
+  }
+
+  if (sub === 'pings') {
+    const leagueId = i.options.getString('league', true).trim();
+    const existing = subscription(guildId, leagueId);
+    if (!existing) {
+      await i.editReply(`This server is not watching \`${leagueId}\`.`);
+      return;
+    }
+    const entries = Object.entries(existing.pingRoles);
+    await i.editReply(
+      entries.length === 0
+        ? `No roles are pinged for \`${leagueId}\`. Suggested: ${SUGGESTED_PING_TYPES.join(', ')}.`
+        : `**Pings for \`${leagueId}\`**\n`
+          + entries.map(([t, r]) => `${t} → <@&${r}>`).join('\n'),
     );
     return;
   }

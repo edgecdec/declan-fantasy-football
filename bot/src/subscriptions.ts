@@ -37,6 +37,16 @@ export const DEFAULT_EVENT_TYPES: TransactionType[] = [
   'chopped',
 ];
 
+/**
+ * Types worth pinging a role for, if someone asks for "all".
+ *
+ * DELIBERATELY NOT every type. Measured across 810 real transactions: free_agent is 419 of them and
+ * waiver 362, around 34 per league-week — a role pinged that often is indistinguishable from spam,
+ * and the first thing anyone does is mute the channel, which loses the notifications altogether.
+ * Trades (~0.7 per league-week) and eliminations (~1) are what people actually want interrupting.
+ */
+export const SUGGESTED_PING_TYPES: TransactionType[] = ['trade', 'chopped'];
+
 export type Subscription = {
   guildId: string;
   channelId: string;
@@ -45,6 +55,13 @@ export type Subscription = {
   eventTypes: TransactionType[];
   includeFailed: boolean;
   minFaab: number;
+  /**
+   * Which role to mention, per transaction type. A type absent from the map never pings.
+   *
+   * One role per (league, type) so trades can wake the league while waiver churn stays silent — and
+   * so two different roles can care about two different things in the same league.
+   */
+  pingRoles: Partial<Record<TransactionType, string>>;
 };
 
 type Row = {
@@ -55,23 +72,52 @@ type Row = {
   event_types: string;
   include_failed: number;
   min_faab: number;
+  ping_roles: string | null;
 };
 
-function hydrate(row: Row): Subscription {
-  let eventTypes: TransactionType[] = [...DEFAULT_EVENT_TYPES];
+/** Parses a stored JSON type array, keeping only types this build understands. */
+function parseStoredTypes(raw: string | null, fallback: TransactionType[]): TransactionType[] {
+  if (raw == null) return [...fallback];
   try {
-    const parsed = JSON.parse(row.event_types) as unknown;
-    if (Array.isArray(parsed)) {
-      // Filtered against the known list rather than trusted: a type this build does not understand
-      // would otherwise sit in the set forever, silently matching nothing.
-      eventTypes = parsed.filter((t): t is TransactionType =>
-        (TRANSACTION_TYPES as readonly string[]).includes(t as string),
-      );
-    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [...fallback];
+    // Filtered rather than trusted: a type this build does not understand would otherwise sit in the
+    // set forever, silently matching nothing.
+    return parsed.filter((t): t is TransactionType =>
+      (TRANSACTION_TYPES as readonly string[]).includes(t as string),
+    );
   } catch {
-    // A malformed row falls back to the defaults rather than dropping the subscription. Losing a
-    // binding is worse than posting slightly more than asked.
+    // A malformed row falls back rather than dropping the subscription. Losing a binding is worse
+    // than posting slightly more than asked.
+    return [...fallback];
   }
+}
+
+/**
+ * Parses the stored type -> role map.
+ *
+ * Unknown types are dropped for the same reason event types are: a key this build does not
+ * understand would sit there forever matching nothing. A non-string value is dropped rather than
+ * coerced, since a role id is always a snowflake string.
+ */
+function parsePingRoles(raw: string | null): Partial<Record<TransactionType, string>> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Partial<Record<TransactionType, string>> = {};
+    for (const [type, roleId] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!(TRANSACTION_TYPES as readonly string[]).includes(type)) continue;
+      if (typeof roleId === 'string' && roleId) out[type as TransactionType] = roleId;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function hydrate(row: Row): Subscription {
+  const eventTypes = parseStoredTypes(row.event_types, DEFAULT_EVENT_TYPES);
   return {
     guildId: row.guild_id,
     channelId: row.channel_id,
@@ -80,6 +126,7 @@ function hydrate(row: Row): Subscription {
     eventTypes,
     includeFailed: row.include_failed === 1,
     minFaab: row.min_faab,
+    pingRoles: parsePingRoles(row.ping_roles),
   };
 }
 
@@ -176,6 +223,40 @@ export function setIncludeFailed(guildId: string, leagueId: string, include: boo
   const info = getBotDb()
     .prepare('UPDATE guild_subscriptions SET include_failed = ? WHERE guild_id = ? AND league_id = ?')
     .run(include ? 1 : 0, guildId, leagueId);
+  return info.changes > 0;
+}
+
+/**
+ * Sets, or with a null role clears, the ping for ONE transaction type.
+ *
+ * Read-modify-write of the whole map. Safe because better-sqlite3 is synchronous and the bot is a
+ * single process, so there is no interleaving to lose an update to — and it keeps the map's shape in
+ * one place rather than spread across SQL JSON functions.
+ */
+export function setPingRole(
+  guildId: string,
+  leagueId: string,
+  type: TransactionType,
+  roleId: string | null,
+): boolean {
+  const existing = subscription(guildId, leagueId);
+  if (!existing) return false;
+
+  const next = { ...existing.pingRoles };
+  if (roleId) next[type] = roleId;
+  else delete next[type];
+
+  getBotDb()
+    .prepare('UPDATE guild_subscriptions SET ping_roles = ? WHERE guild_id = ? AND league_id = ?')
+    .run(JSON.stringify(next), guildId, leagueId);
+  return true;
+}
+
+/** Clears every ping for a league in one go. */
+export function clearPingRoles(guildId: string, leagueId: string): boolean {
+  const info = getBotDb()
+    .prepare(`UPDATE guild_subscriptions SET ping_roles = '{}' WHERE guild_id = ? AND league_id = ?`)
+    .run(guildId, leagueId);
   return info.changes > 0;
 }
 

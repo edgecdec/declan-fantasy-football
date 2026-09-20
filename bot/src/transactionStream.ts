@@ -136,6 +136,26 @@ export function wantsTransaction(sub: Subscription, tx: SleeperTransaction): boo
   return true;
 }
 
+/**
+ * The role to mention for this transaction, or null for no ping.
+ *
+ * Separate from `wantsTransaction` because they answer different questions: whether to POST at all,
+ * and whether to interrupt anyone about it. Every ping-worthy event is postable, but the great
+ * majority of postable events are not worth a notification — 419 of 810 measured transactions were
+ * free-agent moves, and a role pinged 34 times a week gets the channel muted, which loses the
+ * notifications altogether.
+ */
+export function pingRoleFor(sub: Subscription, tx: SleeperTransaction): string | null {
+  const roleId = sub.pingRoles[tx.type as TransactionType];
+  if (!roleId) return null;
+  /*
+   * Never ping for something that did not happen. A failed waiver claim can still be posted when a
+   * guild has opted into those, but waking a role for a claim that lost is pure noise.
+   */
+  if (tx.status !== 'complete') return null;
+  return roleId;
+}
+
 /** Fetches a league week's transactions straight from Sleeper. */
 export async function fetchTransactions(
   leagueId: string,

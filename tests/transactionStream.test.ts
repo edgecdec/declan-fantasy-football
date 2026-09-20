@@ -4,6 +4,7 @@ import type { SleeperTransaction } from '@/services/sleeper/sleeperService';
 import {
   createStreamState,
   hasSeeded,
+  pingRoleFor,
   pruneToWeek,
   seed,
   takeNew,
@@ -45,6 +46,7 @@ const sub = (over: Partial<Subscription> = {}): Subscription => ({
   eventTypes: [...DEFAULT_EVENT_TYPES],
   includeFailed: false,
   minFaab: 0,
+  pingRoles: {},
   ...over,
 });
 
@@ -165,4 +167,45 @@ test('the FAAB floor applies to waivers only, never silencing free agents', () =
   assert.equal(wantsTransaction(withFloor, tx({ type: 'free_agent' })), true);
   // A waiver with no bid recorded is also kept rather than assumed to be zero.
   assert.equal(wantsTransaction(withFloor, tx({ type: 'waiver', settings: null })), true);
+});
+
+test('a role is pinged only for the types it is configured for', () => {
+  // One role per (league, type): trades wake the league, waiver churn stays silent.
+  const s = sub({ pingRoles: { trade: 'role-traders' } });
+
+  assert.equal(pingRoleFor(s, tx({ type: 'trade' })), 'role-traders');
+  assert.equal(pingRoleFor(s, tx({ type: 'waiver' })), null);
+  assert.equal(pingRoleFor(s, tx({ type: 'free_agent' })), null);
+});
+
+test('different types can ping different roles', () => {
+  const s = sub({ pingRoles: { trade: 'role-a', chopped: 'role-b' } });
+  assert.equal(pingRoleFor(s, tx({ type: 'trade' })), 'role-a');
+  assert.equal(pingRoleFor(s, tx({ type: 'chopped' })), 'role-b');
+});
+
+test('no ping configuration means no ping', () => {
+  assert.equal(pingRoleFor(sub(), tx({ type: 'trade' })), null);
+});
+
+test('a failed transaction never pings, even when its type is configured', () => {
+  /*
+   * A guild that opted into failed claims still sees them posted — but waking a role for a claim
+   * that LOST is pure noise, and it is the case most likely to make someone mute the channel.
+   */
+  const s = sub({ pingRoles: { waiver: 'role-x' }, includeFailed: true });
+  const failed = tx({ type: 'waiver', status: 'failed' });
+
+  assert.equal(wantsTransaction(s, failed), true, 'still posted');
+  assert.equal(pingRoleFor(s, failed), null, 'but never pinged');
+});
+
+test('pinging is independent of whether the type is even posted', () => {
+  /*
+   * Deliberately not enforced: a ping role for a type the subscription does not post simply never
+   * fires, because the post is what carries the ping. Coupling them would mean setting a ping role
+   * silently widened which events appear in the channel.
+   */
+  const s = sub({ eventTypes: ['trade'], pingRoles: { waiver: 'role-x' } });
+  assert.equal(wantsTransaction(s, tx({ type: 'waiver' })), false);
 });
