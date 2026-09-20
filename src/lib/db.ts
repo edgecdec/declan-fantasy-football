@@ -229,6 +229,22 @@ function initDb(database: Database.Database): void {
     'CREATE INDEX IF NOT EXISTS idx_ledger_account_league ON ledger(account_id, league_id)',
   );
 
+  /*
+   * Discord identity, for the bot.
+   *
+   * A column on accounts rather than a link table: the relationship is one-to-one and a table would
+   * add a join to every lookup for no expressiveness. The unique index is the part that matters --
+   * two accounts claiming the same Discord id would let one person bet from the other's bankroll.
+   *
+   * A partial index (WHERE ... IS NOT NULL) because almost every row is NULL until someone links,
+   * and a plain UNIQUE would treat those NULLs inconsistently across SQLite versions.
+   */
+  addColumnIfMissing(database, 'accounts', 'discord_user_id', 'TEXT');
+  database.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_discord
+       ON accounts(discord_user_id) WHERE discord_user_id IS NOT NULL`,
+  );
+
   backfillLeagueBankrolls(database);
 }
 

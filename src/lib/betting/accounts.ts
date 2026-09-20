@@ -22,6 +22,8 @@ export type Account = {
   password_hash: string | null;
   is_admin: number;
   balance_cents: number;
+  /** Set once someone links their Discord account via the bot. Null for everyone else. */
+  discord_user_id: string | null;
   created_at: string;
 };
 
@@ -58,6 +60,32 @@ export function findAccountById(accountId: string): Account | undefined {
   return getDb()
     .prepare('SELECT * FROM accounts WHERE id = ?')
     .get(accountId) as Account | undefined;
+}
+
+/** The account a Discord user has linked, if any. How every bot command resolves its caller. */
+export function findAccountByDiscordId(discordUserId: string): Account | undefined {
+  return getDb()
+    .prepare('SELECT * FROM accounts WHERE discord_user_id = ?')
+    .get(discordUserId.trim()) as Account | undefined;
+}
+
+/**
+ * Links a Discord user to an account, or unlinks with `null`.
+ *
+ * Clears the id from any OTHER account first, so re-linking somebody who already had a different
+ * account does not fail on the unique index -- and so a stale link can never leave two rows
+ * pointing at one Discord user. Both in one transaction: a half-applied move would leave the
+ * person able to bet from neither account or, worse, from the wrong one.
+ */
+export function setDiscordId(accountId: string, discordUserId: string | null): void {
+  const db = getDb();
+  db.transaction(() => {
+    if (discordUserId) {
+      db.prepare('UPDATE accounts SET discord_user_id = NULL WHERE discord_user_id = ? AND id != ?')
+        .run(discordUserId, accountId);
+    }
+    db.prepare('UPDATE accounts SET discord_user_id = ? WHERE id = ?').run(discordUserId, accountId);
+  })();
 }
 
 /**
