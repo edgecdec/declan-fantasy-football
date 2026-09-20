@@ -562,19 +562,31 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
 
   /*
    * Narrow columns on purpose. A wide aligned table is what wrapped and broke the first markets
-   * board — an embed code block is far narrower than a terminal, and narrower still on a phone.
+   * board — an embed code block is far narrower than a terminal, and narrower still on a phone. The
+   * dollar signs come out and the units go in the footer, which is what pays for the value column.
    */
-  const lines = [`${pad('bettor', 13)}${pad('pick', 13)}${padLeft('stake', 8)}${padLeft('win', 8)}`];
+  const bare = (cents: number) => (cents / 100).toFixed(2);
+  const lines = [
+    `${pad('bettor', 12)}${pad('pick', 12)}${padLeft('stake', 8)}${padLeft('win', 8)}${padLeft('now', 8)}`,
+  ];
   for (const r of rows) {
     lines.push(
-      pad(r.bettor, 13)
-      + pad(r.pick, 13)
-      + padLeft(money(r.stakeCents), 8)
-      + padLeft(money(r.toWinCents), 8),
+      pad(r.bettor, 12)
+      + pad(r.pick, 12)
+      + padLeft(bare(r.stakeCents), 8)
+      + padLeft(bare(r.toWinCents), 8)
+      /*
+       * Mark-to-market value at the CURRENT line, which is the only column here that moves during a
+       * slate — stake and win were both fixed at placement. Null when the market has not been
+       * re-priced since the bet was struck, shown as a dash rather than as the stake, which would
+       * read as "no movement" when the truth is "not known".
+       */
+      + padLeft(r.valueCents == null ? '—' : bare(r.valueCents), 8),
     );
   }
 
   const atRisk = all.reduce((n, r) => n + r.stakeCents, 0);
+  const nowWorth = all.reduce((n, r) => n + (r.valueCents ?? r.stakeCents), 0);
   await i.editReply({
     embeds: [{
       title:
@@ -584,7 +596,9 @@ async function handleOpenBets(i: ChatInputCommandInteraction): Promise<void> {
       color: 0xfee75c,
       footer: {
         text:
-          `page ${clamped}/${pages} · ${all.length} open · ${money(atRisk)} at risk`
+          `page ${clamped}/${pages} · ${all.length} open · ${money(atRisk)} staked`
+          + ` · now worth ${money(nowWorth)}`
+          + ' · Declan Dollars · now = value at the current line'
           + (pages > 1 ? ` · /openbets page:${clamped === pages ? 1 : clamped + 1}` : ''),
       },
     }],
