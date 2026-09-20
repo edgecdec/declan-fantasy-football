@@ -199,6 +199,18 @@ export type SleeperTransaction = {
   creator: string;
   created: number;
   leg: number; // week number
+  /**
+   * Type-dependent extras, verified against 810 real transactions:
+   *   waiver -> { priority, seq, waiver_bid }   -- waiver_bid is the FAAB amount
+   *   trade  -> { expires_at }
+   *   others -> null
+   */
+  settings?: {
+    waiver_bid?: number;
+    priority?: number;
+    seq?: number;
+    expires_at?: number;
+  } | null;
 };
 
 export const SleeperService = {

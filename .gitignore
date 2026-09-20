@@ -60,3 +60,10 @@ data/backups/
 /tmp/ralph-*-logs/
 
 .test-build/
+
+# The bot's bindings database. Same reasoning as data/*.db* above: deploy_webhook.sh uses
+# `git reset --hard` and never `git clean`, so an ignored file here survives every deploy.
+bot/data/*.db
+bot/data/*.db-wal
+bot/data/*.db-shm
+bot/dist/

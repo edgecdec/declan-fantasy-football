@@ -79,7 +79,9 @@ try {
   execFileSync(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, BETTING_DB_DIR: scratchDbDir },
+    // Both databases get a scratch dir per process: the betting ledger and the bot's own
+    // bindings file. Without BOT_DB_DIR a subscription test would write bot/data/bot.db for real.
+    env: { ...process.env, BETTING_DB_DIR: scratchDbDir, BOT_DB_DIR: scratchDbDir },
   });
 } catch {
   process.exit(1);

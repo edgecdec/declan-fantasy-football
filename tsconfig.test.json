@@ -14,5 +14,11 @@
     "types": ["node"],
     "noEmitOnError": false
   },
-  "include": ["tests/**/*.ts", "src/lib/**/*.ts", "src/services/**/*.ts", "src/types/**/*.ts"]
+  "include": [
+    "tests/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/services/**/*.ts",
+    "src/types/**/*.ts",
+    "bot/src/**/*.ts"
+  ]
 }
