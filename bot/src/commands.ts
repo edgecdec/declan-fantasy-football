@@ -491,10 +491,32 @@ async function handleAdmin(i: ChatInputCommandInteraction): Promise<void> {
       await i.editReply(`Sleeper does not know league \`${leagueId}\`. Check the id.`);
       return;
     }
+    /*
+     * Verify the bot can actually POST there before claiming success.
+     *
+     * A channel-level permission override denying View Channel or Send Messages produces a binding
+     * that looks fine and silently never posts. That happened: a league was bound to a channel the
+     * bot could not see, and the only symptom was "it printed in one server but not another".
+     * Checking here turns a mystery into a sentence.
+     */
+    const me = i.guild?.members.me;
+    // permissionsFor only exists on a GUILD channel; a DM has no overrides to consult.
+    const perms =
+      me && 'permissionsFor' in channel ? channel.permissionsFor(me) : null;
+    const canPost = perms?.has('ViewChannel') && perms?.has('SendMessages');
+    const canEmbed = perms?.has('EmbedLinks');
+
     const created = watchLeague({ guildId, channelId: channel.id, leagueId, leagueName: name });
     await i.editReply(
       `Watching **${name}** in <#${created.channelId}>.\nTypes: ${created.eventTypes.join(', ')}`
-      + `\nFailed waiver claims are hidden — \`/admin failed\` to change that.`,
+      + `\nFailed waiver claims are hidden — \`/admin failed\` to change that.`
+      + (canPost
+        ? canEmbed
+          ? ''
+          : `\n\n⚠️ I can post there but lack **Embed Links**, so messages will be plain text.`
+        : `\n\n⚠️ **I cannot post in <#${created.channelId}>.** The binding is saved, but nothing will`
+          + ` appear until I have **View Channel** and **Send Messages** there — check the channel's`
+          + ` permission overrides, not just the server-wide role.`),
     );
     return;
   }

@@ -218,12 +218,24 @@ async function pollBetEvents(client: Client): Promise<void> {
     if (!embed) continue;
 
     for (const sub of subs.filter(s => s.leagueId === event.leagueId)) {
+      /*
+       * Logged rather than skipped silently. A channel-level permission override denying View
+       * Channel makes this fetch fail, and the earlier version of this loop just moved on — so a
+       * guild that had bound a channel the bot could not see got no announcements and no
+       * explanation, which is exactly how it was reported: "printed in one server but not another".
+       */
       const channel = await client.channels.fetch(sub.channelId).catch(() => null);
-      if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
+      if (!channel || !channel.isTextBased() || !('send' in channel)) {
+        console.error(
+          `[bot] cannot post bet event to channel ${sub.channelId} in guild ${sub.guildId}`
+          + ' — check the bot can View Channel and Send Messages there',
+        );
+        continue;
+      }
       try {
         await (channel as TextChannel).send({ embeds: [embed] });
       } catch (err) {
-        console.error('[bot] bet event send failed', err);
+        console.error(`[bot] bet event send failed for ${sub.channelId}`, err);
       }
     }
   }
