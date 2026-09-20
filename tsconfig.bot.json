@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "bot/dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "noEmitOnError": false
+  },
+  "include": ["bot/src/**/*.ts"]
+}

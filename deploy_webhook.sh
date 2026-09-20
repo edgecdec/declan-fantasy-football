@@ -144,6 +144,26 @@ git checkout -- tsconfig.json 2>/dev/null || true
 # copy (94M against 7.4G free). If a deploy ever ships a build that will not boot,
 # `mv .next.old .next && pm2 restart fantasy-football` is the manual way back.
 
+# The Discord bot, if it changed.
+#
+# Built and restarted HERE, above the pm2 handoff below, because nothing survives that line — it
+# restarts the process that launched this script, taking the whole process group with it. A bot
+# restart placed after it would simply never run.
+#
+# Conditional on bot/ or the lockfile changing, so a routine site deploy does not drop the gateway
+# connection mid-slate. That matters more than it sounds: reconnecting loses any in-flight
+# interaction, and a Sunday deploy would otherwise take the notifications down with it.
+if git diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -qE '^(bot/|package-lock\.json)'; then
+  echo "bot/ changed, rebuilding and restarting fantasy-bot..."
+  if node scripts/build-bot.mjs; then
+    # `|| true` because the bot may not be registered with pm2 yet on a first deploy, and a missing
+    # app must not fail the whole deploy and leave the SITE unreleased.
+    pm2 restart fantasy-bot --update-env || echo "fantasy-bot not registered with pm2 yet; skipping"
+  else
+    echo "BOT BUILD FAILED -- leaving the running bot alone; the site deploy continues."
+  fi
+fi
+
 # EVERYTHING MUST HAPPEN ABOVE THIS LINE.
 #
 # `pm2 restart fantasy-football` restarts the very process that launched this script:
