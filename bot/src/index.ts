@@ -146,31 +146,50 @@ async function pollTransactions(client: Client): Promise<void> {
   }
 }
 
-async function registerCommands(): Promise<void> {
-  const rest = new REST({ version: '10' }).setToken(requireEnv('DISCORD_BOT_TOKEN'));
-  const appId = requireEnv('DISCORD_APP_ID');
-  const guildId = process.env.DISCORD_GUILD_ID;
-
-  /*
-   * Guild-scoped when a guild is configured, because those register INSTANTLY while global commands
-   * take up to an hour to propagate. Global is right once the bot is in servers we do not control.
-   */
-  if (guildId) {
+/**
+ * Registers the command set with one guild.
+ *
+ * PER-GUILD rather than global, and done for EVERY guild the bot is in — not just a configured one.
+ *
+ * Guild-scoped registration takes effect instantly; global registration can take an hour to
+ * propagate. But an earlier version registered only to `DISCORD_GUILD_ID`, which works perfectly
+ * until the bot is added to a second server and then presents as "the bot is here but has no
+ * commands" — a failure with no error anywhere, because nothing went wrong, the commands simply were
+ * never registered there. Doing it per guild on startup and on join means every server gets commands
+ * immediately and there is no single privileged guild.
+ *
+ * The cost is one API call per guild at startup. At this scale that is nothing; if the bot ever runs
+ * in hundreds of servers, global registration becomes the right trade instead.
+ */
+async function registerCommandsForGuild(rest: REST, appId: string, guildId: string): Promise<void> {
+  try {
     await rest.put(Routes.applicationGuildCommands(appId, guildId), { body: commandDefinitions });
     console.log(`[bot] registered ${commandDefinitions.length} commands to guild ${guildId}`);
-  } else {
-    await rest.put(Routes.applicationCommands(appId), { body: commandDefinitions });
-    console.log(`[bot] registered ${commandDefinitions.length} global commands`);
+  } catch (err) {
+    // One guild refusing registration (missing scope, kicked mid-startup) must not stop the others.
+    console.error(`[bot] could not register commands to guild ${guildId}`, err);
   }
 }
 
 async function main(): Promise<void> {
-  await registerCommands();
+  const appId = requireEnv('DISCORD_APP_ID');
+  const rest = new REST({ version: '10' }).setToken(requireEnv('DISCORD_BOT_TOKEN'));
 
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-  client.once('clientReady', () => {
+  client.once('clientReady', async () => {
     console.log(`[bot] online as ${client.user?.tag}`);
+    // After ready, not before: the guild list comes from the gateway, so registering up front would
+    // have nothing to iterate.
+    const guilds = [...client.guilds.cache.keys()];
+    console.log(`[bot] in ${guilds.length} guild(s)`);
+    for (const guildId of guilds) await registerCommandsForGuild(rest, appId, guildId);
+  });
+
+  // Added to a new server: register immediately so its commands work without waiting for a restart.
+  client.on('guildCreate', async guild => {
+    console.log(`[bot] added to guild ${guild.id} (${guild.name})`);
+    await registerCommandsForGuild(rest, appId, guild.id);
   });
 
   client.on('interactionCreate', async interaction => {
