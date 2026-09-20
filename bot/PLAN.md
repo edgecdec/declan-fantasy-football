@@ -71,16 +71,19 @@ Steps 1–2 are **done** (commit `189b167`).
 
 | # | Step | Notes |
 |---|---|---|
-| ~~1~~ | ~~`POST /api/betting/tick` + cron~~ | done |
+| ~~1~~ | ~~`POST /api/betting/tick`~~ | done. **Cron still not installed** — see below |
 | ~~2~~ | ~~`bet_events` + 3 insertion points~~ | done; `line_moved` deferred to step 8 with the bot, since it needs the coalescing threshold designed alongside |
 | 3 | Parlay pricing, pure + tested | Where the money is wrong if it is wrong. No DB, no IO |
 | 4 | `wager_legs` migration + backfill | The backfill is the important part: afterwards there is ONE code path and no union |
 | 5 | Parlay gates + mutually-exclusive check | Per leg; any failing leg refuses the slip |
 | 6 | Two-phase settlement + slip valuation | Grade lost the moment one leg dies |
-| 7 | `discord_user_id`, `getServiceCaller`, `/api/bot/*` | Do not loosen `getAuthUser` |
-| 8 | Bot: cursor reader, then bet announcements, then `line_moved` | Read-only first |
-| 9 | Sleeper transaction poller + guild subscriptions | Independent of 3–6; can ship before them |
-| 10 | Read commands | Needs 7 |
+| ~~7~~ | ~~`discord_user_id`, `getServiceCaller`, `/api/bot/*`~~ | done |
+| ~~9~~ | ~~Transaction poller + guild subscriptions + ping roles~~ | done, live |
+| ~~10~~ | ~~Read commands~~ | done: `/balances` `/balance` `/slips` `/standings` `/markets` `/watching` `/admin` |
+| ~~11~~ | ~~`/bet` + `POST /api/bot/wager`~~ | done. Every guard verified firing through the bot path |
+| 8 | Bot reads the outbox and announces placements/settlements | `/api/bot/events` exists; nothing consumes it yet |
+| 12 | `line_moved` event + coalescing | Highest-volume event; needs a threshold chosen against real movement |
+| 3–6 | The parlay chain | Deferred, unchanged |
 
 Steps 9 and 10 do not depend on the parlay chain, so notifications can land first if that is worth
 more.
@@ -94,33 +97,32 @@ actually matters: getting it wrong lets someone quietly exceed
 
 ## Step 9 — league activity
 
-### Storage (bot's own SQLite, separate from `betting.db`)
+### Storage — bindings only, in `bot/data/bot.db`
 
 ```sql
 CREATE TABLE IF NOT EXISTS guild_subscriptions (
   guild_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
   league_id TEXT NOT NULL,
-  season TEXT NOT NULL,
-  -- JSON array: trade, waiver, free_agent, commissioner, chopped
-  event_types TEXT NOT NULL,
+  league_name TEXT,
+  event_types TEXT NOT NULL,      -- JSON array
   include_failed INTEGER NOT NULL DEFAULT 0,
   min_faab INTEGER NOT NULL DEFAULT 0,
+  ping_roles TEXT,                -- JSON map: event type -> role id
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (guild_id, league_id)
 );
-
--- Dedup cursor. Sleeper transaction ids are snowflakes, so ordering is meaningful, but a claim
--- can be created before an earlier one and processed after, so "seen" is a set not a watermark.
-CREATE TABLE IF NOT EXISTS seen_transactions (
-  transaction_id TEXT PRIMARY KEY,
-  league_id TEXT NOT NULL,
-  posted_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
 ```
 
-A set rather than a max-id watermark on purpose: waiver claims all process in one batch and a
-watermark would silently skip any that Sleeper returns out of order.
+**There is no `seen_transactions` table, and there must not be one.** An earlier draft of this plan
+proposed it; the requirement is that transaction state is never stored. Dedup is an in-memory `Set`
+keyed `leagueId:week`, lost on restart, and a restart is made safe by SEEDING instead: the first
+sweep of a league-week records every id and posts nothing. Verified in production — a deploy logged
+`seeded ... week 2 with 73 ids` rather than dumping 73 stale transactions into the channel.
+
+Rejected a `created > startedAt` watermark, which looks simpler and is wrong: waiver claims process
+in one batch and Sleeper can return them out of order relative to `created`, so a watermark either
+drops or reposts depending which way it rounds.
 
 Separate DB file from `betting.db` so the bot can be restarted, wiped or moved without touching
 money, and so the nightly ledger backup stays about the ledger.
