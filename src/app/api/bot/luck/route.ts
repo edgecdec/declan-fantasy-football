@@ -37,7 +37,15 @@ export async function GET(request: Request) {
       ok: true,
       league: { leagueId, name: league.name, season: league.season },
       weeksCounted: analysis.weeksCounted,
-      // Luckiest first: actual wins above expectation is the interesting end of the table.
+      /*
+       * Ordered by EXPECTED wins, descending — a power ranking rather than a luck ranking.
+       *
+       * Sorting by luck put whoever had the flukiest fortnight on top, which reads as a leaderboard
+       * of nothing: luck is noise by construction and reverts. Expected wins is the durable figure,
+       * so the table now ranks teams by how good they have actually been and shows luck as the
+       * deviation from it. Ties break on points scored, since two identical expectations are
+       * genuinely separated by that.
+       */
       teams: analysis.standings
         .map(t => ({
           name: t.name,
@@ -48,7 +56,7 @@ export async function GET(request: Request) {
           pointsFor: t.pointsFor,
           pointsAgainst: t.pointsAgainst,
         }))
-        .sort((a, b) => b.luck - a.luck),
+        .sort((a, b) => b.expectedWins - a.expectedWins || b.pointsFor - a.pointsFor),
     });
   } catch (err) {
     return NextResponse.json(
