@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatBetEvent } from '../bot/src/betEventStream';
+import { formatBetEvent, formatWeekSettled } from '../bot/src/betEventStream';
 import type { BetEvent } from '../bot/src/siteApi';
 
 /**
@@ -55,42 +55,19 @@ test('backing side b names side b', () => {
   assert.match(embed.description!, /\+299/);
 });
 
-test('a win reports the payout and the profit separately', () => {
-  const embed = formatBetEvent(
-    event({ type: 'wager_won', payload: { accountId: 'a', payoutCents: 125, profitCents: 25 } }),
-    'edgecdec',
-  )!;
-  assert.match(embed.title!, /won/i);
-  assert.match(embed.description!, /\$1\.25/);
-  assert.match(embed.description!, /\$0\.25 profit/);
-});
-
-test('a loss and a void both read correctly', () => {
-  const lost = formatBetEvent(
-    event({ type: 'wager_lost', payload: { accountId: 'a', stakeCents: 500 } }),
-    'egruis',
-  )!;
-  assert.match(lost.title!, /lost/i);
-  assert.match(lost.description!, /egruis/);
-  assert.match(lost.description!, /\$5\.00/);
-
-  const voided = formatBetEvent(
-    event({ type: 'wager_void', payload: { accountId: 'a', refundedCents: 500, reason: 'tie' } }),
-    'egruis',
-  )!;
-  assert.match(voided.title!, /void/i);
-  assert.match(voided.description!, /\$5\.00\*\* back/);
-  assert.match(voided.description!, /tied/);
-});
-
-test('market_settled and line_moved stay silent', () => {
+test('per-wager settlement events are SILENT — the digest replaces them', () => {
   /*
-   * market_settled carries no bettor and fires once per market, so it adds nothing to the per-wager
-   * results beside it. line_moved rides the 60-second tick and is the highest-volume event in the
-   * system — posting it unthrottled would drown everything else.
+   * These used to post individually, which turned one week into twenty messages reading
+   * "collected $56.50" with no indication of which matchup. They are still written to the outbox as
+   * the audit trail; the readable version of a week is the single week_settled digest.
    */
-  assert.equal(formatBetEvent(event({ type: 'market_settled' }), null), null);
-  assert.equal(formatBetEvent(event({ type: 'line_moved' }), null), null);
+  for (const type of ['wager_won', 'wager_lost', 'wager_void', 'market_settled', 'line_moved']) {
+    assert.equal(
+      formatBetEvent(event({ type, payload: { accountId: 'a', payoutCents: 125 } }), 'edgecdec'),
+      null,
+      `${type} must not post on its own`,
+    );
+  }
 });
 
 test('an unknown bettor degrades to "Someone" rather than undefined', () => {
@@ -166,4 +143,102 @@ test('a nonsensical stored probability is ignored', () => {
     )!;
     assert.ok(!/%/.test(embed.description!), `should ignore probability=${bad}`);
   }
+});
+
+const digest = (over: Record<string, unknown> = {}): BetEvent =>
+  event({
+    type: 'week_settled',
+    refId: 'L1:2',
+    payload: {
+      bets: [
+        {
+          bettor: 'egruis', pick: 'AggressiveIyAvg', against: 'cemisme',
+          stakeCents: 25000, netCents: 21008, status: 'won',
+          pickScore: 141.2, againstScore: 118.6,
+        },
+        {
+          bettor: 'TheSebasDog', pick: 'kermason', against: 'edgecdec',
+          stakeCents: 50000, netCents: -50000, status: 'lost',
+          pickScore: 96.4, againstScore: 130.1,
+        },
+        {
+          bettor: 'edgecdec', pick: 'cdalton3', against: 'pullmanguy',
+          stakeCents: 1000, netCents: 0, status: 'void',
+          pickScore: 110.0, againstScore: 110.0,
+        },
+      ],
+      standings: [
+        { bettor: 'egruis', stakeCents: 25000, netCents: 21008, won: 1, lost: 0, voided: 0 },
+        { bettor: 'edgecdec', stakeCents: 1000, netCents: 0, won: 0, lost: 0, voided: 1 },
+        { bettor: 'TheSebasDog', stakeCents: 50000, netCents: -50000, won: 0, lost: 1, voided: 0 },
+      ],
+      champion: { bettor: 'egruis', stakeCents: 25000, netCents: 21008, won: 1, lost: 0, voided: 0 },
+      loser: { bettor: 'TheSebasDog', stakeCents: 50000, netCents: -50000, won: 0, lost: 1, voided: 0 },
+      totalStakedCents: 76000,
+      totalNetCents: -28992,
+      betCount: 3,
+      bettorCount: 3,
+      ...over,
+    },
+  });
+
+test('the digest is exactly two embeds: summary then every bet', () => {
+  const out = formatWeekSettled(digest(), "Graham's Football Fantasy");
+  assert.equal(out.length, 2);
+  assert.match(out[0].title!, /week 2 betting/);
+  assert.match(out[1].title!, /every bet/);
+});
+
+test('the summary names a champion and a loser', () => {
+  const [summary] = formatWeekSettled(digest(), 'Test League');
+  assert.match(summary.description!, /egruis/);
+  assert.match(summary.description!, /\$210\.08/);
+  assert.match(summary.description!, /TheSebasDog/);
+  assert.match(summary.description!, /\$500\.00/);
+  // Every bettor appears in the table with a record.
+  assert.match(summary.description!, /1-0/);
+  assert.match(summary.description!, /0-1/);
+});
+
+test('every listed bet NAMES ITS MATCHUP and score — the original complaint', () => {
+  const [, detail] = formatWeekSettled(digest(), 'Test League');
+  assert.match(detail.description!, /egruis\*\*.* on AggressiveIyAvg vs cemisme/);
+  assert.match(detail.description!, /141\.2-118\.6/);
+  // The winning pick's own score comes FIRST. Emitting the market's a/b order made a winning bet on
+  // side b read as a bet on the loser.
+  assert.match(detail.description!, /on AggressiveIyAvg vs cemisme \(141\.2-118\.6\)/);
+  assert.match(detail.description!, /on kermason vs edgecdec \(96\.4-130\.1\)/);
+  assert.match(detail.description!, /TheSebasDog\*\*.* on kermason vs edgecdec/);
+  // And the outcome of each.
+  assert.match(detail.description!, /\+210\.08/);
+  assert.match(detail.description!, /-500\.00/);
+});
+
+test('a week where everybody lost claims no champion', () => {
+  const [summary] = formatWeekSettled(
+    digest({
+      champion: null,
+      standings: [{ bettor: 'a', stakeCents: 100, netCents: -100, won: 0, lost: 1, voided: 0 }],
+    }),
+    'Test League',
+  );
+  assert.match(summary.description!, /Nobody finished the week up/);
+  assert.ok(!/👑 \*\*/.test(summary.description!), 'must not crown the least-bad result');
+});
+
+test('a push counts as zero, not as a loss', () => {
+  const [summary] = formatWeekSettled(digest(), 'Test League');
+  // edgecdec's only bet was void: 0-0 with a push noted, never 0-1.
+  assert.match(summary.description!, /edgecdec\s+10\.00\s+0\.00\s+0-0 \(1 push\)/);
+});
+
+test('the house take is the mirror of the bettors net', () => {
+  const [summary] = formatWeekSettled(digest(), 'Test League');
+  // Bettors lost 289.92 between them, so the house made exactly that.
+  assert.match(summary.footer!.text!, /bettors net -\$289\.92/);
+  assert.match(summary.footer!.text!, /house \$289\.92/);
+});
+
+test('an empty digest posts nothing at all', () => {
+  assert.deepEqual(formatWeekSettled(digest({ bets: [], standings: [] }), 'Test League'), []);
 });

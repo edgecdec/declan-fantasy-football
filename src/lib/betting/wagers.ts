@@ -391,6 +391,43 @@ export function settleFinishedMarkets(
         }
       }
     }
+
+    /*
+     * ONE digest per league week, emitted when the LAST market settles.
+     *
+     * Previously every wager status flip became its own event and therefore its own Discord message:
+     * a single week produced twenty-odd "collected $56.50" posts with no indication of which matchup
+     * any of them concerned. Unreadable, and the individual events cannot be fixed into something
+     * readable because none of them knows it is one of twenty.
+     *
+     * The server is the only place that can know a week is FINISHED — markets settle from Thursday to
+     * Monday, so "the flood has stopped" is unknowable from the stream alone. Hence: settle as before,
+     * then check whether anything is left unsettled for this league week, and only then summarise.
+     *
+     * Guarded on `settled > 0` so a repeat tick over an already-finished week cannot emit twice. The
+     * per-wager events are still written: they are the audit trail, and the bot simply stays quiet
+     * about them now.
+     */
+    if (settled > 0) {
+      const remaining = db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM markets
+           WHERE league_id = ? AND season = ? AND week = ? AND status IN ('open','closed')`,
+        )
+        .get(leagueId, season, week) as { n: number };
+
+      if (remaining.n === 0) {
+        recordBetEvent(db, {
+          type: 'week_settled',
+          leagueId,
+          season,
+          week,
+          refId: `${leagueId}:${week}`,
+          payload: buildWeekDigest(db, leagueId, season, week),
+        });
+      }
+    }
+
     return { settled, paid };
   });
 
@@ -398,6 +435,102 @@ export function settleFinishedMarkets(
 }
 
 type DbHandle = ReturnType<typeof getDb>;
+
+/**
+ * Everything that happened to money in one league week.
+ *
+ * Built from the WHOLE week rather than from the markets settled in this pass, because a week settles
+ * across several passes — Thursday's game is graded days before Monday's, and a digest covering only
+ * the final pass would report one matchup as if it were the week.
+ *
+ * A void is deliberately worth zero rather than counted as a loss: the stake came back, so it did not
+ * move anybody's money, and including it would make a tie look like a defeat.
+ */
+function buildWeekDigest(
+  db: DbHandle,
+  leagueId: string,
+  season: string,
+  week: number,
+): Record<string, unknown> {
+  const rows = db
+    .prepare(
+      `SELECT a.display_name AS bettor, w.side, w.stake_cents, w.to_win_cents, w.status,
+              m.matchup_id, m.name_a, m.name_b, m.final_a, m.final_b
+       FROM wagers w
+       JOIN accounts a ON a.id = w.account_id
+       JOIN markets m ON m.id = w.market_id
+       WHERE m.league_id = ? AND m.season = ? AND m.week = ? AND w.status <> 'open'
+       ORDER BY w.stake_cents DESC`,
+    )
+    .all(leagueId, season, week) as {
+      bettor: string;
+      side: string;
+      stake_cents: number;
+      to_win_cents: number;
+      status: string;
+      matchup_id: number;
+      name_a: string | null;
+      name_b: string | null;
+      final_a: number | null;
+      final_b: number | null;
+    }[];
+
+  const net = (r: (typeof rows)[number]) =>
+    r.status === 'won' ? r.to_win_cents : r.status === 'lost' ? -r.stake_cents : 0;
+
+  const bets = rows.map(r => ({
+    bettor: r.bettor,
+    pick: (r.side === 'a' ? r.name_a : r.name_b) ?? r.side.toUpperCase(),
+    against: (r.side === 'a' ? r.name_b : r.name_a) ?? null,
+    stakeCents: r.stake_cents,
+    netCents: net(r),
+    status: r.status,
+    matchupId: r.matchup_id,
+    /*
+     * Scores ORIENTED TO THE PICK, not to the market's A/B order.
+     *
+     * final_a and final_b belong to sides a and b. Emitting them raw meant that whenever someone
+     * backed side b, a reader saw "kermason vs cemisme (112.9-153.8)" where 112.9 was actually
+     * cemisme's — the winning bet appeared to be on the loser. Resolving it here, where the side is
+     * known, makes it impossible for a formatter to get the order wrong.
+     */
+    pickScore: r.side === 'a' ? r.final_a : r.final_b,
+    againstScore: r.side === 'a' ? r.final_b : r.final_a,
+  }));
+
+  const byBettor = new Map<string, { bettor: string; stakeCents: number; netCents: number; won: number; lost: number; voided: number }>();
+  for (const b of bets) {
+    const entry = byBettor.get(b.bettor) ?? {
+      bettor: b.bettor, stakeCents: 0, netCents: 0, won: 0, lost: 0, voided: 0,
+    };
+    entry.stakeCents += b.stakeCents;
+    entry.netCents += b.netCents;
+    if (b.status === 'won') entry.won += 1;
+    else if (b.status === 'lost') entry.lost += 1;
+    else entry.voided += 1;
+    byBettor.set(b.bettor, entry);
+  }
+
+  const standings = [...byBettor.values()].sort((x, y) => y.netCents - x.netCents);
+  /*
+   * Champion and loser only when the figure is actually positive or negative. In a week where every
+   * bet lost, the least-bad result is not a champion, and saying so would be worse than saying
+   * nothing.
+   */
+  const best = standings[0];
+  const worst = standings[standings.length - 1];
+
+  return {
+    bets,
+    standings,
+    champion: best && best.netCents > 0 ? best : null,
+    loser: worst && worst.netCents < 0 ? worst : null,
+    totalStakedCents: bets.reduce((n, b) => n + b.stakeCents, 0),
+    totalNetCents: bets.reduce((n, b) => n + b.netCents, 0),
+    betCount: bets.length,
+    bettorCount: standings.length,
+  };
+}
 
 /**
  * A payout, into the bankroll of the league the bet was struck in.

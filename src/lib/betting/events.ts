@@ -19,6 +19,8 @@ export type BetEventType =
   | 'wager_won'
   | 'wager_lost'
   | 'wager_void'
+  /** One per league week, when the last market settles. The readable summary of the week. */
+  | 'week_settled'
   | 'line_moved';
 
 export type BetEvent = {

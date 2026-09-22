@@ -1,5 +1,5 @@
 import type { APIEmbed } from 'discord.js';
-import { americanOdds, money } from './format';
+import { americanOdds, money, pad, padLeft } from './format';
 import type { BetEvent } from './siteApi';
 
 /**
@@ -108,48 +108,128 @@ export function formatBetEvent(event: BetEvent, bettor: string | null): APIEmbed
     };
   }
 
-  if (event.type === 'wager_won') {
-    const payout = num(p, 'payoutCents');
-    const profit = num(p, 'profitCents');
-    if (payout == null) return null;
-    return {
-      title: '💰 Bet won',
-      description:
-        `**${who}** collected **${money(payout)}**`
-        + (profit != null ? ` — ${money(profit)} profit` : ''),
-      color: COLOUR.won,
-      footer: { text: `week ${event.week}` },
-    };
-  }
-
-  if (event.type === 'wager_lost') {
-    const stake = num(p, 'stakeCents');
-    return {
-      title: '💸 Bet lost',
-      description: `**${who}** dropped **${money(stake ?? 0)}**`,
-      color: COLOUR.lost,
-      footer: { text: `week ${event.week}` },
-    };
-  }
-
-  if (event.type === 'wager_void') {
-    const refund = num(p, 'refundedCents') ?? num(p, 'stakeCents');
-    return {
-      title: '↩️ Bet voided',
-      description:
-        `**${who}** got **${money(refund ?? 0)}** back`
-        + (str(p, 'reason') === 'tie' ? ' — the matchup tied' : ''),
-      color: COLOUR.void,
-      footer: { text: `week ${event.week}` },
-    };
-  }
-
   /*
-   * market_settled and line_moved are intentionally silent.
+   * EVERY OTHER EVENT IS SILENT, and the settlement ones are the point.
    *
-   * market_settled fires once per market with no bettor, so it adds nothing to the per-wager results
-   * that accompany it. line_moved is the highest-volume event in the system, riding the 60-second
-   * tick, and needs coalescing and a movement threshold before it is fit to post at all.
+   * wager_won / wager_lost / wager_void used to post individually, which turned one week into twenty
+   * messages reading "collected $56.50" with no indication of which matchup. They are still written
+   * to the outbox — they are the audit trail — but the readable version of a week is the single
+   * week_settled digest below, which is the only thing that knows it is summarising twenty bets.
+   *
+   * market_settled fires once per market with no bettor, adding nothing the digest does not say.
+   * line_moved rides the 60-second tick and needs coalescing and a movement threshold first.
    */
   return null;
+}
+
+type DigestBet = {
+  bettor: string;
+  pick: string;
+  against: string | null;
+  stakeCents: number;
+  netCents: number;
+  status: string;
+  /** Oriented to the PICK, so the first number is always the side that was backed. */
+  pickScore: number | null;
+  againstScore: number | null;
+};
+
+type DigestStanding = {
+  bettor: string;
+  stakeCents: number;
+  netCents: number;
+  won: number;
+  lost: number;
+  voided: number;
+};
+
+/**
+ * The week's betting, as two messages: who won and lost overall, then every bet.
+ *
+ * Two rather than one because they answer different questions and one would be too long for an embed
+ * anyway — a ten-person league settles thirty-odd bets, which overruns the 4096-character description
+ * limit once each line names its matchup.
+ *
+ * `leagueName` comes from the subscription rather than the payload: the bot knows which league it is
+ * posting for, and the event does not carry a display name.
+ */
+export function formatWeekSettled(event: BetEvent, leagueName: string | null): APIEmbed[] {
+  const p = event.payload;
+  const bets = (Array.isArray(p.bets) ? p.bets : []) as DigestBet[];
+  const standings = (Array.isArray(p.standings) ? p.standings : []) as DigestStanding[];
+  if (bets.length === 0) return [];
+
+  const champion = (p.champion ?? null) as DigestStanding | null;
+  const loser = (p.loser ?? null) as DigestStanding | null;
+  const staked = num(p, 'totalStakedCents') ?? 0;
+  const net = num(p, 'totalNetCents') ?? 0;
+  const where = leagueName ?? 'League';
+  const bare = (cents: number) => (cents / 100).toFixed(2);
+  const signed = (cents: number) => (cents > 0 ? '+' : '') + bare(cents);
+
+  const summaryLines = [
+    `${pad('bettor', 12)}${padLeft('staked', 9)}${padLeft('net', 9)}  W-L`,
+  ];
+  for (const s of standings) {
+    summaryLines.push(
+      pad(s.bettor, 12)
+      + padLeft(bare(s.stakeCents), 9)
+      + padLeft(signed(s.netCents), 9)
+      + '  ' + `${s.won}-${s.lost}`
+      + (s.voided ? ` (${s.voided} push)` : ''),
+    );
+  }
+
+  const headline: string[] = [];
+  if (champion) {
+    headline.push(`👑 **${champion.bettor}** took the week, up **${money(champion.netCents)}**`);
+  } else {
+    // Every bet losing is a real outcome, and calling the least-bad result a champion would be worse
+    // than saying plainly that the house won.
+    headline.push('👑 Nobody finished the week up.');
+  }
+  if (loser) {
+    headline.push(`💀 **${loser.bettor}** gave back **${money(Math.abs(loser.netCents))}**`);
+  }
+
+  const summary: APIEmbed = {
+    title: `🏁 ${where} — week ${event.week} betting`,
+    description: headline.join('\n') + '\n' + ['```', ...summaryLines, '```'].join('\n'),
+    color: COLOUR.won,
+    footer: {
+      text:
+        `${bets.length} bets · ${money(staked)} staked · bettors net ${money(net)}`
+        + ` · house ${money(-net)} · Declan Dollars`,
+    },
+  };
+
+  /*
+   * Every bet, each NAMING ITS MATCHUP. That absence was the other half of the complaint: a payout
+   * with no game attached is unverifiable, so the pick is shown against who it beat or lost to, with
+   * the final score.
+   */
+  const detailLines: string[] = [];
+  for (const b of bets) {
+    const mark = b.status === 'won' ? '✅' : b.status === 'lost' ? '❌' : '➖';
+    const score =
+      b.pickScore != null && b.againstScore != null
+        ? ` (${b.pickScore.toFixed(1)}-${b.againstScore.toFixed(1)})`
+        : '';
+    detailLines.push(
+      `${mark} **${b.bettor}** ${money(b.stakeCents)} on ${b.pick}`
+      + (b.against ? ` vs ${b.against}` : '')
+      + score
+      + ` → **${signed(b.netCents)}**`,
+    );
+  }
+
+  const detail: APIEmbed = {
+    title: `${where} — week ${event.week}, every bet`,
+    // Truncated rather than split across messages: the summary carries the totals, so a very long
+    // week loses detail rather than losing the point.
+    description: detailLines.join('\n').slice(0, 4000),
+    color: COLOUR.void,
+  };
+
+  return [summary, detail];
 }

@@ -13,7 +13,7 @@ import {
   handlePageButton,
 } from './commands';
 import { formatTransaction, type ManagerNames, type PlayerLookup } from './formatTransaction';
-import { formatBetEvent } from './betEventStream';
+import { formatBetEvent, formatWeekSettled } from './betEventStream';
 import { fetchBetEvents, fetchLatestEventId } from './siteApi';
 import { allSubscriptions, leaguesToPoll } from './subscriptions';
 import {
@@ -216,13 +216,23 @@ async function pollBetEvents(client: Client): Promise<void> {
 
   const subs = allSubscriptions();
   for (const event of events) {
-    const embed = formatBetEvent(event, event.bettorName);
-    // Advance the cursor whether or not it was posted: a silent event is still handled, and leaving
-    // it behind the cursor would re-fetch it forever.
+    // Advance the cursor whether or not anything is posted: a silent event is still handled, and
+    // leaving it behind the cursor would re-fetch it forever.
     betCursor = Math.max(betCursor, event.id);
-    if (!embed) continue;
 
     for (const sub of subs.filter(s => s.leagueId === event.leagueId)) {
+      /*
+       * The digest needs the league's display name, which the event does not carry — so it is built
+       * per subscription rather than once per event. Placements are the same embed for everyone.
+       */
+      const embeds =
+        event.type === 'week_settled'
+          ? formatWeekSettled(event, sub.leagueName)
+          : [formatBetEvent(event, event.bettorName)].filter(
+              (e): e is NonNullable<typeof e> => e !== null,
+            );
+      if (embeds.length === 0) continue;
+
       /*
        * Logged rather than skipped silently. A channel-level permission override denying View
        * Channel makes this fetch fail, and the earlier version of this loop just moved on — so a
@@ -237,10 +247,16 @@ async function pollBetEvents(client: Client): Promise<void> {
         );
         continue;
       }
-      try {
-        await (channel as TextChannel).send({ embeds: [embed] });
-      } catch (err) {
-        console.error(`[bot] bet event send failed for ${sub.channelId}`, err);
+      /*
+       * One message per embed rather than both in one, so the summary and the full list are separately
+       * quotable and jumpable-to. Sent in order.
+       */
+      for (const embed of embeds) {
+        try {
+          await (channel as TextChannel).send({ embeds: [embed] });
+        } catch (err) {
+          console.error(`[bot] bet event send failed for ${sub.channelId}`, err);
+        }
       }
     }
   }
