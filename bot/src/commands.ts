@@ -30,6 +30,7 @@ import {
   adminWhois,
   fetchHistory,
   fetchLeaderboard,
+  fetchLuck,
   fetchMarkets,
   fetchMe,
   placeBet,
@@ -125,6 +126,12 @@ export const commandDefinitions = [
     )
     .addStringOption(o =>
       o.setName('league').setDescription('League id, if this channel watches more than one'),
+    ),
+  new SlashCommandBuilder()
+    .setName('luck')
+    .setDescription('Expected wins vs actual wins — who has been lucky')
+    .addStringOption(o =>
+      o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
     ),
   new SlashCommandBuilder()
     .setName('website')
@@ -792,6 +799,71 @@ export async function handlePageButton(i: ButtonInteraction): Promise<void> {
   await i.editReply(out).catch(err => console.error('[bot] page update failed', err));
 }
 
+/**
+ * Expected wins against actual wins.
+ *
+ * The `league` option accepts ANY Sleeper league id, not only one this guild watches — unlike
+ * /balances or /openbets, which are gated on the bindings because they expose money. This is public
+ * schedule-and-scores arithmetic, so there is nothing to protect and real use for pointing it at a
+ * league the bot knows nothing about.
+ */
+async function handleLuck(i: ChatInputCommandInteraction): Promise<void> {
+  const explicit = i.options.getString('league')?.trim();
+  let leagueId = explicit ?? null;
+
+  if (!leagueId) {
+    const resolved = resolveLeagues(i.guildId!, i.channelId, null);
+    if ('error' in resolved) {
+      await i.editReply(`${resolved.error}\nOr pass a league id: \`/luck league:<id>\``);
+      return;
+    }
+    leagueId = resolved[0].leagueId;
+  }
+
+  const res = await fetchLuck(leagueId);
+  if (!res.ok) {
+    await i.editReply(`Could not analyse that league: ${res.error}`);
+    return;
+  }
+  const { teams, weeksCounted, league } = res.data;
+  if (teams.length === 0 || weeksCounted === 0) {
+    await i.editReply(`**${league.name}** — no completed weeks to analyse yet.`);
+    return;
+  }
+
+  const signed = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2);
+  const lines = [
+    `${pad('manager', 13)}${padLeft('W', 4)}${padLeft('exp', 7)}${padLeft('luck', 8)}`,
+  ];
+  for (const t of teams) {
+    lines.push(
+      pad(t.name, 13)
+      + padLeft(String(t.actualWins), 4)
+      + padLeft(t.expectedWins.toFixed(2), 7)
+      + padLeft(signed(t.luck), 8),
+    );
+  }
+
+  await i.editReply({
+    embeds: [{
+      title: `${league.name} — luck through ${weeksCounted} week${weeksCounted === 1 ? '' : 's'}`,
+      description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
+      color: 0x5865f2,
+      footer: {
+        text:
+          'exp = wins you would expect from your scores against a random opponent each week'
+          + ' · luck = actual minus expected'
+          /*
+           * Said plainly, because the number invites over-reading. Half a win of "luck" after two
+           * weeks is noise; the same figure after twelve is a real story, and nothing else on the
+           * line tells you which you are looking at.
+           */
+          + (weeksCounted < 4 ? ' · few weeks so far, treat as noise' : ''),
+      },
+    }],
+  });
+}
+
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {
   const base = (process.env.SITE_URL ?? 'https://fantasyfootball.edgecdec.com').replace(/\/$/, '');
   const resolved = resolveLeagues(i.guildId!, i.channelId, null);
@@ -1156,6 +1228,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'bet': return await handleBet(i);
       case 'standings': return await handleStandings(i);
       case 'website': return await handleWebsite(i);
+      case 'luck': return await handleLuck(i);
       case 'openbets': return await handleOpenBets(i);
       case 'bethistory': return await handleBetHistory(i);
       case 'watching': return await handleWatching(i);

@@ -208,6 +208,24 @@ export function fetchHistory(
   return call(`/api/bot/history?leagueId=${encodeURIComponent(leagueId)}&limit=${limit}`);
 }
 
+export type LuckTeam = {
+  name: string;
+  teamName: string | null;
+  actualWins: number;
+  expectedWins: number;
+  luck: number;
+  pointsFor: number;
+  pointsAgainst: number;
+};
+
+export function fetchLuck(leagueId: string): Promise<SiteResult<{
+  league: { leagueId: string; name: string; season: string };
+  weeksCounted: number;
+  teams: LuckTeam[];
+}>> {
+  return call(`/api/bot/luck?leagueId=${encodeURIComponent(leagueId)}`);
+}
+
 export function placeBet(args: {
   discordUserId: string;
   marketId: string;
