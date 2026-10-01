@@ -198,6 +198,8 @@ export type SleeperTransaction = {
   waiver_budget?: SleeperWaiverBudget[];
   creator: string;
   created: number;
+  /** When it completed or failed, in ms. Later than `created` for a trade that sat pending. */
+  status_updated?: number;
   leg: number; // week number
   /**
    * Type-dependent extras, verified against 810 real transactions:

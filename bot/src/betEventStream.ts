@@ -78,6 +78,23 @@ function legProbability(payload: Record<string, unknown>): number | null {
   return typeof p === 'number' && p > 0 && p < 1 ? p : null;
 }
 
+/** One placement as a single line, or null when the payload is missing its amounts. */
+function placementLine(event: BetEvent, bettor: string | null): string | null {
+  const p = event.payload;
+  const stake = num(p, 'stakeCents');
+  const toWin = num(p, 'toWinCents');
+  if (stake == null || toWin == null) return null;
+  const pick = pickName(p);
+  const price = legPrice(p);
+  const chance = legProbability(p);
+  return (
+    `**${bettor ?? 'Someone'}** put **${money(stake)}** on ${pick ?? 'a matchup'}`
+    + (chance != null ? ` (${(chance * 100).toFixed(1)}%)` : '')
+    + (price != null ? ` at ${americanOdds(price)}` : '')
+    + ` to win **${money(toWin)}**`
+  );
+}
+
 /**
  * How to announce one event, or null to stay quiet.
  *
@@ -86,23 +103,12 @@ function legProbability(payload: Record<string, unknown>): number | null {
  * frozen at the time.
  */
 export function formatBetEvent(event: BetEvent, bettor: string | null): APIEmbed | null {
-  const who = bettor ?? 'Someone';
-  const p = event.payload;
-
   if (event.type === 'wager_placed') {
-    const stake = num(p, 'stakeCents');
-    const toWin = num(p, 'toWinCents');
-    if (stake == null || toWin == null) return null;
-    const pick = pickName(p);
-    const price = legPrice(p);
-    const chance = legProbability(p);
+    const line = placementLine(event, bettor);
+    if (!line) return null;
     return {
       title: '🎲 Bet placed',
-      description:
-        `**${who}** put **${money(stake)}** on ${pick ?? 'a matchup'}`
-        + (chance != null ? ` (${(chance * 100).toFixed(1)}%)` : '')
-        + (price != null ? ` at ${americanOdds(price)}` : '')
-        + `\nto win **${money(toWin)}**`,
+      description: line,
       color: COLOUR.placed,
       footer: { text: `week ${event.week}` },
     };
@@ -120,6 +126,38 @@ export function formatBetEvent(event: BetEvent, bettor: string | null): APIEmbed
    * line_moved rides the 60-second tick and needs coalescing and a movement threshold first.
    */
   return null;
+}
+
+/**
+ * Every bet placed in one league during one flush window, as ONE message.
+ *
+ * One message per bet was too chatty once a league started betting in earnest — ten bets in a burst
+ * is ten pings. The poller collects a window's placements per league and posts them here together,
+ * oldest first so the list reads as it happened. Null when nothing in the window is announceable.
+ */
+export function formatPlacements(events: BetEvent[], leagueName: string | null): APIEmbed | null {
+  const lines = events
+    .filter(e => e.type === 'wager_placed')
+    .map(e => placementLine(e, e.bettorName))
+    .filter((l): l is string => l !== null);
+  if (lines.length === 0) return null;
+
+  const staked = events.reduce((n, e) => n + (num(e.payload, 'stakeCents') ?? 0), 0);
+  const weeks = [...new Set(events.map(e => e.week))];
+  const where = leagueName ? ` · ${leagueName}` : '';
+  return {
+    title: lines.length === 1 ? `🎲 Bet placed${where}` : `🎲 ${lines.length} bets placed${where}`,
+    // Truncated rather than split: a window that overruns an embed is a burst, and the count in the
+    // title still says how many there were.
+    description: lines.map(l => `• ${l}`).join('\n').slice(0, 4000),
+    color: COLOUR.placed,
+    footer: {
+      text:
+        (weeks.length === 1 ? `week ${weeks[0]} · ` : '')
+        + (lines.length > 1 ? `${money(staked)} staked · ` : '')
+        + 'Declan Dollars',
+    },
+  };
 }
 
 type DigestBet = {
@@ -209,7 +247,13 @@ export function formatWeekSettled(event: BetEvent, leagueName: string | null): A
    * the final score.
    */
   const detailLines: string[] = [];
-  for (const b of bets) {
+  /*
+   * Biggest win first, biggest loss last — requested, and it puts the bets people talk about at the
+   * two ends. Sorted here as well as at the source so digests emitted before the source sorted read
+   * the same way. Ties go to the larger stake.
+   */
+  const ordered = [...bets].sort((x, y) => y.netCents - x.netCents || y.stakeCents - x.stakeCents);
+  for (const b of ordered) {
     const mark = b.status === 'won' ? '✅' : b.status === 'lost' ? '❌' : '➖';
     const score =
       b.pickScore != null && b.againstScore != null
@@ -232,4 +276,48 @@ export function formatWeekSettled(event: BetEvent, leagueName: string | null): A
   };
 
   return [summary, detail];
+}
+
+/**
+ * Placements older than this when a window flushes are dropped rather than announced.
+ *
+ * The cursor survives restarts, so a bot that was down for a day would otherwise come back and
+ * announce a day of bets as if they had just happened. A digest is exempt: a week's result is worth
+ * posting late, a "just bet" message is not.
+ */
+export const MAX_PLACEMENT_AGE_MS = 60 * 60_000;
+
+/** SQLite's datetime('now') is UTC with a space and no zone; Date.parse would read it as local. */
+function eventTime(event: BetEvent): number {
+  return Date.parse(event.createdAt.replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(event.createdAt) ? '' : 'Z'));
+}
+
+export type FlushWindow = {
+  /** wager_placed events per league, oldest first. */
+  placements: Map<string, BetEvent[]>;
+  /** week_settled events, each already one digest. */
+  digests: BetEvent[];
+};
+
+/**
+ * Splits one window's outbox events into what each league should hear.
+ *
+ * Everything else — per-wager settlements, market_settled, line_moved — is consumed silently, as
+ * formatBetEvent documents.
+ */
+export function groupWindow(events: BetEvent[], now: number): FlushWindow {
+  const placements = new Map<string, BetEvent[]>();
+  const digests: BetEvent[] = [];
+  for (const event of [...events].sort((a, b) => a.id - b.id)) {
+    if (event.type === 'week_settled') {
+      digests.push(event);
+    } else if (event.type === 'wager_placed') {
+      const at = eventTime(event);
+      if (Number.isFinite(at) && now - at > MAX_PLACEMENT_AGE_MS) continue;
+      const list = placements.get(event.leagueId) ?? [];
+      list.push(event);
+      placements.set(event.leagueId, list);
+    }
+  }
+  return { placements, digests };
 }

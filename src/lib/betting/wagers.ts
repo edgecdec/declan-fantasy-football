@@ -496,7 +496,10 @@ function buildWeekDigest(
      */
     pickScore: r.side === 'a' ? r.final_a : r.final_b,
     againstScore: r.side === 'a' ? r.final_b : r.final_a,
-  }));
+  }))
+    // Biggest win first, biggest loss last; ties to the larger stake. Net is derived above, so this
+    // cannot be an ORDER BY.
+    .sort((x, y) => y.netCents - x.netCents || y.stakeCents - x.stakeCents);
 
   const byBettor = new Map<string, { bettor: string; stakeCents: number; netCents: number; won: number; lost: number; voided: number }>();
   for (const b of bets) {

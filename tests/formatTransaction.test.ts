@@ -41,7 +41,10 @@ const base: SleeperTransaction = {
 const fmt = (over: Partial<SleeperTransaction>) =>
   formatTransaction({ ...base, ...over }, NAMES, PLAYERS, 'Test League');
 
-test('a trade attributes each side correctly', () => {
+const column = (msg: ReturnType<typeof fmt>, who: string) =>
+  msg.fields!.find(f => f.name === who)!.value;
+
+test('a trade is one column per manager listing what each RECEIVES, like Sleeper', () => {
   // Real shape: 11646 goes TO roster 8 and FROM roster 9.
   const msg = fmt({
     type: 'trade',
@@ -50,14 +53,32 @@ test('a trade attributes each side correctly', () => {
     drops: { '11646': 9, '13286': 8 },
   });
 
-  assert.match(msg.title, /Trade/);
-  const alice = msg.lines.find(l => l.includes('alice'))!;
-  const bob = msg.lines.find(l => l.includes('bob'))!;
+  assert.match(msg.title, /Trade completed/);
+  assert.match(msg.lines[0], /alice\*\* ⇄ \*\*bob/);
+  assert.equal(msg.fields!.length, 2);
+  assert.ok(msg.fields!.every(f => f.inline), 'columns sit side by side');
 
-  assert.match(alice, /gets Puka Nacua/);
-  assert.match(alice, /gives Jeremiyah Love/);
-  assert.match(bob, /gets Jeremiyah Love/);
-  assert.match(bob, /gives Puka Nacua/);
+  assert.match(column(msg, 'alice'), /\+ Puka Nacua WR/);
+  assert.match(column(msg, 'bob'), /\+ Jeremiyah Love RB/);
+  // What a side gave up is the OTHER column, not repeated as a red line in its own.
+  assert.ok(!column(msg, 'alice').includes('Jeremiyah Love'));
+  assert.ok(!column(msg, 'bob').includes('Puka Nacua'));
+});
+
+test('a release to make roster room shows red under the receiver', () => {
+  const msg = fmt({
+    type: 'trade',
+    roster_ids: [8, 9],
+    adds: { '11646': 8 },
+    drops: { '11646': 9, '4046': 8 },
+  });
+  assert.match(column(msg, 'alice'), /\n- Patrick Mahomes QB/);
+  assert.match(column(msg, 'bob'), /nothing/);
+});
+
+test('a trade column is a diff block, so Discord colours it green and red', () => {
+  const msg = fmt({ type: 'trade', roster_ids: [8, 9], adds: { '11646': 8 }, drops: { '11646': 9 } });
+  assert.match(column(msg, 'alice'), /^```diff\n[\s\S]*\n```$/);
 });
 
 test('a lopsided or three-team trade needs no special case', () => {
@@ -67,19 +88,30 @@ test('a lopsided or three-team trade needs no special case', () => {
     adds: { '11646': 8, '13286': 9, '4046': 15 },
     drops: { '11646': 9, '13286': 15, '4046': 8 },
   });
-  assert.equal(msg.lines.length, 3);
-  assert.ok(msg.lines.some(l => l.includes('carol')));
+  assert.equal(msg.fields!.length, 3);
+  assert.match(column(msg, 'carol'), /Patrick Mahomes/);
 });
 
-test('draft picks in a trade are mentioned rather than silently lost', () => {
+test('draft picks and FAAB land in the receiving column, naming a moved pick\'s origin', () => {
   const msg = fmt({
     type: 'trade',
     roster_ids: [8, 9],
     adds: { '11646': 8 },
     drops: { '11646': 9 },
-    draft_picks: [{}, {}] as never,
+    draft_picks: [
+      { season: '2027', round: 1, roster_id: 9, previous_owner_id: 9, owner_id: 8 },
+      { season: '2027', round: 2, roster_id: 15, previous_owner_id: 8, owner_id: 9 },
+    ],
+    waiver_budget: [{ sender: 8, receiver: 9, amount: 15 }],
   });
-  assert.ok(msg.lines.some(l => /2 draft picks/.test(l)));
+  assert.match(column(msg, 'alice'), /\+ 2027 1st round pick\n/);
+  assert.match(column(msg, 'bob'), /\+ 2027 2nd round pick \(carol\)/);
+  assert.match(column(msg, 'bob'), /\+ \$15 FAAB/);
+});
+
+test('a trade carries its time so Discord can show it', () => {
+  const msg = fmt({ type: 'trade', roster_ids: [8, 9], created: 1000, status_updated: 5000 });
+  assert.equal(msg.timestamp, 5000);
 });
 
 test('a won waiver names the FAAB cost', () => {
@@ -142,7 +174,9 @@ test('a long player list is truncated with a count', () => {
   const adds: Record<string, number> = {};
   for (let i = 0; i < 10; i++) adds[`x${i}`] = 8;
   const msg = fmt({ type: 'trade', roster_ids: [8, 9], adds, drops: null });
-  assert.match(msg.lines[0], /and 4 more/);
+  assert.match(column(msg, 'alice'), /and 4 more/);
+  const waiver = fmt({ adds });
+  assert.match(waiver.lines[0], /and 4 more/);
 });
 
 test('an unknown player id degrades to its id rather than "undefined"', () => {

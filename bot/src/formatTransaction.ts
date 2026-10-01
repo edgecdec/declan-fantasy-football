@@ -20,6 +20,10 @@ export type TransactionMessage = {
   lines: string[];
   /** Discord embed colour. */
   colour: number;
+  /** Side-by-side columns, one per manager. Only trades use them. */
+  fields?: { name: string; value: string; inline: boolean }[];
+  /** When it happened, in ms — rendered by Discord in the reader's own timezone. */
+  timestamp?: number;
 };
 
 const COLOUR = {
@@ -77,26 +81,7 @@ export function formatTransaction(
   const failed = tx.status !== 'complete';
 
   if (tx.type === 'trade') {
-    /*
-     * Per roster: what it RECEIVES (its id in `adds`) and what it GIVES UP (its id in `drops`).
-     * Deriving it this way rather than pairing the two maps means a three-team trade, or one with
-     * uneven counts, reads correctly without special-casing.
-     */
-    const lines = tx.roster_ids.map(rosterId => {
-      const gets = idsFor(tx.adds, rosterId);
-      const gives = idsFor(tx.drops, rosterId);
-      const parts: string[] = [];
-      if (gets.length) parts.push(`gets ${nameList(gets, players)}`);
-      if (gives.length) parts.push(`gives ${nameList(gives, players)}`);
-      return `**${manager(rosterId, names)}** ${parts.join(' · ') || 'no players'}`;
-    });
-    const picks = tx.draft_picks?.length ?? 0;
-    if (picks > 0) lines.push(`_plus ${picks} draft pick${picks === 1 ? '' : 's'}_`);
-    return {
-      title: `🔄 Trade${where}`,
-      lines,
-      colour: COLOUR.trade,
-    };
+    return formatTrade(tx, names, players, where);
   }
 
   if (tx.type === 'chopped') {
@@ -156,5 +141,75 @@ export function formatTransaction(
     title: `🛠 ${tx.type === 'commissioner' ? 'Commissioner move' : tx.type}${where}`,
     lines: [`**${manager(rosterId, names)}** ${parts.join(' · ') || 'made a change'}.`],
     colour: tx.type === 'commissioner' ? COLOUR.commissioner : COLOUR.other,
+  };
+}
+
+/** "Puka Nacua WR - LAR", Sleeper's own subtitle order. Team is often unknown for free agents. */
+function tradeRow(playerId: string, players: PlayerLookup): string {
+  const row = players[playerId];
+  if (!row?.n) return `player ${playerId}`;
+  const meta = [row.p, row.t].filter(Boolean).join(' - ');
+  return meta ? `${row.n} ${meta}` : row.n;
+}
+
+function ordinal(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/**
+ * A trade laid out the way Sleeper's own trade card is: one column per manager, listing what that
+ * manager RECEIVES, green, with anything they released to make room in red underneath.
+ *
+ * What each side gives up is deliberately not repeated — it is the other column, exactly as in the
+ * app, and listing it twice was the wall-of-text the earlier one-line format turned into.
+ *
+ * The columns are inline embed fields, so Discord puts them side by side on desktop and stacks them
+ * on mobile. The colour comes from a `diff` code block: Discord paints `+` lines green and `-` lines
+ * red, which is as close to Sleeper's green and red as an embed gets.
+ */
+function formatTrade(
+  tx: SleeperTransaction,
+  names: ManagerNames,
+  players: PlayerLookup,
+  where: string,
+): TransactionMessage {
+  const received = new Set(Object.keys(tx.adds ?? {}));
+
+  const fields = tx.roster_ids.map(rosterId => {
+    const rows: string[] = [];
+    const gets = idsFor(tx.adds, rosterId);
+    for (const id of gets.slice(0, MAX_PLAYERS_LISTED)) rows.push(`+ ${tradeRow(id, players)}`);
+    if (gets.length > MAX_PLAYERS_LISTED) rows.push(`+ and ${gets.length - MAX_PLAYERS_LISTED} more`);
+
+    for (const pick of tx.draft_picks ?? []) {
+      if (pick.owner_id !== rosterId) continue;
+      // Whose pick it originally was matters once it has moved more than once — Sleeper shows it too.
+      const via = pick.roster_id !== pick.previous_owner_id ? ` (${manager(pick.roster_id, names)})` : '';
+      rows.push(`+ ${pick.season} ${ordinal(pick.round)} round pick${via}`);
+    }
+    for (const budget of tx.waiver_budget ?? []) {
+      if (budget.receiver === rosterId) rows.push(`+ $${budget.amount} FAAB`);
+    }
+
+    // A drop that nobody received is a release to make roster room, not part of the swap.
+    const released = idsFor(tx.drops, rosterId).filter(id => !received.has(id));
+    for (const id of released) rows.push(`- ${tradeRow(id, players)}`);
+
+    if (rows.length === 0) rows.push('  nothing');
+    return {
+      name: manager(rosterId, names),
+      value: ['```diff', ...rows, '```'].join('\n').slice(0, 1024),
+      inline: true,
+    };
+  });
+
+  const sides = tx.roster_ids.map(r => `**${manager(r, names)}**`);
+  return {
+    title: `🔄 Trade${tx.status === 'complete' ? ' completed' : ` ${tx.status}`}${where}`,
+    lines: [sides.join(' ⇄ ')],
+    fields,
+    colour: COLOUR.trade,
+    timestamp: tx.status_updated ?? tx.created,
   };
 }

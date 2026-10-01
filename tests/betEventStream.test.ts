@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatBetEvent, formatWeekSettled } from '../bot/src/betEventStream';
+import {
+  MAX_PLACEMENT_AGE_MS,
+  formatBetEvent,
+  formatPlacements,
+  formatWeekSettled,
+  groupWindow,
+} from '../bot/src/betEventStream';
 import type { BetEvent } from '../bot/src/siteApi';
 
 /**
@@ -241,4 +247,68 @@ test('the house take is the mirror of the bettors net', () => {
 
 test('an empty digest posts nothing at all', () => {
   assert.deepEqual(formatWeekSettled(digest({ bets: [], standings: [] }), 'Test League'), []);
+});
+
+test('the bet list runs biggest win to biggest loss', () => {
+  const [, detail] = formatWeekSettled(digest(), 'Test League');
+  const lines = detail.description!.split('\n');
+  // Source order was stake-descending (500, 250, 10); net order is +210.08, 0.00, -500.00.
+  assert.match(lines[0], /egruis/);
+  assert.match(lines[1], /edgecdec/);
+  assert.match(lines[2], /TheSebasDog/);
+});
+
+const placed = (id: number, over: Partial<BetEvent> = {}) =>
+  event({ id, refId: `w${id}`, bettorName: `b${id}`, ...over });
+
+test('a window of placements in one league is ONE message listing every bet', () => {
+  const embed = formatPlacements([placed(1), placed(2), placed(3)], 'Test League')!;
+  assert.match(embed.title!, /3 bets placed · Test League/);
+  const lines = embed.description!.split('\n');
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /b1/);
+  assert.match(lines[2], /b3/);
+  assert.match(embed.footer!.text!, /\$3\.00 staked/);
+});
+
+test('a single placement reads as one bet', () => {
+  const embed = formatPlacements([placed(1)], 'Test League')!;
+  assert.match(embed.title!, /^🎲 Bet placed · Test League$/);
+});
+
+test('a window with nothing announceable posts nothing', () => {
+  assert.equal(formatPlacements([placed(1, { payload: { accountId: 'a' } })], 'L'), null);
+  assert.equal(formatPlacements([], 'L'), null);
+});
+
+test('grouping splits placements by league and keeps digests apart', () => {
+  const now = Date.parse('2026-09-20T06:03:00Z');
+  const w = groupWindow(
+    [
+      placed(3, { leagueId: 'L2' }),
+      placed(1),
+      { ...placed(2), type: 'wager_won' },
+      { ...placed(4), type: 'week_settled' },
+      placed(5),
+    ],
+    now,
+  );
+  assert.deepEqual([...w.placements.keys()].sort(), ['L1', 'L2']);
+  // Oldest first, whatever order the page arrived in.
+  assert.deepEqual(w.placements.get('L1')!.map(e => e.id), [1, 5]);
+  assert.deepEqual(w.digests.map(e => e.id), [4]);
+});
+
+test('placements from a long outage are dropped, a late digest is not', () => {
+  // createdAt is SQLite UTC with no zone; it must not be read as local time.
+  const created = Date.parse('2026-09-20T06:00:00Z');
+  const fresh = groupWindow([placed(1)], created + MAX_PLACEMENT_AGE_MS - 1000);
+  assert.equal(fresh.placements.get('L1')!.length, 1);
+
+  const stale = groupWindow(
+    [placed(1), { ...placed(2), type: 'week_settled' }],
+    created + MAX_PLACEMENT_AGE_MS + 1000,
+  );
+  assert.equal(stale.placements.size, 0);
+  assert.equal(stale.digests.length, 1);
 });

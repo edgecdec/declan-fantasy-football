@@ -3,6 +3,7 @@ import {
   GatewayIntentBits,
   REST,
   Routes,
+  type APIEmbed,
   type TextChannel,
 } from 'discord.js';
 import playerIndex from '../../data/player_index.json';
@@ -13,9 +14,10 @@ import {
   handlePageButton,
 } from './commands';
 import { formatTransaction, type ManagerNames, type PlayerLookup } from './formatTransaction';
-import { formatBetEvent, formatWeekSettled } from './betEventStream';
-import { fetchBetEvents, fetchLatestEventId } from './siteApi';
-import { allSubscriptions, leaguesToPoll } from './subscriptions';
+import { formatPlacements, formatWeekSettled, groupWindow } from './betEventStream';
+import { getState, setState } from './botDb';
+import { fetchBetEvents, fetchLatestEventId, type BetEvent } from './siteApi';
+import { allSubscriptions, leaguesToPoll, type Subscription } from './subscriptions';
 import {
   createStreamState,
   fetchTransactions,
@@ -40,6 +42,9 @@ import {
  */
 
 const POLL_INTERVAL_MS = 60_000;
+/** Bet announcements are batched: one message per league per window. */
+const BET_FLUSH_MS = 5 * 60_000;
+const BET_CURSOR_KEY = 'bet_cursor';
 /** A week rolls over on Tuesday; re-reading it costs one request and avoids a stale-week edge case. */
 const STATE_REFRESH_MS = 15 * 60_000;
 
@@ -58,12 +63,10 @@ let currentSeason = '';
 /**
  * Cursor into the bet outbox.
  *
- * Initialised to the CURRENT latest id at startup, never 0. Starting at 0 would replay every bet
- * ever placed into the channel on each restart — the same class of mistake the transaction seeding
- * avoids, and the reason /api/bot/events returns nothing at all unless `after` is given explicitly.
- *
- * In memory, so a restart drops anything that landed while the bot was down. That is consistent with
- * how league activity is treated: notifications are a stream, not an archive.
+ * Restored from bot.db on startup so a deploy mid-window does not drop that window's bets. With no
+ * stored cursor it starts at the CURRENT latest id, never 0: starting at 0 would replay every bet
+ * ever placed into the channel — the reason /api/bot/events returns nothing unless `after` is given.
+ * A long outage cannot flood a channel either; groupWindow drops placements over an hour old.
  */
 let betCursor = -1;
 
@@ -157,7 +160,13 @@ async function pollTransactions(client: Client): Promise<void> {
         try {
           await (channel as TextChannel).send({
             content: pingRole ? `<@&${pingRole}>` : undefined,
-            embeds: [{ title: msg.title, description: msg.lines.join('\n'), color: msg.colour }],
+            embeds: [{
+              title: msg.title,
+              description: msg.lines.join('\n'),
+              color: msg.colour,
+              fields: msg.fields,
+              timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : undefined,
+            }],
             /*
              * allowed_mentions is set explicitly, and set NARROWLY. Default behaviour would honour
              * any mention the message happens to contain; naming exactly the one role means a
@@ -194,7 +203,12 @@ async function pollTransactions(client: Client): Promise<void> {
  * in hundreds of servers, global registration becomes the right trade instead.
  */
 /**
- * Posts new bet events to every channel watching that league.
+ * Posts the last window's bet events to every channel watching each league.
+ *
+ * Runs every BET_FLUSH_MS rather than every minute, and posts AT MOST ONE placement message per
+ * league per window: one message per bet turned a burst of ten bets into ten pings. The site's
+ * outbox is the buffer — nothing is held in the bot's memory between windows, so there is nothing
+ * to lose on a restart beyond the persisted cursor, which is written only after a window is handled.
  *
  * Fan-out is per SUBSCRIPTION, matching the transaction poller: a league watched by two guilds posts
  * to both, each in its own channel, and a guild watching nothing hears nothing.
@@ -203,64 +217,100 @@ async function pollTransactions(client: Client): Promise<void> {
  * nothing to say about wagers. If bet announcements ever need muting, that is its own setting rather
  * than an overload of this one.
  */
-async function pollBetEvents(client: Client): Promise<void> {
-  if (betCursor < 0) return;
-
-  const res = await fetchBetEvents(betCursor);
-  if (!res.ok) {
-    console.error('[bot] could not read bet events:', res.error);
+async function flushBetEvents(client: Client): Promise<void> {
+  if (betCursor < 0) {
+    // The site was unreachable at startup. Retry for "now" rather than falling back to 0, which
+    // would replay every bet ever placed.
+    await initBetCursor();
     return;
   }
-  const { events } = res.data;
+
+  // Page through everything since the cursor. A settled week writes several events per bet, so one
+  // window can exceed a single page.
+  const events: BetEvent[] = [];
+  let after = betCursor;
+  for (;;) {
+    const res = await fetchBetEvents(after);
+    if (!res.ok) {
+      console.error('[bot] could not read bet events:', res.error);
+      // Post what was read rather than nothing; the cursor below only covers that much.
+      break;
+    }
+    if (res.data.events.length === 0) break;
+    events.push(...res.data.events);
+    after = res.data.events[res.data.events.length - 1].id;
+  }
   if (events.length === 0) return;
 
+  const { placements, digests } = groupWindow(events, Date.now());
   const subs = allSubscriptions();
-  for (const event of events) {
-    // Advance the cursor whether or not anything is posted: a silent event is still handled, and
-    // leaving it behind the cursor would re-fetch it forever.
-    betCursor = Math.max(betCursor, event.id);
 
-    for (const sub of subs.filter(s => s.leagueId === event.leagueId)) {
-      /*
-       * The digest needs the league's display name, which the event does not carry — so it is built
-       * per subscription rather than once per event. Placements are the same embed for everyone.
-       */
-      const embeds =
-        event.type === 'week_settled'
-          ? formatWeekSettled(event, sub.leagueName)
-          : [formatBetEvent(event, event.bettorName)].filter(
-              (e): e is NonNullable<typeof e> => e !== null,
-            );
-      if (embeds.length === 0) continue;
-
-      /*
-       * Logged rather than skipped silently. A channel-level permission override denying View
-       * Channel makes this fetch fail, and the earlier version of this loop just moved on — so a
-       * guild that had bound a channel the bot could not see got no announcements and no
-       * explanation, which is exactly how it was reported: "printed in one server but not another".
-       */
-      const channel = await client.channels.fetch(sub.channelId).catch(() => null);
-      if (!channel || !channel.isTextBased() || !('send' in channel)) {
-        console.error(
-          `[bot] cannot post bet event to channel ${sub.channelId} in guild ${sub.guildId}`
-          + ' — check the bot can View Channel and Send Messages there',
-        );
-        continue;
-      }
-      /*
-       * One message per embed rather than both in one, so the summary and the full list are separately
-       * quotable and jumpable-to. Sent in order.
-       */
-      for (const embed of embeds) {
-        try {
-          await (channel as TextChannel).send({ embeds: [embed] });
-        } catch (err) {
-          console.error(`[bot] bet event send failed for ${sub.channelId}`, err);
-        }
+  const send = async (sub: Subscription, embeds: APIEmbed[]): Promise<void> => {
+    /*
+     * Logged rather than skipped silently. A channel-level permission override denying View
+     * Channel makes this fetch fail, and an earlier version just moved on — so a guild that had
+     * bound a channel the bot could not see got no announcements and no explanation, which is
+     * exactly how it was reported: "printed in one server but not another".
+     */
+    const channel = await client.channels.fetch(sub.channelId).catch(() => null);
+    if (!channel || !channel.isTextBased() || !('send' in channel)) {
+      console.error(
+        `[bot] cannot post bet event to channel ${sub.channelId} in guild ${sub.guildId}`
+        + ' — check the bot can View Channel and Send Messages there',
+      );
+      return;
+    }
+    // One message per embed so a digest's summary and full list are separately quotable.
+    for (const embed of embeds) {
+      try {
+        await (channel as TextChannel).send({ embeds: [embed] });
+      } catch (err) {
+        console.error(`[bot] bet event send failed for ${sub.channelId}`, err);
       }
     }
+  };
+
+  for (const [leagueId, batch] of placements) {
+    for (const sub of subs.filter(s => s.leagueId === leagueId)) {
+      // Built per subscription because the title carries the league's display name.
+      const embed = formatPlacements(batch, sub.leagueName);
+      if (embed) await send(sub, [embed]);
+    }
   }
-  console.log(`[bot] handled ${events.length} bet event(s), cursor now ${betCursor}`);
+  for (const event of digests) {
+    for (const sub of subs.filter(s => s.leagueId === event.leagueId)) {
+      const embeds = formatWeekSettled(event, sub.leagueName);
+      if (embeds.length) await send(sub, embeds);
+    }
+  }
+
+  /*
+   * Advanced past everything read, posted or not: a silent event is still handled, and leaving it
+   * behind the cursor would re-fetch it forever. Persisted so a deploy mid-window does not drop it.
+   */
+  betCursor = Math.max(betCursor, after);
+  setState(BET_CURSOR_KEY, String(betCursor));
+  const placed = [...placements.values()].reduce((n, b) => n + b.length, 0);
+  console.log(
+    `[bot] handled ${events.length} bet event(s) — ${placed} placement(s) in ${placements.size}`
+    + ` league(s), ${digests.length} digest(s); cursor now ${betCursor}`,
+  );
+}
+
+async function initBetCursor(): Promise<void> {
+  const stored = Number(getState(BET_CURSOR_KEY) ?? NaN);
+  if (Number.isInteger(stored) && stored >= 0) {
+    betCursor = stored;
+    return;
+  }
+  // First run: start at "now" so nothing that already happened is announced.
+  const latest = await fetchLatestEventId();
+  if (!latest.ok) {
+    console.error('[bot] could not read the latest bet event id:', latest.error);
+    return;
+  }
+  betCursor = latest.data.latest;
+  setState(BET_CURSOR_KEY, String(betCursor));
 }
 
 async function registerCommandsForGuild(rest: REST, appId: string, guildId: string): Promise<void> {
@@ -322,11 +372,9 @@ async function main(): Promise<void> {
   await refreshNflState();
   setInterval(() => void refreshNflState(), STATE_REFRESH_MS);
 
-  // Start the cursor at "now" so a restart announces nothing that already happened.
-  const latest = await fetchLatestEventId();
-  betCursor = latest.ok ? latest.data.latest : 0;
-  console.log(`[bot] bet event cursor starts at ${betCursor}`);
-  setInterval(() => void pollBetEvents(client), POLL_INTERVAL_MS);
+  await initBetCursor();
+  console.log(`[bot] bet event cursor starts at ${betCursor}, flushing every ${BET_FLUSH_MS / 1000}s`);
+  setInterval(() => void flushBetEvents(client), BET_FLUSH_MS);
   // First sweep runs immediately so a restart seeds without waiting a minute, during which a real
   // transaction could land and then be treated as history.
   await pollTransactions(client);

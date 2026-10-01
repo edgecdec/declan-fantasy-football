@@ -12,11 +12,11 @@ import fs from 'node:fs';
  *  - the bot never holds a write handle on the database that records balances, so no bug here can
  *    corrupt one there
  *
- * What it stores is ONLY channel bindings: which league posts where, and which event types. It
- * stores NO league transaction state at all — no seen-ids table, no cursor, nothing. Deduplication
- * is an in-memory Set that dies with the process, by explicit requirement: notifications are a
- * stream, and anything missed while the bot was down is dropped rather than caught up. See
- * transactionStream.ts for how a restart avoids reposting the week.
+ * What it stores is channel bindings — which league posts where, and which event types — plus one
+ * integer: the bet-outbox cursor (see bot_state below). It stores NO league transaction state at
+ * all — no seen-ids table, nothing. Deduplication is an in-memory Set that dies with the process, by
+ * explicit requirement: league activity is a stream, and anything missed while the bot was down is
+ * dropped rather than caught up. See transactionStream.ts for how a restart avoids reposting the week.
  */
 
 /** Overridable so a test gets its own file per process, mirroring BETTING_DB_DIR in src/lib/db.ts. */
@@ -71,6 +71,18 @@ function initBotDb(database: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_subs_league ON guild_subscriptions(league_id);
+
+    /*
+     * Small key/value state. Holds the bet-outbox cursor and nothing about any league.
+     *
+     * The cursor is persisted because bet announcements are batched into five-minute windows: with
+     * the cursor in memory, every deploy would silently drop whatever window was in flight. The
+     * events themselves stay in the site's outbox -- this is only the bookmark into it.
+     */
+    CREATE TABLE IF NOT EXISTS bot_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   /*
@@ -98,6 +110,21 @@ function addColumnIfMissing(
   const cols = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (cols.some(c => c.name === column)) return;
   database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+
+export function getState(key: string): string | null {
+  const row = getBotDb().prepare('SELECT value FROM bot_state WHERE key = ?').get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+export function setState(key: string, value: string): void {
+  getBotDb()
+    .prepare(
+      'INSERT INTO bot_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    )
+    .run(key, value);
 }
 
 /** Test seam: drops the handle so a fresh path is picked up. */
