@@ -7,7 +7,7 @@
     "rank": 1,
     "tier": 1,
     "projected_points": 299.9,
-    "custom_value": 10493,
+    "custom_value": 10454,
     "adp": 1.5,
     "is_estimated": false
   },
@@ -19,7 +19,7 @@
     "rank": 2,
     "tier": 1,
     "projected_points": 292.9,
-    "custom_value": 10335,
+    "custom_value": 9884,
     "adp": 2.0,
     "is_estimated": false
   },
@@ -31,8 +31,8 @@
     "rank": 3,
     "tier": 1,
     "projected_points": 361.5,
-    "custom_value": 11016,
-    "adp": 3.4,
+    "custom_value": 11007,
+    "adp": 3.3,
     "is_estimated": false
   },
   {
@@ -43,7 +43,7 @@
     "rank": 4,
     "tier": 1,
     "projected_points": 256.6,
-    "custom_value": 8855,
+    "custom_value": 8791,
     "adp": 4.6,
     "is_estimated": false
   },
@@ -55,7 +55,7 @@
     "rank": 5,
     "tier": 1,
     "projected_points": 259.0,
-    "custom_value": 7671,
+    "custom_value": 7559,
     "adp": 5.7,
     "is_estimated": false
   },
@@ -67,8 +67,8 @@
     "rank": 6,
     "tier": 1,
     "projected_points": 235.1,
-    "custom_value": 10385,
-    "adp": 6.2,
+    "custom_value": 10359,
+    "adp": 5.8,
     "is_estimated": false
   },
   {
@@ -79,7 +79,7 @@
     "rank": 7,
     "tier": 1,
     "projected_points": 256.0,
-    "custom_value": 7386,
+    "custom_value": 6990,
     "adp": 7.5,
     "is_estimated": false
   },
@@ -91,7 +91,7 @@
     "rank": 8,
     "tier": 1,
     "projected_points": 254.3,
-    "custom_value": 7546,
+    "custom_value": 7738,
     "adp": 8.3,
     "is_estimated": false
   },
@@ -103,8 +103,8 @@
     "rank": 9,
     "tier": 1,
     "projected_points": 326.0,
-    "custom_value": 8108,
-    "adp": 8.8,
+    "custom_value": 8459,
+    "adp": 9.2,
     "is_estimated": false
   },
   {
@@ -115,20 +115,8 @@
     "rank": 10,
     "tier": 1,
     "projected_points": 227.5,
-    "custom_value": 8198,
+    "custom_value": 8224,
     "adp": 10.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "8138",
-    "name": "James Cook",
-    "position": "RB",
-    "team": "BUF",
-    "rank": 11,
-    "tier": 1,
-    "projected_points": 245.3,
-    "custom_value": 6536,
-    "adp": 11.4,
     "is_estimated": false
   },
   {
@@ -136,11 +124,23 @@
     "name": "Drake Maye",
     "position": "QB",
     "team": "NE",
-    "rank": 12,
+    "rank": 11,
     "tier": 1,
     "projected_points": 320.8,
-    "custom_value": 3253,
-    "adp": 12.6,
+    "custom_value": 3220,
+    "adp": 11.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "8138",
+    "name": "James Cook",
+    "position": "RB",
+    "team": "BUF",
+    "rank": 12,
+    "tier": 1,
+    "projected_points": 245.3,
+    "custom_value": 5885,
+    "adp": 11.4,
     "is_estimated": false
   },
   {
@@ -151,8 +151,8 @@
     "rank": 13,
     "tier": 2,
     "projected_points": 222.5,
-    "custom_value": 7524,
-    "adp": 13.3,
+    "custom_value": 7700,
+    "adp": 13.2,
     "is_estimated": false
   },
   {
@@ -163,7 +163,7 @@
     "rank": 14,
     "tier": 2,
     "projected_points": 306.1,
-    "custom_value": 6196,
+    "custom_value": 5843,
     "adp": 14.9,
     "is_estimated": false
   },
@@ -175,7 +175,7 @@
     "rank": 15,
     "tier": 2,
     "projected_points": 205.4,
-    "custom_value": 5612,
+    "custom_value": 5441,
     "adp": 15.9,
     "is_estimated": false
   },
@@ -187,7 +187,7 @@
     "rank": 16,
     "tier": 2,
     "projected_points": 228.2,
-    "custom_value": 3784,
+    "custom_value": 3717,
     "adp": 16.7,
     "is_estimated": false
   },
@@ -211,7 +211,7 @@
     "rank": 18,
     "tier": 2,
     "projected_points": 228.7,
-    "custom_value": 5059,
+    "custom_value": 4737,
     "adp": 17.6,
     "is_estimated": false
   },
@@ -223,8 +223,8 @@
     "rank": 19,
     "tier": 2,
     "projected_points": 225.5,
-    "custom_value": 7953,
-    "adp": 19.1,
+    "custom_value": 7715,
+    "adp": 19.0,
     "is_estimated": false
   },
   {
@@ -235,7 +235,7 @@
     "rank": 20,
     "tier": 2,
     "projected_points": 218.9,
-    "custom_value": 2453,
+    "custom_value": 2247,
     "adp": 20.5,
     "is_estimated": false
   },
@@ -247,8 +247,8 @@
     "rank": 21,
     "tier": 2,
     "projected_points": 308.7,
-    "custom_value": 2836,
-    "adp": 21.1,
+    "custom_value": 2670,
+    "adp": 21.0,
     "is_estimated": false
   },
   {
@@ -259,20 +259,8 @@
     "rank": 22,
     "tier": 2,
     "projected_points": 249.5,
-    "custom_value": 7366,
-    "adp": 22.1,
-    "is_estimated": false
-  },
-  {
-    "player_id": "9224",
-    "name": "Chase Brown",
-    "position": "RB",
-    "team": "CIN",
-    "rank": 23,
-    "tier": 2,
-    "projected_points": 226.7,
-    "custom_value": 4536,
-    "adp": 23.2,
+    "custom_value": 7230,
+    "adp": 22.0,
     "is_estimated": false
   },
   {
@@ -280,11 +268,23 @@
     "name": "A.J. Brown",
     "position": "WR",
     "team": "NE",
-    "rank": 24,
+    "rank": 23,
     "tier": 2,
     "projected_points": 140.0,
-    "custom_value": 2342,
-    "adp": 24.8,
+    "custom_value": 2418,
+    "adp": 23.2,
+    "is_estimated": false
+  },
+  {
+    "player_id": "9224",
+    "name": "Chase Brown",
+    "position": "RB",
+    "team": "CIN",
+    "rank": 24,
+    "tier": 2,
+    "projected_points": 226.7,
+    "custom_value": 4464,
+    "adp": 23.2,
     "is_estimated": false
   },
   {
@@ -295,20 +295,8 @@
     "rank": 25,
     "tier": 3,
     "projected_points": 258.9,
-    "custom_value": 7084,
+    "custom_value": 6511,
     "adp": 25.4,
-    "is_estimated": false
-  },
-  {
-    "player_id": "6904",
-    "name": "Jalen Hurts",
-    "position": "QB",
-    "team": "PHI",
-    "rank": 26,
-    "tier": 3,
-    "projected_points": 310.5,
-    "custom_value": 4042,
-    "adp": 26.1,
     "is_estimated": false
   },
   {
@@ -316,11 +304,23 @@
     "name": "Derrick Henry",
     "position": "RB",
     "team": "BAL",
-    "rank": 27,
+    "rank": 26,
     "tier": 3,
     "projected_points": 238.4,
-    "custom_value": 6279,
-    "adp": 26.6,
+    "custom_value": 6228,
+    "adp": 26.5,
+    "is_estimated": false
+  },
+  {
+    "player_id": "6904",
+    "name": "Jalen Hurts",
+    "position": "QB",
+    "team": "PHI",
+    "rank": 27,
+    "tier": 3,
+    "projected_points": 310.5,
+    "custom_value": 4043,
+    "adp": 27.9,
     "is_estimated": false
   },
   {
@@ -331,7 +331,7 @@
     "rank": 28,
     "tier": 3,
     "projected_points": 299.3,
-    "custom_value": 4754,
+    "custom_value": 4493,
     "adp": 28.4,
     "is_estimated": false
   },
@@ -344,7 +344,7 @@
     "tier": 3,
     "projected_points": 205.2,
     "custom_value": 4886,
-    "adp": 29.7,
+    "adp": 29.6,
     "is_estimated": false
   },
   {
@@ -355,8 +355,8 @@
     "rank": 30,
     "tier": 3,
     "projected_points": 220.0,
-    "custom_value": 4696,
-    "adp": 30.1,
+    "custom_value": 4447,
+    "adp": 30.0,
     "is_estimated": false
   },
   {
@@ -367,8 +367,8 @@
     "rank": 31,
     "tier": 3,
     "projected_points": 205.7,
-    "custom_value": 3390,
-    "adp": 31.1,
+    "custom_value": 3328,
+    "adp": 31.0,
     "is_estimated": false
   },
   {
@@ -379,7 +379,7 @@
     "rank": 32,
     "tier": 3,
     "projected_points": 295.5,
-    "custom_value": 2722,
+    "custom_value": 2474,
     "adp": 32.8,
     "is_estimated": false
   },
@@ -391,8 +391,8 @@
     "rank": 33,
     "tier": 3,
     "projected_points": 193.7,
-    "custom_value": 2483,
-    "adp": 33.7,
+    "custom_value": 2414,
+    "adp": 33.6,
     "is_estimated": false
   },
   {
@@ -403,8 +403,8 @@
     "rank": 34,
     "tier": 3,
     "projected_points": 188.3,
-    "custom_value": 4250,
-    "adp": 34.6,
+    "custom_value": 4230,
+    "adp": 34.5,
     "is_estimated": false
   },
   {
@@ -415,7 +415,7 @@
     "rank": 35,
     "tier": 3,
     "projected_points": 303.9,
-    "custom_value": 4282,
+    "custom_value": 4496,
     "adp": 35.2,
     "is_estimated": false
   },
@@ -427,7 +427,7 @@
     "rank": 36,
     "tier": 3,
     "projected_points": 194.9,
-    "custom_value": 5845,
+    "custom_value": 5596,
     "adp": 35.5,
     "is_estimated": false
   },
@@ -439,8 +439,8 @@
     "rank": 37,
     "tier": 4,
     "projected_points": 192.0,
-    "custom_value": 3634,
-    "adp": 37.7,
+    "custom_value": 3834,
+    "adp": 37.6,
     "is_estimated": false
   },
   {
@@ -451,8 +451,8 @@
     "rank": 38,
     "tier": 4,
     "projected_points": 185.3,
-    "custom_value": 2493,
-    "adp": 38.6,
+    "custom_value": 2549,
+    "adp": 38.5,
     "is_estimated": false
   },
   {
@@ -463,7 +463,7 @@
     "rank": 39,
     "tier": 4,
     "projected_points": 236.4,
-    "custom_value": 1395,
+    "custom_value": 1416,
     "adp": 39.1,
     "is_estimated": false
   },
@@ -475,8 +475,8 @@
     "rank": 40,
     "tier": 4,
     "projected_points": 303.4,
-    "custom_value": 4692,
-    "adp": 40.9,
+    "custom_value": 4396,
+    "adp": 40.8,
     "is_estimated": false
   },
   {
@@ -487,8 +487,8 @@
     "rank": 41,
     "tier": 4,
     "projected_points": 193.0,
-    "custom_value": 3346,
-    "adp": 41.7,
+    "custom_value": 3408,
+    "adp": 41.6,
     "is_estimated": false
   },
   {
@@ -499,8 +499,8 @@
     "rank": 42,
     "tier": 4,
     "projected_points": 192.5,
-    "custom_value": 2492,
-    "adp": 42.4,
+    "custom_value": 2685,
+    "adp": 41.6,
     "is_estimated": false
   },
   {
@@ -511,7 +511,7 @@
     "rank": 43,
     "tier": 4,
     "projected_points": 189.2,
-    "custom_value": 2895,
+    "custom_value": 2631,
     "adp": 43.9,
     "is_estimated": false
   },
@@ -523,8 +523,8 @@
     "rank": 44,
     "tier": 4,
     "projected_points": 184.5,
-    "custom_value": 2275,
-    "adp": 44.0,
+    "custom_value": 2419,
+    "adp": 44.9,
     "is_estimated": false
   },
   {
@@ -535,8 +535,8 @@
     "rank": 45,
     "tier": 4,
     "projected_points": 286.7,
-    "custom_value": 5429,
-    "adp": 44.9,
+    "custom_value": 5565,
+    "adp": 45.0,
     "is_estimated": false
   },
   {
@@ -552,27 +552,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "11563",
-    "name": "Bo Nix",
-    "position": "QB",
-    "team": "DEN",
-    "rank": 47,
-    "tier": 4,
-    "projected_points": 295.7,
-    "custom_value": 3057,
-    "adp": 47.7,
-    "is_estimated": false
-  },
-  {
     "player_id": "6801",
     "name": "Tee Higgins",
     "position": "WR",
     "team": "CIN",
-    "rank": 48,
+    "rank": 47,
     "tier": 4,
     "projected_points": 186.9,
-    "custom_value": 3114,
-    "adp": 48.8,
+    "custom_value": 2827,
+    "adp": 47.3,
+    "is_estimated": false
+  },
+  {
+    "player_id": "11563",
+    "name": "Bo Nix",
+    "position": "QB",
+    "team": "DEN",
+    "rank": 48,
+    "tier": 4,
+    "projected_points": 295.7,
+    "custom_value": 2924,
+    "adp": 47.6,
     "is_estimated": false
   },
   {
@@ -583,8 +583,8 @@
     "rank": 49,
     "tier": 5,
     "projected_points": 187.7,
-    "custom_value": 1626,
-    "adp": 49.8,
+    "custom_value": 1695,
+    "adp": 49.7,
     "is_estimated": false
   },
   {
@@ -595,8 +595,8 @@
     "rank": 50,
     "tier": 5,
     "projected_points": 187.7,
-    "custom_value": 4180,
-    "adp": 50.3,
+    "custom_value": 4139,
+    "adp": 50.2,
     "is_estimated": false
   },
   {
@@ -607,8 +607,8 @@
     "rank": 51,
     "tier": 5,
     "projected_points": 180.2,
-    "custom_value": 2363,
-    "adp": 51.7,
+    "custom_value": 2178,
+    "adp": 51.6,
     "is_estimated": false
   },
   {
@@ -619,8 +619,8 @@
     "rank": 52,
     "tier": 5,
     "projected_points": 221.8,
-    "custom_value": 2960,
-    "adp": 52.9,
+    "custom_value": 2535,
+    "adp": 52.8,
     "is_estimated": false
   },
   {
@@ -631,8 +631,8 @@
     "rank": 53,
     "tier": 5,
     "projected_points": 179.3,
-    "custom_value": 2329,
-    "adp": 53.2,
+    "custom_value": 2134,
+    "adp": 53.1,
     "is_estimated": false
   },
   {
@@ -643,8 +643,8 @@
     "rank": 54,
     "tier": 5,
     "projected_points": 189.7,
-    "custom_value": 941,
-    "adp": 53.7,
+    "custom_value": 1039,
+    "adp": 53.8,
     "is_estimated": false
   },
   {
@@ -655,8 +655,8 @@
     "rank": 55,
     "tier": 5,
     "projected_points": 303.2,
-    "custom_value": 5842,
-    "adp": 55.8,
+    "custom_value": 5675,
+    "adp": 55.7,
     "is_estimated": false
   },
   {
@@ -667,8 +667,8 @@
     "rank": 56,
     "tier": 5,
     "projected_points": 183.4,
-    "custom_value": 4109,
-    "adp": 56.2,
+    "custom_value": 4184,
+    "adp": 56.1,
     "is_estimated": false
   },
   {
@@ -679,8 +679,8 @@
     "rank": 57,
     "tier": 5,
     "projected_points": 182.5,
-    "custom_value": 1744,
-    "adp": 57.1,
+    "custom_value": 1671,
+    "adp": 57.0,
     "is_estimated": false
   },
   {
@@ -691,20 +691,8 @@
     "rank": 58,
     "tier": 5,
     "projected_points": 185.5,
-    "custom_value": 1350,
-    "adp": 58.6,
-    "is_estimated": false
-  },
-  {
-    "player_id": "421",
-    "name": "Matthew Stafford",
-    "position": "QB",
-    "team": "LAR",
-    "rank": 59,
-    "tier": 5,
-    "projected_points": 280.2,
-    "custom_value": 3133,
-    "adp": 59.0,
+    "custom_value": 1442,
+    "adp": 58.5,
     "is_estimated": false
   },
   {
@@ -712,11 +700,23 @@
     "name": "D'Andre Swift",
     "position": "RB",
     "team": "CHI",
-    "rank": 60,
+    "rank": 59,
     "tier": 5,
     "projected_points": 189.5,
-    "custom_value": 3147,
-    "adp": 60.3,
+    "custom_value": 3074,
+    "adp": 59.8,
+    "is_estimated": false
+  },
+  {
+    "player_id": "421",
+    "name": "Matthew Stafford",
+    "position": "QB",
+    "team": "LAR",
+    "rank": 60,
+    "tier": 5,
+    "projected_points": 280.2,
+    "custom_value": 3088,
+    "adp": 59.9,
     "is_estimated": false
   },
   {
@@ -727,8 +727,8 @@
     "rank": 61,
     "tier": 6,
     "projected_points": 283.5,
-    "custom_value": 3596,
-    "adp": 61.3,
+    "custom_value": 3392,
+    "adp": 61.2,
     "is_estimated": false
   },
   {
@@ -739,8 +739,8 @@
     "rank": 62,
     "tier": 6,
     "projected_points": 127.9,
-    "custom_value": 1012,
-    "adp": 62.0,
+    "custom_value": 950,
+    "adp": 62.9,
     "is_estimated": false
   },
   {
@@ -751,8 +751,8 @@
     "rank": 63,
     "tier": 6,
     "projected_points": 190.1,
-    "custom_value": 1709,
-    "adp": 62.2,
+    "custom_value": 1518,
+    "adp": 63.7,
     "is_estimated": false
   },
   {
@@ -763,20 +763,8 @@
     "rank": 64,
     "tier": 6,
     "projected_points": 161.0,
-    "custom_value": 2901,
-    "adp": 64.5,
-    "is_estimated": false
-  },
-  {
-    "player_id": "12512",
-    "name": "Quinshon Judkins",
-    "position": "RB",
-    "team": "CLE",
-    "rank": 65,
-    "tier": 6,
-    "projected_points": 180.0,
-    "custom_value": 1385,
-    "adp": 65.7,
+    "custom_value": 2845,
+    "adp": 64.4,
     "is_estimated": false
   },
   {
@@ -784,11 +772,23 @@
     "name": "Luther Burden",
     "position": "WR",
     "team": "CHI",
-    "rank": 66,
+    "rank": 65,
     "tier": 6,
     "projected_points": 173.0,
-    "custom_value": 1482,
-    "adp": 66.8,
+    "custom_value": 1260,
+    "adp": 65.3,
+    "is_estimated": false
+  },
+  {
+    "player_id": "12512",
+    "name": "Quinshon Judkins",
+    "position": "RB",
+    "team": "CLE",
+    "rank": 66,
+    "tier": 6,
+    "projected_points": 180.0,
+    "custom_value": 1290,
+    "adp": 65.6,
     "is_estimated": false
   },
   {
@@ -799,8 +799,8 @@
     "rank": 67,
     "tier": 6,
     "projected_points": 215.5,
-    "custom_value": 1695,
-    "adp": 67.1,
+    "custom_value": 1653,
+    "adp": 67.9,
     "is_estimated": false
   },
   {
@@ -811,8 +811,8 @@
     "rank": 68,
     "tier": 6,
     "projected_points": 147.5,
-    "custom_value": 2058,
-    "adp": 68.7,
+    "custom_value": 1971,
+    "adp": 68.5,
     "is_estimated": false
   },
   {
@@ -823,8 +823,8 @@
     "rank": 69,
     "tier": 6,
     "projected_points": 176.8,
-    "custom_value": 1137,
-    "adp": 69.1,
+    "custom_value": 1192,
+    "adp": 69.0,
     "is_estimated": false
   },
   {
@@ -835,8 +835,8 @@
     "rank": 70,
     "tier": 6,
     "projected_points": 278.5,
-    "custom_value": 2583,
-    "adp": 70.4,
+    "custom_value": 2768,
+    "adp": 70.3,
     "is_estimated": false
   },
   {
@@ -847,8 +847,8 @@
     "rank": 71,
     "tier": 6,
     "projected_points": 274.9,
-    "custom_value": 1492,
-    "adp": 71.1,
+    "custom_value": 1369,
+    "adp": 71.2,
     "is_estimated": false
   },
   {
@@ -859,8 +859,8 @@
     "rank": 72,
     "tier": 6,
     "projected_points": 176.2,
-    "custom_value": 902,
-    "adp": 71.4,
+    "custom_value": 879,
+    "adp": 71.2,
     "is_estimated": false
   },
   {
@@ -871,8 +871,8 @@
     "rank": 73,
     "tier": 7,
     "projected_points": 153.5,
-    "custom_value": 1121,
-    "adp": 73.9,
+    "custom_value": 1231,
+    "adp": 73.8,
     "is_estimated": false
   },
   {
@@ -883,8 +883,8 @@
     "rank": 74,
     "tier": 7,
     "projected_points": 158.8,
-    "custom_value": 2191,
-    "adp": 74.7,
+    "custom_value": 2117,
+    "adp": 74.6,
     "is_estimated": false
   },
   {
@@ -895,8 +895,8 @@
     "rank": 75,
     "tier": 7,
     "projected_points": 191.2,
-    "custom_value": 1235,
-    "adp": 75.9,
+    "custom_value": 1278,
+    "adp": 75.8,
     "is_estimated": false
   },
   {
@@ -907,8 +907,8 @@
     "rank": 76,
     "tier": 7,
     "projected_points": 160.5,
-    "custom_value": 644,
-    "adp": 76.6,
+    "custom_value": 621,
+    "adp": 76.5,
     "is_estimated": false
   },
   {
@@ -919,8 +919,8 @@
     "rank": 77,
     "tier": 7,
     "projected_points": 187.2,
-    "custom_value": 1314,
-    "adp": 77.5,
+    "custom_value": 1380,
+    "adp": 77.4,
     "is_estimated": false
   },
   {
@@ -931,8 +931,8 @@
     "rank": 78,
     "tier": 7,
     "projected_points": 198.9,
-    "custom_value": 853,
-    "adp": 78.5,
+    "custom_value": 1020,
+    "adp": 77.7,
     "is_estimated": false
   },
   {
@@ -943,8 +943,8 @@
     "rank": 79,
     "tier": 7,
     "projected_points": 173.9,
-    "custom_value": 621,
-    "adp": 79.4,
+    "custom_value": 649,
+    "adp": 79.3,
     "is_estimated": false
   },
   {
@@ -955,8 +955,8 @@
     "rank": 80,
     "tier": 7,
     "projected_points": 188.1,
-    "custom_value": 594,
-    "adp": 80.2,
+    "custom_value": 563,
+    "adp": 80.1,
     "is_estimated": false
   },
   {
@@ -967,8 +967,8 @@
     "rank": 81,
     "tier": 7,
     "projected_points": 283.1,
-    "custom_value": 1936,
-    "adp": 80.8,
+    "custom_value": 1832,
+    "adp": 81.1,
     "is_estimated": false
   },
   {
@@ -979,8 +979,8 @@
     "rank": 82,
     "tier": 7,
     "projected_points": 176.1,
-    "custom_value": 3234,
-    "adp": 82.2,
+    "custom_value": 3198,
+    "adp": 82.1,
     "is_estimated": false
   },
   {
@@ -991,8 +991,8 @@
     "rank": 83,
     "tier": 7,
     "projected_points": 176.4,
-    "custom_value": 3296,
-    "adp": 83.4,
+    "custom_value": 3282,
+    "adp": 83.3,
     "is_estimated": false
   },
   {
@@ -1003,8 +1003,8 @@
     "rank": 84,
     "tier": 7,
     "projected_points": 144.8,
-    "custom_value": 788,
-    "adp": 84.5,
+    "custom_value": 790,
+    "adp": 83.6,
     "is_estimated": false
   },
   {
@@ -1015,8 +1015,8 @@
     "rank": 85,
     "tier": 8,
     "projected_points": 152.6,
-    "custom_value": 1786,
-    "adp": 85.9,
+    "custom_value": 1837,
+    "adp": 85.8,
     "is_estimated": false
   },
   {
@@ -1027,8 +1027,8 @@
     "rank": 86,
     "tier": 8,
     "projected_points": 262.7,
-    "custom_value": 2490,
-    "adp": 86.4,
+    "custom_value": 3059,
+    "adp": 86.2,
     "is_estimated": false
   },
   {
@@ -1039,8 +1039,8 @@
     "rank": 87,
     "tier": 8,
     "projected_points": 155.2,
-    "custom_value": 566,
-    "adp": 87.1,
+    "custom_value": 583,
+    "adp": 87.9,
     "is_estimated": false
   },
   {
@@ -1051,8 +1051,8 @@
     "rank": 88,
     "tier": 8,
     "projected_points": 154.5,
-    "custom_value": 805,
-    "adp": 88.3,
+    "custom_value": 743,
+    "adp": 88.2,
     "is_estimated": false
   },
   {
@@ -1063,8 +1063,8 @@
     "rank": 89,
     "tier": 8,
     "projected_points": 270.9,
-    "custom_value": 3996,
-    "adp": 89.3,
+    "custom_value": 4475,
+    "adp": 89.1,
     "is_estimated": false
   },
   {
@@ -1075,8 +1075,8 @@
     "rank": 90,
     "tier": 8,
     "projected_points": 164.4,
-    "custom_value": 472,
-    "adp": 89.4,
+    "custom_value": 487,
+    "adp": 89.5,
     "is_estimated": false
   },
   {
@@ -1087,8 +1087,8 @@
     "rank": 91,
     "tier": 8,
     "projected_points": 125.6,
-    "custom_value": 683,
-    "adp": 91.9,
+    "custom_value": 561,
+    "adp": 91.8,
     "is_estimated": false
   },
   {
@@ -1099,8 +1099,8 @@
     "rank": 92,
     "tier": 8,
     "projected_points": 152.3,
-    "custom_value": 709,
-    "adp": 92.1,
+    "custom_value": 799,
+    "adp": 92.0,
     "is_estimated": false
   },
   {
@@ -1111,8 +1111,8 @@
     "rank": 93,
     "tier": 8,
     "projected_points": 180.1,
-    "custom_value": 2102,
-    "adp": 93.6,
+    "custom_value": 1926,
+    "adp": 93.4,
     "is_estimated": false
   },
   {
@@ -1123,20 +1123,8 @@
     "rank": 94,
     "tier": 8,
     "projected_points": 188.9,
-    "custom_value": 2069,
-    "adp": 94.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "4217",
-    "name": "George Kittle",
-    "position": "TE",
-    "team": "SF",
-    "rank": 95,
-    "tier": 8,
-    "projected_points": 184.8,
-    "custom_value": 3020,
-    "adp": 95.0,
+    "custom_value": 2098,
+    "adp": 94.0,
     "is_estimated": false
   },
   {
@@ -1144,11 +1132,23 @@
     "name": "Tony Pollard",
     "position": "RB",
     "team": "TEN",
-    "rank": 96,
+    "rank": 95,
     "tier": 8,
     "projected_points": 146.1,
-    "custom_value": 645,
-    "adp": 96.6,
+    "custom_value": 759,
+    "adp": 95.6,
+    "is_estimated": false
+  },
+  {
+    "player_id": "4217",
+    "name": "George Kittle",
+    "position": "TE",
+    "team": "SF",
+    "rank": 96,
+    "tier": 8,
+    "projected_points": 184.8,
+    "custom_value": 2824,
+    "adp": 95.8,
     "is_estimated": false
   },
   {
@@ -1159,20 +1159,8 @@
     "rank": 97,
     "tier": 9,
     "projected_points": 144.8,
-    "custom_value": 417,
-    "adp": 97.8,
-    "is_estimated": false
-  },
-  {
-    "player_id": "9758",
-    "name": "C.J. Stroud",
-    "position": "QB",
-    "team": "HOU",
-    "rank": 98,
-    "tier": 9,
-    "projected_points": 247.8,
-    "custom_value": 1929,
-    "adp": 98.1,
+    "custom_value": 484,
+    "adp": 97.7,
     "is_estimated": false
   },
   {
@@ -1180,11 +1168,23 @@
     "name": "Rico Dowdle",
     "position": "RB",
     "team": "PIT",
-    "rank": 99,
+    "rank": 98,
     "tier": 9,
     "projected_points": 142.1,
-    "custom_value": 298,
-    "adp": 98.8,
+    "custom_value": 292,
+    "adp": 98.7,
+    "is_estimated": false
+  },
+  {
+    "player_id": "9758",
+    "name": "C.J. Stroud",
+    "position": "QB",
+    "team": "HOU",
+    "rank": 99,
+    "tier": 9,
+    "projected_points": 247.8,
+    "custom_value": 1815,
+    "adp": 99.7,
     "is_estimated": false
   },
   {
@@ -1195,8 +1195,8 @@
     "rank": 100,
     "tier": 9,
     "projected_points": 136.5,
-    "custom_value": 1716,
-    "adp": 100.7,
+    "custom_value": 1828,
+    "adp": 100.6,
     "is_estimated": false
   },
   {
@@ -1207,8 +1207,8 @@
     "rank": 101,
     "tier": 9,
     "projected_points": 139.6,
-    "custom_value": 343,
-    "adp": 101.6,
+    "custom_value": 322,
+    "adp": 101.4,
     "is_estimated": false
   },
   {
@@ -1219,8 +1219,8 @@
     "rank": 102,
     "tier": 9,
     "projected_points": 147.2,
-    "custom_value": 469,
-    "adp": 102.2,
+    "custom_value": 427,
+    "adp": 102.0,
     "is_estimated": false
   },
   {
@@ -1231,8 +1231,8 @@
     "rank": 103,
     "tier": 9,
     "projected_points": 136.9,
-    "custom_value": 2526,
-    "adp": 103.0,
+    "custom_value": 2646,
+    "adp": 103.8,
     "is_estimated": false
   },
   {
@@ -1243,8 +1243,8 @@
     "rank": 104,
     "tier": 9,
     "projected_points": 270.1,
-    "custom_value": 866,
-    "adp": 104.2,
+    "custom_value": 356,
+    "adp": 104.1,
     "is_estimated": false
   },
   {
@@ -1255,8 +1255,8 @@
     "rank": 105,
     "tier": 9,
     "projected_points": 138.5,
-    "custom_value": 411,
-    "adp": 105.4,
+    "custom_value": 468,
+    "adp": 105.3,
     "is_estimated": false
   },
   {
@@ -1267,8 +1267,8 @@
     "rank": 106,
     "tier": 9,
     "projected_points": 177.3,
-    "custom_value": 776,
-    "adp": 106.2,
+    "custom_value": 658,
+    "adp": 106.1,
     "is_estimated": false
   },
   {
@@ -1279,8 +1279,8 @@
     "rank": 107,
     "tier": 9,
     "projected_points": 150.9,
-    "custom_value": 155,
-    "adp": 107.5,
+    "custom_value": 167,
+    "adp": 107.6,
     "is_estimated": false
   },
   {
@@ -1291,8 +1291,8 @@
     "rank": 108,
     "tier": 9,
     "projected_points": 172.8,
-    "custom_value": 842,
-    "adp": 107.9,
+    "custom_value": 932,
+    "adp": 107.7,
     "is_estimated": false
   },
   {
@@ -1303,8 +1303,8 @@
     "rank": 109,
     "tier": 10,
     "projected_points": 137.9,
-    "custom_value": 3,
-    "adp": 109.0,
+    "custom_value": 29,
+    "adp": 109.9,
     "is_estimated": false
   },
   {
@@ -1316,7 +1316,7 @@
     "tier": 10,
     "projected_points": 162.6,
     "custom_value": 3,
-    "adp": 110.5,
+    "adp": 110.4,
     "is_estimated": false
   },
   {
@@ -1327,8 +1327,8 @@
     "rank": 111,
     "tier": 10,
     "projected_points": 127.8,
-    "custom_value": 579,
-    "adp": 111.0,
+    "custom_value": 475,
+    "adp": 111.9,
     "is_estimated": false
   },
   {
@@ -1339,8 +1339,8 @@
     "rank": 112,
     "tier": 10,
     "projected_points": 223.5,
-    "custom_value": 891,
-    "adp": 112.0,
+    "custom_value": 791,
+    "adp": 112.8,
     "is_estimated": false
   },
   {
@@ -1351,8 +1351,8 @@
     "rank": 113,
     "tier": 10,
     "projected_points": 227.8,
-    "custom_value": 201,
-    "adp": 113.3,
+    "custom_value": 614,
+    "adp": 113.2,
     "is_estimated": false
   },
   {
@@ -1363,8 +1363,8 @@
     "rank": 114,
     "tier": 10,
     "projected_points": 141.7,
-    "custom_value": 679,
-    "adp": 114.2,
+    "custom_value": 792,
+    "adp": 114.0,
     "is_estimated": false
   },
   {
@@ -1375,8 +1375,8 @@
     "rank": 115,
     "tier": 10,
     "projected_points": 143.7,
-    "custom_value": 448,
-    "adp": 115.3,
+    "custom_value": 329,
+    "adp": 115.2,
     "is_estimated": false
   },
   {
@@ -1387,8 +1387,8 @@
     "rank": 116,
     "tier": 10,
     "projected_points": 143.1,
-    "custom_value": 518,
-    "adp": 116.8,
+    "custom_value": 537,
+    "adp": 116.6,
     "is_estimated": false
   },
   {
@@ -1399,8 +1399,8 @@
     "rank": 117,
     "tier": 10,
     "projected_points": 177.5,
-    "custom_value": 445,
-    "adp": 117.0,
+    "custom_value": 432,
+    "adp": 117.8,
     "is_estimated": false
   },
   {
@@ -1411,20 +1411,8 @@
     "rank": 118,
     "tier": 10,
     "projected_points": 125.3,
-    "custom_value": 945,
-    "adp": 118.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "5022",
-    "name": "Dallas Goedert",
-    "position": "TE",
-    "team": "PHI",
-    "rank": 119,
-    "tier": 10,
-    "projected_points": 149.2,
-    "custom_value": 280,
-    "adp": 119.9,
+    "custom_value": 1068,
+    "adp": 118.0,
     "is_estimated": false
   },
   {
@@ -1432,11 +1420,23 @@
     "name": "Michael Pittman",
     "position": "WR",
     "team": "PIT",
-    "rank": 120,
+    "rank": 119,
     "tier": 10,
     "projected_points": 136.4,
-    "custom_value": 259,
-    "adp": 120.7,
+    "custom_value": 204,
+    "adp": 119.5,
+    "is_estimated": false
+  },
+  {
+    "player_id": "5022",
+    "name": "Dallas Goedert",
+    "position": "TE",
+    "team": "PHI",
+    "rank": 120,
+    "tier": 10,
+    "projected_points": 149.2,
+    "custom_value": 228,
+    "adp": 119.7,
     "is_estimated": false
   },
   {
@@ -1447,8 +1447,8 @@
     "rank": 121,
     "tier": 11,
     "projected_points": 134.9,
-    "custom_value": 240,
-    "adp": 121.2,
+    "custom_value": 196,
+    "adp": 121.0,
     "is_estimated": false
   },
   {
@@ -1459,8 +1459,8 @@
     "rank": 122,
     "tier": 11,
     "projected_points": 128.8,
-    "custom_value": 149,
-    "adp": 122.9,
+    "custom_value": 135,
+    "adp": 122.8,
     "is_estimated": false
   },
   {
@@ -1471,8 +1471,8 @@
     "rank": 123,
     "tier": 11,
     "projected_points": 235.6,
-    "custom_value": 2731,
-    "adp": 123.0,
+    "custom_value": 2503,
+    "adp": 123.8,
     "is_estimated": false
   },
   {
@@ -1483,20 +1483,8 @@
     "rank": 124,
     "tier": 11,
     "projected_points": 90.5,
-    "custom_value": 670,
-    "adp": 124.0,
-    "is_estimated": false
-  },
-  {
-    "player_id": "9500",
-    "name": "Josh Downs",
-    "position": "WR",
-    "team": "IND",
-    "rank": 125,
-    "tier": 11,
-    "projected_points": 137.3,
-    "custom_value": 1126,
-    "adp": 125.6,
+    "custom_value": 634,
+    "adp": 124.8,
     "is_estimated": false
   },
   {
@@ -1504,11 +1492,23 @@
     "name": "Jacory Croskey-Merritt",
     "position": "RB",
     "team": "WAS",
-    "rank": 126,
+    "rank": 125,
     "tier": 11,
     "projected_points": 118.4,
-    "custom_value": 614,
-    "adp": 125.9,
+    "custom_value": 694,
+    "adp": 125.7,
+    "is_estimated": false
+  },
+  {
+    "player_id": "9500",
+    "name": "Josh Downs",
+    "position": "WR",
+    "team": "IND",
+    "rank": 126,
+    "tier": 11,
+    "projected_points": 137.3,
+    "custom_value": 1117,
+    "adp": 125.8,
     "is_estimated": false
   },
   {
@@ -1519,8 +1519,8 @@
     "rank": 127,
     "tier": 11,
     "projected_points": 127.4,
-    "custom_value": 459,
-    "adp": 127.7,
+    "custom_value": 536,
+    "adp": 127.5,
     "is_estimated": false
   },
   {
@@ -1531,8 +1531,8 @@
     "rank": 128,
     "tier": 11,
     "projected_points": 105.4,
-    "custom_value": 23,
-    "adp": 128.4,
+    "custom_value": 37,
+    "adp": 128.2,
     "is_estimated": false
   },
   {
@@ -1543,8 +1543,8 @@
     "rank": 129,
     "tier": 11,
     "projected_points": 135.2,
-    "custom_value": 421,
-    "adp": 129.5,
+    "custom_value": 406,
+    "adp": 129.3,
     "is_estimated": false
   },
   {
@@ -1555,8 +1555,8 @@
     "rank": 130,
     "tier": 11,
     "projected_points": 141.0,
-    "custom_value": 1366,
-    "adp": 130.5,
+    "custom_value": 1265,
+    "adp": 130.2,
     "is_estimated": false
   },
   {
@@ -1567,8 +1567,8 @@
     "rank": 131,
     "tier": 11,
     "projected_points": 168.0,
-    "custom_value": 123,
-    "adp": 131.8,
+    "custom_value": 97,
+    "adp": 131.5,
     "is_estimated": false
   },
   {
@@ -1579,8 +1579,8 @@
     "rank": 132,
     "tier": 11,
     "projected_points": 120.1,
-    "custom_value": 1238,
-    "adp": 132.5,
+    "custom_value": 1191,
+    "adp": 131.7,
     "is_estimated": false
   },
   {
@@ -1591,20 +1591,8 @@
     "rank": 133,
     "tier": 12,
     "projected_points": 137.3,
-    "custom_value": 604,
-    "adp": 133.5,
-    "is_estimated": false
-  },
-  {
-    "player_id": "8121",
-    "name": "Romeo Doubs",
-    "position": "WR",
-    "team": "NE",
-    "rank": 134,
-    "tier": 12,
-    "projected_points": 132.7,
-    "custom_value": 283,
-    "adp": 134.3,
+    "custom_value": 536,
+    "adp": 133.3,
     "is_estimated": false
   },
   {
@@ -1612,11 +1600,23 @@
     "name": "Xavier Worthy",
     "position": "WR",
     "team": "KC",
-    "rank": 135,
+    "rank": 134,
     "tier": 12,
     "projected_points": 134.0,
-    "custom_value": 276,
-    "adp": 134.7,
+    "custom_value": 264,
+    "adp": 134.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "8121",
+    "name": "Romeo Doubs",
+    "position": "WR",
+    "team": "NE",
+    "rank": 135,
+    "tier": 12,
+    "projected_points": 132.7,
+    "custom_value": 259,
+    "adp": 135.5,
     "is_estimated": false
   },
   {
@@ -1627,8 +1627,8 @@
     "rank": 136,
     "tier": 12,
     "projected_points": 127.7,
-    "custom_value": 791,
-    "adp": 136.0,
+    "custom_value": 810,
+    "adp": 136.7,
     "is_estimated": false
   },
   {
@@ -1639,8 +1639,8 @@
     "rank": 137,
     "tier": 12,
     "projected_points": 111.1,
-    "custom_value": 459,
-    "adp": 137.3,
+    "custom_value": 416,
+    "adp": 137.0,
     "is_estimated": false
   },
   {
@@ -1651,8 +1651,8 @@
     "rank": 138,
     "tier": 12,
     "projected_points": 72.7,
-    "custom_value": 140,
-    "adp": 138.1,
+    "custom_value": 137,
+    "adp": 137.1,
     "is_estimated": false
   },
   {
@@ -1664,7 +1664,7 @@
     "tier": 12,
     "projected_points": 106.0,
     "custom_value": 3,
-    "adp": 139.4,
+    "adp": 139.3,
     "is_estimated": false
   },
   {
@@ -1688,7 +1688,7 @@
     "tier": 12,
     "projected_points": 103.0,
     "custom_value": 3,
-    "adp": 141.1,
+    "adp": 141.0,
     "is_estimated": false
   },
   {
@@ -1699,8 +1699,8 @@
     "rank": 142,
     "tier": 12,
     "projected_points": 137.0,
-    "custom_value": 214,
-    "adp": 142.6,
+    "custom_value": 161,
+    "adp": 142.5,
     "is_estimated": false
   },
   {
@@ -1712,7 +1712,7 @@
     "tier": 12,
     "projected_points": 212.2,
     "custom_value": 3,
-    "adp": 143.4,
+    "adp": 143.6,
     "is_estimated": false
   },
   {
@@ -1724,7 +1724,7 @@
     "tier": 12,
     "projected_points": 96.0,
     "custom_value": 3,
-    "adp": 143.8,
+    "adp": 143.7,
     "is_estimated": false
   },
   {
@@ -1748,7 +1748,7 @@
     "tier": 13,
     "projected_points": 177.0,
     "custom_value": 3,
-    "adp": 146.3,
+    "adp": 146.0,
     "is_estimated": false
   },
   {
@@ -1759,8 +1759,8 @@
     "rank": 147,
     "tier": 13,
     "projected_points": 176.8,
-    "custom_value": 116,
-    "adp": 147.1,
+    "custom_value": 110,
+    "adp": 147.9,
     "is_estimated": false
   },
   {
@@ -1772,7 +1772,7 @@
     "tier": 13,
     "projected_points": 95.0,
     "custom_value": 3,
-    "adp": 148.3,
+    "adp": 148.2,
     "is_estimated": false
   },
   {
@@ -1783,8 +1783,8 @@
     "rank": 149,
     "tier": 13,
     "projected_points": 89.5,
-    "custom_value": 151,
-    "adp": 149.5,
+    "custom_value": 125,
+    "adp": 149.2,
     "is_estimated": false
   },
   {
@@ -1795,8 +1795,8 @@
     "rank": 150,
     "tier": 13,
     "projected_points": 155.8,
-    "custom_value": 59,
-    "adp": 150.9,
+    "custom_value": 85,
+    "adp": 149.3,
     "is_estimated": false
   },
   {
@@ -1807,20 +1807,8 @@
     "rank": 151,
     "tier": 13,
     "projected_points": 154.9,
-    "custom_value": 1182,
-    "adp": 151.4,
-    "is_estimated": false
-  },
-  {
-    "player_id": "8134",
-    "name": "Khalil Shakir",
-    "position": "WR",
-    "team": "BUF",
-    "rank": 152,
-    "tier": 13,
-    "projected_points": 135.2,
-    "custom_value": 183,
-    "adp": 152.4,
+    "custom_value": 1210,
+    "adp": 151.0,
     "is_estimated": false
   },
   {
@@ -1828,11 +1816,23 @@
     "name": "Jalen Coker",
     "position": "WR",
     "team": "CAR",
-    "rank": 153,
+    "rank": 152,
     "tier": 13,
     "projected_points": 135.9,
-    "custom_value": 1303,
-    "adp": 152.5,
+    "custom_value": 1331,
+    "adp": 152.1,
+    "is_estimated": false
+  },
+  {
+    "player_id": "8134",
+    "name": "Khalil Shakir",
+    "position": "WR",
+    "team": "BUF",
+    "rank": 153,
+    "tier": 13,
+    "projected_points": 135.2,
+    "custom_value": 145,
+    "adp": 153.4,
     "is_estimated": false
   },
   {
@@ -1843,20 +1843,8 @@
     "rank": 154,
     "tier": 13,
     "projected_points": 125.0,
-    "custom_value": 58,
-    "adp": 154.9,
-    "is_estimated": false
-  },
-  {
-    "player_id": "12474",
-    "name": "Woody Marks",
-    "position": "RB",
-    "team": "HOU",
-    "rank": 155,
-    "tier": 13,
-    "projected_points": 74.3,
-    "custom_value": 451,
-    "adp": 155.7,
+    "custom_value": 50,
+    "adp": 154.7,
     "is_estimated": false
   },
   {
@@ -1864,11 +1852,23 @@
     "name": "Rashid Shaheed",
     "position": "WR",
     "team": "SEA",
-    "rank": 156,
+    "rank": 155,
     "tier": 13,
     "projected_points": 115.6,
-    "custom_value": 28,
-    "adp": 156.9,
+    "custom_value": 30,
+    "adp": 155.2,
+    "is_estimated": false
+  },
+  {
+    "player_id": "12474",
+    "name": "Woody Marks",
+    "position": "RB",
+    "team": "HOU",
+    "rank": 156,
+    "tier": 13,
+    "projected_points": 74.3,
+    "custom_value": 435,
+    "adp": 155.4,
     "is_estimated": false
   },
   {
@@ -1879,8 +1879,8 @@
     "rank": 157,
     "tier": 14,
     "projected_points": 61.7,
-    "custom_value": 704,
-    "adp": 157.3,
+    "custom_value": 854,
+    "adp": 157.0,
     "is_estimated": false
   },
   {
@@ -1891,8 +1891,8 @@
     "rank": 158,
     "tier": 14,
     "projected_points": 58.9,
-    "custom_value": 72,
-    "adp": 158.6,
+    "custom_value": 85,
+    "adp": 158.4,
     "is_estimated": false
   },
   {
@@ -1904,7 +1904,7 @@
     "tier": 14,
     "projected_points": 87.4,
     "custom_value": 3,
-    "adp": 159.9,
+    "adp": 159.7,
     "is_estimated": false
   },
   {
@@ -1915,8 +1915,8 @@
     "rank": 160,
     "tier": 14,
     "projected_points": 63.4,
-    "custom_value": 176,
-    "adp": 160.9,
+    "custom_value": 169,
+    "adp": 160.6,
     "is_estimated": false
   },
   {
@@ -1952,7 +1952,7 @@
     "tier": 14,
     "projected_points": 113.0,
     "custom_value": 3,
-    "adp": 163.5,
+    "adp": 163.4,
     "is_estimated": false
   },
   {
@@ -1976,7 +1976,7 @@
     "tier": 14,
     "projected_points": 111.0,
     "custom_value": 3,
-    "adp": 165.0,
+    "adp": 165.9,
     "is_estimated": false
   },
   {
@@ -1987,8 +1987,8 @@
     "rank": 166,
     "tier": 14,
     "projected_points": 160.0,
-    "custom_value": 1060,
-    "adp": 166.9,
+    "custom_value": 536,
+    "adp": 166.5,
     "is_estimated": false
   },
   {
@@ -1999,8 +1999,8 @@
     "rank": 167,
     "tier": 14,
     "projected_points": 222.5,
-    "custom_value": 1128,
-    "adp": 167.1,
+    "custom_value": 1097,
+    "adp": 167.8,
     "is_estimated": false
   },
   {
@@ -2012,7 +2012,7 @@
     "tier": 14,
     "projected_points": 92.0,
     "custom_value": 3,
-    "adp": 168.1,
+    "adp": 167.9,
     "is_estimated": false
   },
   {
@@ -2023,20 +2023,8 @@
     "rank": 169,
     "tier": 15,
     "projected_points": 171.5,
-    "custom_value": 117,
-    "adp": 169.1,
-    "is_estimated": false
-  },
-  {
-    "player_id": "12015",
-    "name": "Harrison Mevis",
-    "position": "K",
-    "team": "LAR",
-    "rank": 170,
-    "tier": 15,
-    "projected_points": 106.0,
-    "custom_value": 3,
-    "adp": 170.5,
+    "custom_value": 71,
+    "adp": 169.8,
     "is_estimated": false
   },
   {
@@ -2044,11 +2032,23 @@
     "name": "Pittsburgh Steelers",
     "position": "DEF",
     "team": "PIT",
-    "rank": 171,
+    "rank": 170,
     "tier": 15,
     "projected_points": 88.0,
     "custom_value": 3,
-    "adp": 170.7,
+    "adp": 170.6,
+    "is_estimated": false
+  },
+  {
+    "player_id": "12015",
+    "name": "Harrison Mevis",
+    "position": "K",
+    "team": "LAR",
+    "rank": 171,
+    "tier": 15,
+    "projected_points": 106.0,
+    "custom_value": 3,
+    "adp": 171.5,
     "is_estimated": false
   },
   {
@@ -2059,8 +2059,8 @@
     "rank": 172,
     "tier": 15,
     "projected_points": 166.9,
-    "custom_value": 618,
-    "adp": 172.1,
+    "custom_value": 532,
+    "adp": 172.7,
     "is_estimated": false
   },
   {
@@ -2084,7 +2084,7 @@
     "tier": 15,
     "projected_points": 92.0,
     "custom_value": 3,
-    "adp": 174.5,
+    "adp": 173.6,
     "is_estimated": false
   },
   {
@@ -2095,8 +2095,8 @@
     "rank": 175,
     "tier": 15,
     "projected_points": 110.2,
-    "custom_value": 745,
-    "adp": 175.9,
+    "custom_value": 759,
+    "adp": 175.4,
     "is_estimated": false
   },
   {
@@ -2108,7 +2108,7 @@
     "tier": 15,
     "projected_points": 106.0,
     "custom_value": 3,
-    "adp": 176.0,
+    "adp": 176.9,
     "is_estimated": false
   },
   {
@@ -2120,7 +2120,7 @@
     "tier": 15,
     "projected_points": 91.0,
     "custom_value": 3,
-    "adp": 177.7,
+    "adp": 177.6,
     "is_estimated": false
   },
   {
@@ -2132,19 +2132,7 @@
     "tier": 15,
     "projected_points": 159.3,
     "custom_value": 3,
-    "adp": 178.3,
-    "is_estimated": false
-  },
-  {
-    "player_id": "13346",
-    "name": "Denzel Boston",
-    "position": "WR",
-    "team": "CLE",
-    "rank": 179,
-    "tier": 15,
-    "projected_points": 108.2,
-    "custom_value": 913,
-    "adp": 179.1,
+    "adp": 178.0,
     "is_estimated": false
   },
   {
@@ -2152,11 +2140,23 @@
     "name": "Tyjae Spears",
     "position": "RB",
     "team": "TEN",
-    "rank": 180,
+    "rank": 179,
     "tier": 15,
     "projected_points": 97.1,
-    "custom_value": 73,
-    "adp": 179.2,
+    "custom_value": 76,
+    "adp": 179.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13346",
+    "name": "Denzel Boston",
+    "position": "WR",
+    "team": "CLE",
+    "rank": 180,
+    "tier": 15,
+    "projected_points": 108.2,
+    "custom_value": 793,
+    "adp": 179.6,
     "is_estimated": false
   },
   {
@@ -2168,7 +2168,7 @@
     "tier": 16,
     "projected_points": 100.8,
     "custom_value": 3,
-    "adp": 181.7,
+    "adp": 181.5,
     "is_estimated": false
   },
   {
@@ -2180,7 +2180,7 @@
     "tier": 16,
     "projected_points": 107.6,
     "custom_value": 3,
-    "adp": 182.7,
+    "adp": 182.4,
     "is_estimated": false
   },
   {
@@ -2191,8 +2191,8 @@
     "rank": 183,
     "tier": 16,
     "projected_points": 53.0,
-    "custom_value": 518,
-    "adp": 183.7,
+    "custom_value": 548,
+    "adp": 183.2,
     "is_estimated": false
   },
   {
@@ -2204,7 +2204,7 @@
     "tier": 16,
     "projected_points": 87.9,
     "custom_value": 137,
-    "adp": 184.2,
+    "adp": 184.7,
     "is_estimated": false
   },
   {
@@ -2215,8 +2215,8 @@
     "rank": 185,
     "tier": 16,
     "projected_points": 61.2,
-    "custom_value": 64,
-    "adp": 186.3,
+    "custom_value": 57,
+    "adp": 186.0,
     "is_estimated": false
   },
   {
@@ -2228,19 +2228,7 @@
     "tier": 16,
     "projected_points": 107.0,
     "custom_value": 3,
-    "adp": 187.9,
-    "is_estimated": false
-  },
-  {
-    "player_id": "DET",
-    "name": "Detroit Lions",
-    "position": "DEF",
-    "team": "DET",
-    "rank": 187,
-    "tier": 16,
-    "projected_points": 92.0,
-    "custom_value": 3,
-    "adp": 188.4,
+    "adp": 187.8,
     "is_estimated": false
   },
   {
@@ -2248,11 +2236,23 @@
     "name": "Harrison Butker",
     "position": "K",
     "team": "KC",
-    "rank": 188,
+    "rank": 187,
     "tier": 16,
     "projected_points": 100.0,
     "custom_value": 3,
-    "adp": 188.5,
+    "adp": 188.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "DET",
+    "name": "Detroit Lions",
+    "position": "DEF",
+    "team": "DET",
+    "rank": 188,
+    "tier": 16,
+    "projected_points": 92.0,
+    "custom_value": 3,
+    "adp": 189.6,
     "is_estimated": false
   },
   {
@@ -2275,8 +2275,8 @@
     "rank": 190,
     "tier": 16,
     "projected_points": 39.2,
-    "custom_value": 1666,
-    "adp": 191.2,
+    "custom_value": 1565,
+    "adp": 191.5,
     "is_estimated": false
   },
   {
@@ -2288,7 +2288,7 @@
     "tier": 16,
     "projected_points": 109.0,
     "custom_value": 3,
-    "adp": 192.3,
+    "adp": 191.8,
     "is_estimated": false
   },
   {
@@ -2299,8 +2299,8 @@
     "rank": 192,
     "tier": 16,
     "projected_points": 156.9,
-    "custom_value": 75,
-    "adp": 193.0,
+    "custom_value": 72,
+    "adp": 193.7,
     "is_estimated": false
   },
   {
@@ -2312,7 +2312,7 @@
     "tier": 17,
     "projected_points": 93.0,
     "custom_value": 3,
-    "adp": 194.4,
+    "adp": 194.3,
     "is_estimated": false
   },
   {
@@ -2323,8 +2323,8 @@
     "rank": 194,
     "tier": 17,
     "projected_points": 67.2,
-    "custom_value": 233,
-    "adp": 195.5,
+    "custom_value": 250,
+    "adp": 195.9,
     "is_estimated": false
   },
   {
@@ -2340,27 +2340,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "11610",
-    "name": "Malik Washington",
-    "position": "WR",
-    "team": "MIA",
-    "rank": 196,
-    "tier": 17,
-    "projected_points": 107.3,
-    "custom_value": 341,
-    "adp": 197.5,
-    "is_estimated": false
-  },
-  {
     "player_id": "13296",
     "name": "Caleb Douglas",
     "position": "WR",
     "team": "MIA",
-    "rank": 197,
+    "rank": 196,
     "tier": 17,
     "projected_points": 77.8,
-    "custom_value": 60,
-    "adp": 197.6,
+    "custom_value": 56,
+    "adp": 197.1,
+    "is_estimated": false
+  },
+  {
+    "player_id": "11610",
+    "name": "Malik Washington",
+    "position": "WR",
+    "team": "MIA",
+    "rank": 197,
+    "tier": 17,
+    "projected_points": 107.3,
+    "custom_value": 338,
+    "adp": 197.2,
     "is_estimated": false
   },
   {
@@ -2371,8 +2371,8 @@
     "rank": 198,
     "tier": 17,
     "projected_points": 84.8,
-    "custom_value": 287,
-    "adp": 199.7,
+    "custom_value": 267,
+    "adp": 199.2,
     "is_estimated": false
   },
   {
@@ -2384,7 +2384,7 @@
     "tier": 17,
     "projected_points": 77.5,
     "custom_value": 3,
-    "adp": 200.9,
+    "adp": 200.6,
     "is_estimated": false
   },
   {
@@ -2395,8 +2395,8 @@
     "rank": 200,
     "tier": 17,
     "projected_points": 102.1,
-    "custom_value": 526,
-    "adp": 201.2,
+    "custom_value": 317,
+    "adp": 201.3,
     "is_estimated": false
   },
   {
@@ -2407,8 +2407,8 @@
     "rank": 201,
     "tier": 17,
     "projected_points": 109.0,
-    "custom_value": 39,
-    "adp": 202.1,
+    "custom_value": 64,
+    "adp": 202.9,
     "is_estimated": false
   },
   {
@@ -2419,8 +2419,8 @@
     "rank": 202,
     "tier": 17,
     "projected_points": 143.2,
-    "custom_value": 1212,
-    "adp": 203.9,
+    "custom_value": 1194,
+    "adp": 203.0,
     "is_estimated": false
   },
   {
@@ -2431,8 +2431,8 @@
     "rank": 203,
     "tier": 17,
     "projected_points": 102.9,
-    "custom_value": 250,
-    "adp": 204.9,
+    "custom_value": 221,
+    "adp": 203.7,
     "is_estimated": false
   },
   {
@@ -2443,8 +2443,8 @@
     "rank": 204,
     "tier": 17,
     "projected_points": 59.2,
-    "custom_value": 211,
-    "adp": 205.6,
+    "custom_value": 201,
+    "adp": 205.0,
     "is_estimated": false
   },
   {
@@ -2456,7 +2456,7 @@
     "tier": 18,
     "projected_points": 104.6,
     "custom_value": 3,
-    "adp": 206.3,
+    "adp": 206.1,
     "is_estimated": false
   },
   {
@@ -2467,8 +2467,8 @@
     "rank": 206,
     "tier": 18,
     "projected_points": 104.7,
-    "custom_value": 32,
-    "adp": 206.5,
+    "custom_value": 19,
+    "adp": 207.3,
     "is_estimated": false
   },
   {
@@ -2480,7 +2480,7 @@
     "tier": 18,
     "projected_points": 97.1,
     "custom_value": 3,
-    "adp": 208.0,
+    "adp": 208.8,
     "is_estimated": false
   },
   {
@@ -2492,7 +2492,7 @@
     "tier": 18,
     "projected_points": 77.2,
     "custom_value": 3,
-    "adp": 209.5,
+    "adp": 209.4,
     "is_estimated": false
   },
   {
@@ -2504,7 +2504,7 @@
     "tier": 18,
     "projected_points": 48.6,
     "custom_value": 3,
-    "adp": 210.3,
+    "adp": 210.0,
     "is_estimated": false
   },
   {
@@ -2515,8 +2515,8 @@
     "rank": 210,
     "tier": 18,
     "projected_points": 86.2,
-    "custom_value": 15,
-    "adp": 211.1,
+    "custom_value": 3,
+    "adp": 211.8,
     "is_estimated": false
   },
   {
@@ -2527,8 +2527,8 @@
     "rank": 211,
     "tier": 18,
     "projected_points": 57.4,
-    "custom_value": 369,
-    "adp": 212.4,
+    "custom_value": 398,
+    "adp": 212.2,
     "is_estimated": false
   },
   {
@@ -2539,7 +2539,7 @@
     "rank": 212,
     "tier": 18,
     "projected_points": 43.4,
-    "custom_value": 16,
+    "custom_value": 15,
     "adp": 213.2,
     "is_estimated": false
   },
@@ -2551,20 +2551,8 @@
     "rank": 213,
     "tier": 18,
     "projected_points": 86.2,
-    "custom_value": 7,
-    "adp": 214.1,
-    "is_estimated": false
-  },
-  {
-    "player_id": "11618",
-    "name": "Jalen McMillan",
-    "position": "WR",
-    "team": "TB",
-    "rank": 214,
-    "tier": 18,
-    "projected_points": 105.4,
-    "custom_value": 3,
-    "adp": 215.1,
+    "custom_value": 24,
+    "adp": 214.5,
     "is_estimated": false
   },
   {
@@ -2572,11 +2560,23 @@
     "name": "Braelon Allen",
     "position": "RB",
     "team": "NYJ",
-    "rank": 215,
+    "rank": 214,
     "tier": 18,
     "projected_points": 47.2,
-    "custom_value": 404,
-    "adp": 215.3,
+    "custom_value": 436,
+    "adp": 215.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "11618",
+    "name": "Jalen McMillan",
+    "position": "WR",
+    "team": "TB",
+    "rank": 215,
+    "tier": 18,
+    "projected_points": 105.4,
+    "custom_value": 3,
+    "adp": 215.9,
     "is_estimated": false
   },
   {
@@ -2588,7 +2588,7 @@
     "tier": 18,
     "projected_points": 98.1,
     "custom_value": 3,
-    "adp": 217.4,
+    "adp": 217.0,
     "is_estimated": false
   },
   {
@@ -2612,7 +2612,7 @@
     "tier": 19,
     "projected_points": 106.0,
     "custom_value": 3,
-    "adp": 219.0,
+    "adp": 219.9,
     "is_estimated": false
   },
   {
@@ -2624,7 +2624,7 @@
     "tier": 19,
     "projected_points": 86.0,
     "custom_value": 3,
-    "adp": 220.4,
+    "adp": 220.2,
     "is_estimated": false
   },
   {
@@ -2635,7 +2635,7 @@
     "rank": 220,
     "tier": 19,
     "projected_points": 134.3,
-    "custom_value": 376,
+    "custom_value": 462,
     "adp": 221.1,
     "is_estimated": false
   },
@@ -2648,7 +2648,7 @@
     "tier": 19,
     "projected_points": 96.0,
     "custom_value": 3,
-    "adp": 222.5,
+    "adp": 221.5,
     "is_estimated": false
   },
   {
@@ -2660,7 +2660,19 @@
     "tier": 19,
     "projected_points": 144.6,
     "custom_value": 3,
-    "adp": 223.7,
+    "adp": 223.2,
+    "is_estimated": false
+  },
+  {
+    "player_id": "7600",
+    "name": "Pat Freiermuth",
+    "position": "TE",
+    "team": "PIT",
+    "rank": 223,
+    "tier": 19,
+    "projected_points": 141.2,
+    "custom_value": 31,
+    "adp": 224.4,
     "is_estimated": false
   },
   {
@@ -2668,24 +2680,12 @@
     "name": "Jayden Higgins",
     "position": "WR",
     "team": "HOU",
-    "rank": 223,
+    "rank": 224,
     "tier": 19,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 224.1,
+    "adp": 225.8,
     "is_estimated": true
-  },
-  {
-    "player_id": "7600",
-    "name": "Pat Freiermuth",
-    "position": "TE",
-    "team": "PIT",
-    "rank": 224,
-    "tier": 19,
-    "projected_points": 141.2,
-    "custom_value": 3,
-    "adp": 224.6,
-    "is_estimated": false
   },
   {
     "player_id": "7528",
@@ -2696,7 +2696,7 @@
     "tier": 19,
     "projected_points": 23.8,
     "custom_value": 3,
-    "adp": 226.7,
+    "adp": 226.2,
     "is_estimated": false
   },
   {
@@ -2708,7 +2708,7 @@
     "tier": 19,
     "projected_points": 63.8,
     "custom_value": 3,
-    "adp": 227.0,
+    "adp": 227.8,
     "is_estimated": false
   },
   {
@@ -2720,7 +2720,7 @@
     "tier": 19,
     "projected_points": 122.7,
     "custom_value": 3,
-    "adp": 228.8,
+    "adp": 228.0,
     "is_estimated": false
   },
   {
@@ -2743,8 +2743,8 @@
     "rank": 229,
     "tier": 20,
     "projected_points": 54.7,
-    "custom_value": 34,
-    "adp": 230.7,
+    "custom_value": 45,
+    "adp": 230.8,
     "is_estimated": false
   },
   {
@@ -2755,8 +2755,8 @@
     "rank": 230,
     "tier": 20,
     "projected_points": 70.4,
-    "custom_value": 5,
-    "adp": 231.4,
+    "custom_value": 14,
+    "adp": 231.3,
     "is_estimated": false
   },
   {
@@ -2768,7 +2768,7 @@
     "tier": 20,
     "projected_points": 54.9,
     "custom_value": 3,
-    "adp": 232.1,
+    "adp": 232.8,
     "is_estimated": false
   },
   {
@@ -2780,7 +2780,7 @@
     "tier": 20,
     "projected_points": 57.7,
     "custom_value": 3,
-    "adp": 233.5,
+    "adp": 233.3,
     "is_estimated": false
   },
   {
@@ -2791,8 +2791,8 @@
     "rank": 233,
     "tier": 20,
     "projected_points": 80.8,
-    "custom_value": 234,
-    "adp": 234.0,
+    "custom_value": 232,
+    "adp": 233.5,
     "is_estimated": false
   },
   {
@@ -2803,7 +2803,7 @@
     "rank": 234,
     "tier": 20,
     "projected_points": 89.6,
-    "custom_value": 448,
+    "custom_value": 434,
     "adp": 235.6,
     "is_estimated": false
   },
@@ -2816,19 +2816,7 @@
     "tier": 20,
     "projected_points": 63.5,
     "custom_value": 3,
-    "adp": 236.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "11575",
-    "name": "Ray Davis",
-    "position": "RB",
-    "team": "BUF",
-    "rank": 236,
-    "tier": 20,
-    "projected_points": 60.6,
-    "custom_value": 3,
-    "adp": 237.0,
+    "adp": 236.9,
     "is_estimated": false
   },
   {
@@ -2836,11 +2824,23 @@
     "name": "Lucas Krull",
     "position": "TE",
     "team": "DEN",
-    "rank": 237,
+    "rank": 236,
     "tier": 20,
     "projected_points": 9.1,
     "custom_value": 3,
     "adp": 237,
+    "is_estimated": false
+  },
+  {
+    "player_id": "11575",
+    "name": "Ray Davis",
+    "position": "RB",
+    "team": "BUF",
+    "rank": 237,
+    "tier": 20,
+    "projected_points": 60.6,
+    "custom_value": 3,
+    "adp": 237.6,
     "is_estimated": false
   },
   {
@@ -2852,7 +2852,7 @@
     "tier": 20,
     "projected_points": 51.7,
     "custom_value": 3,
-    "adp": 238.7,
+    "adp": 238.6,
     "is_estimated": false
   },
   {
@@ -2864,7 +2864,7 @@
     "tier": 20,
     "projected_points": 97.7,
     "custom_value": 3,
-    "adp": 239.0,
+    "adp": 239.2,
     "is_estimated": false
   },
   {
@@ -2875,8 +2875,8 @@
     "rank": 240,
     "tier": 20,
     "projected_points": 78.9,
-    "custom_value": 45,
-    "adp": 240.2,
+    "custom_value": 41,
+    "adp": 239.3,
     "is_estimated": false
   },
   {
@@ -2899,8 +2899,8 @@
     "rank": 242,
     "tier": 21,
     "projected_points": 93.4,
-    "custom_value": 17,
-    "adp": 241.0,
+    "custom_value": 21,
+    "adp": 241.6,
     "is_estimated": false
   },
   {
@@ -2912,19 +2912,7 @@
     "tier": 21,
     "projected_points": 73.1,
     "custom_value": 3,
-    "adp": 242.7,
-    "is_estimated": false
-  },
-  {
-    "player_id": "5995",
-    "name": "Justice Hill",
-    "position": "RB",
-    "team": "BAL",
-    "rank": 244,
-    "tier": 21,
-    "projected_points": 55.7,
-    "custom_value": 3,
-    "adp": 242.7,
+    "adp": 242.1,
     "is_estimated": false
   },
   {
@@ -2932,12 +2920,24 @@
     "name": "Jelani Woods",
     "position": "TE",
     "team": "NYJ",
-    "rank": 245,
+    "rank": 244,
     "tier": 21,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 243,
     "is_estimated": true
+  },
+  {
+    "player_id": "5995",
+    "name": "Justice Hill",
+    "position": "RB",
+    "team": "BAL",
+    "rank": 245,
+    "tier": 21,
+    "projected_points": 55.7,
+    "custom_value": 3,
+    "adp": 243.9,
+    "is_estimated": false
   },
   {
     "player_id": "13301",
@@ -2947,8 +2947,8 @@
     "rank": 246,
     "tier": 21,
     "projected_points": 61.2,
-    "custom_value": 19,
-    "adp": 244.5,
+    "custom_value": 41,
+    "adp": 244.6,
     "is_estimated": false
   },
   {
@@ -2972,19 +2972,19 @@
     "tier": 21,
     "projected_points": 80.9,
     "custom_value": 3,
-    "adp": 245.3,
+    "adp": 245.4,
     "is_estimated": false
   },
   {
-    "player_id": "11647",
-    "name": "Kimani Vidal",
-    "position": "RB",
-    "team": "LAC",
+    "player_id": "3321",
+    "name": "Tyreek Hill",
+    "position": "WR",
+    "team": "FA",
     "rank": 249,
     "tier": 21,
-    "projected_points": 53.0,
-    "custom_value": 3,
-    "adp": 246.6,
+    "projected_points": 77.2,
+    "custom_value": 165,
+    "adp": 245.6,
     "is_estimated": false
   },
   {
@@ -3000,14 +3000,14 @@
     "is_estimated": false
   },
   {
-    "player_id": "3321",
-    "name": "Tyreek Hill",
-    "position": "WR",
-    "team": "FA",
+    "player_id": "11647",
+    "name": "Kimani Vidal",
+    "position": "RB",
+    "team": "LAC",
     "rank": 251,
     "tier": 21,
-    "projected_points": 77.2,
-    "custom_value": 154,
+    "projected_points": 53.0,
+    "custom_value": 3,
     "adp": 247.1,
     "is_estimated": false
   },
@@ -3020,31 +3020,19 @@
     "tier": 21,
     "projected_points": 13.6,
     "custom_value": 3,
-    "adp": 248.6,
+    "adp": 248.4,
     "is_estimated": false
   },
   {
-    "player_id": "13405",
-    "name": "Kaytron Allen",
-    "position": "RB",
-    "team": "WAS",
+    "player_id": "13317",
+    "name": "Ted Hurst",
+    "position": "WR",
+    "team": "TB",
     "rank": 253,
     "tier": 22,
-    "projected_points": 41.9,
+    "projected_points": 79.9,
     "custom_value": 3,
-    "adp": 249.0,
-    "is_estimated": false
-  },
-  {
-    "player_id": "13545",
-    "name": "Trey Smack",
-    "position": "K",
-    "team": "GB",
-    "rank": 254,
-    "tier": 22,
-    "projected_points": 70.0,
-    "custom_value": 3,
-    "adp": 250.2,
+    "adp": 249.7,
     "is_estimated": false
   },
   {
@@ -3052,7 +3040,7 @@
     "name": "Jarquez Hunter",
     "position": "RB",
     "team": "MIA",
-    "rank": 255,
+    "rank": 254,
     "tier": 22,
     "projected_points": 8.6,
     "custom_value": 3,
@@ -3060,15 +3048,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "BUF",
-    "name": "Buffalo Bills",
-    "position": "DEF",
-    "team": "BUF",
+    "player_id": "13405",
+    "name": "Kaytron Allen",
+    "position": "RB",
+    "team": "WAS",
+    "rank": 255,
+    "tier": 22,
+    "projected_points": 41.9,
+    "custom_value": 3,
+    "adp": 250.8,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13545",
+    "name": "Trey Smack",
+    "position": "K",
+    "team": "GB",
     "rank": 256,
     "tier": 22,
-    "projected_points": 84.0,
+    "projected_points": 70.0,
     "custom_value": 3,
-    "adp": 251.1,
+    "adp": 251.2,
     "is_estimated": false
   },
   {
@@ -3080,7 +3080,19 @@
     "tier": 22,
     "projected_points": 84.0,
     "custom_value": 3,
-    "adp": 251.8,
+    "adp": 251.7,
+    "is_estimated": false
+  },
+  {
+    "player_id": "BUF",
+    "name": "Buffalo Bills",
+    "position": "DEF",
+    "team": "BUF",
+    "rank": 258,
+    "tier": 22,
+    "projected_points": 84.0,
+    "custom_value": 3,
+    "adp": 253.9,
     "is_estimated": false
   },
   {
@@ -3088,11 +3100,11 @@
     "name": "Wil Lutz",
     "position": "K",
     "team": "DEN",
-    "rank": 258,
+    "rank": 259,
     "tier": 22,
     "projected_points": 100.0,
     "custom_value": 3,
-    "adp": 253.0,
+    "adp": 254.0,
     "is_estimated": false
   },
   {
@@ -3100,11 +3112,11 @@
     "name": "Kansas City Chiefs",
     "position": "DEF",
     "team": "KC",
-    "rank": 259,
+    "rank": 260,
     "tier": 22,
     "projected_points": 87.0,
     "custom_value": 3,
-    "adp": 254.2,
+    "adp": 255.6,
     "is_estimated": false
   },
   {
@@ -3112,23 +3124,11 @@
     "name": "Chase McLaughlin",
     "position": "K",
     "team": "TB",
-    "rank": 260,
+    "rank": 261,
     "tier": 22,
     "projected_points": 105.0,
     "custom_value": 3,
-    "adp": 255.4,
-    "is_estimated": false
-  },
-  {
-    "player_id": "2078",
-    "name": "Odell Beckham",
-    "position": "WR",
-    "team": "FA",
-    "rank": 261,
-    "tier": 22,
-    "projected_points": 23.0,
-    "custom_value": 3,
-    "adp": 256.9,
+    "adp": 256.4,
     "is_estimated": false
   },
   {
@@ -3151,8 +3151,20 @@
     "rank": 263,
     "tier": 22,
     "projected_points": 29.5,
-    "custom_value": 3,
+    "custom_value": 17,
     "adp": 257.8,
+    "is_estimated": false
+  },
+  {
+    "player_id": "2078",
+    "name": "Odell Beckham",
+    "position": "WR",
+    "team": "FA",
+    "rank": 264,
+    "tier": 22,
+    "projected_points": 23.0,
+    "custom_value": 3,
+    "adp": 257.9,
     "is_estimated": false
   },
   {
@@ -3160,8 +3172,8 @@
     "name": "Quinn Ewers",
     "position": "QB",
     "team": "JAX",
-    "rank": 264,
-    "tier": 22,
+    "rank": 265,
+    "tier": 23,
     "projected_points": 12.4,
     "custom_value": 3,
     "adp": 258.6,
@@ -3172,11 +3184,11 @@
     "name": "Evan Engram",
     "position": "TE",
     "team": "DEN",
-    "rank": 265,
+    "rank": 266,
     "tier": 23,
     "projected_points": 78.5,
     "custom_value": 3,
-    "adp": 258.6,
+    "adp": 259.4,
     "is_estimated": false
   },
   {
@@ -3184,11 +3196,11 @@
     "name": "Mike Gesicki",
     "position": "TE",
     "team": "CIN",
-    "rank": 266,
+    "rank": 267,
     "tier": 23,
     "projected_points": 115.4,
-    "custom_value": 15,
-    "adp": 259.4,
+    "custom_value": 3,
+    "adp": 260.6,
     "is_estimated": false
   },
   {
@@ -3196,23 +3208,11 @@
     "name": "Eli Stowers",
     "position": "TE",
     "team": "PHI",
-    "rank": 267,
+    "rank": 268,
     "tier": 23,
     "projected_points": 89.2,
     "custom_value": 3,
-    "adp": 260.4,
-    "is_estimated": false
-  },
-  {
-    "player_id": "13317",
-    "name": "Ted Hurst",
-    "position": "WR",
-    "team": "TB",
-    "rank": 268,
-    "tier": 23,
-    "projected_points": 79.9,
-    "custom_value": 3,
-    "adp": 260.9,
+    "adp": 261.2,
     "is_estimated": false
   },
   {
@@ -3236,19 +3236,7 @@
     "tier": 23,
     "projected_points": 62.8,
     "custom_value": 3,
-    "adp": 262.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "13424",
-    "name": "Seth McGowan",
-    "position": "RB",
-    "team": "IND",
-    "rank": 271,
-    "tier": 23,
-    "projected_points": 32.8,
-    "custom_value": 3,
-    "adp": 263.1,
+    "adp": 262.8,
     "is_estimated": false
   },
   {
@@ -3256,11 +3244,23 @@
     "name": "Colby Parkinson",
     "position": "TE",
     "team": "LAR",
-    "rank": 272,
+    "rank": 271,
     "tier": 23,
     "projected_points": 83.5,
     "custom_value": 3,
-    "adp": 264.2,
+    "adp": 263.5,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13424",
+    "name": "Seth McGowan",
+    "position": "RB",
+    "team": "IND",
+    "rank": 272,
+    "tier": 23,
+    "projected_points": 32.8,
+    "custom_value": 3,
+    "adp": 263.9,
     "is_estimated": false
   },
   {
@@ -3283,8 +3283,8 @@
     "rank": 274,
     "tier": 23,
     "projected_points": 23.2,
-    "custom_value": 3,
-    "adp": 266.5,
+    "custom_value": 6,
+    "adp": 266.0,
     "is_estimated": false
   },
   {
@@ -3319,20 +3319,8 @@
     "rank": 277,
     "tier": 24,
     "projected_points": 84.3,
-    "custom_value": 147,
-    "adp": 268.2,
-    "is_estimated": false
-  },
-  {
-    "player_id": "12498",
-    "name": "Mason Taylor",
-    "position": "TE",
-    "team": "NYJ",
-    "rank": 278,
-    "tier": 24,
-    "projected_points": 106.4,
-    "custom_value": 3,
-    "adp": 269.8,
+    "custom_value": 106,
+    "adp": 268.1,
     "is_estimated": false
   },
   {
@@ -3340,9 +3328,21 @@
     "name": "Jaylin Noel",
     "position": "WR",
     "team": "HOU",
-    "rank": 279,
+    "rank": 278,
     "tier": 24,
     "projected_points": 69.2,
+    "custom_value": 3,
+    "adp": 269.5,
+    "is_estimated": false
+  },
+  {
+    "player_id": "12498",
+    "name": "Mason Taylor",
+    "position": "TE",
+    "team": "NYJ",
+    "rank": 279,
+    "tier": 24,
+    "projected_points": 106.4,
     "custom_value": 3,
     "adp": 269.8,
     "is_estimated": false
@@ -3367,20 +3367,8 @@
     "rank": 281,
     "tier": 24,
     "projected_points": 71.3,
-    "custom_value": 20,
-    "adp": 271.7,
-    "is_estimated": false
-  },
-  {
-    "player_id": "4981",
-    "name": "Calvin Ridley",
-    "position": "WR",
-    "team": "TEN",
-    "rank": 282,
-    "tier": 24,
-    "projected_points": 63.8,
     "custom_value": 3,
-    "adp": 272.2,
+    "adp": 271.4,
     "is_estimated": false
   },
   {
@@ -3388,23 +3376,23 @@
     "name": "Jaylen Wright",
     "position": "RB",
     "team": "MIA",
-    "rank": 283,
+    "rank": 282,
     "tier": 24,
     "projected_points": 41.1,
-    "custom_value": 280,
-    "adp": 273.6,
+    "custom_value": 336,
+    "adp": 272.5,
     "is_estimated": false
   },
   {
-    "player_id": "13347",
-    "name": "Demond Claiborne",
-    "position": "RB",
-    "team": "MIN",
-    "rank": 284,
+    "player_id": "4981",
+    "name": "Calvin Ridley",
+    "position": "WR",
+    "team": "TEN",
+    "rank": 283,
     "tier": 24,
-    "projected_points": 22.8,
+    "projected_points": 63.8,
     "custom_value": 3,
-    "adp": 274.3,
+    "adp": 273.2,
     "is_estimated": false
   },
   {
@@ -3412,11 +3400,23 @@
     "name": "J.J. McCarthy",
     "position": "QB",
     "team": "NYG",
-    "rank": 285,
+    "rank": 284,
     "tier": 24,
     "projected_points": 13.6,
     "custom_value": 3,
-    "adp": 275.6,
+    "adp": 274.3,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13347",
+    "name": "Demond Claiborne",
+    "position": "RB",
+    "team": "MIN",
+    "rank": 285,
+    "tier": 24,
+    "projected_points": 22.8,
+    "custom_value": 3,
+    "adp": 275.0,
     "is_estimated": false
   },
   {
@@ -3428,7 +3428,7 @@
     "tier": 24,
     "projected_points": 93.3,
     "custom_value": 3,
-    "adp": 276.5,
+    "adp": 276.0,
     "is_estimated": false
   },
   {
@@ -3468,23 +3468,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "9482",
-    "name": "Michael Mayer",
-    "position": "TE",
-    "team": "LV",
-    "rank": 290,
-    "tier": 25,
-    "projected_points": 89.3,
-    "custom_value": 3,
-    "adp": 278.3,
-    "is_estimated": false
-  },
-  {
     "player_id": "7591",
     "name": "Justin Fields",
     "position": "QB",
     "team": "KC",
-    "rank": 291,
+    "rank": 290,
     "tier": 25,
     "projected_points": 34.7,
     "custom_value": 3,
@@ -3496,12 +3484,24 @@
     "name": "Lan Larison",
     "position": "RB",
     "team": "NE",
-    "rank": 292,
+    "rank": 291,
     "tier": 25,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 279,
     "is_estimated": true
+  },
+  {
+    "player_id": "9482",
+    "name": "Michael Mayer",
+    "position": "TE",
+    "team": "LV",
+    "rank": 292,
+    "tier": 25,
+    "projected_points": 89.3,
+    "custom_value": 3,
+    "adp": 279.1,
+    "is_estimated": false
   },
   {
     "player_id": "13421",
@@ -3516,27 +3516,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "13402",
-    "name": "Skyler Bell",
-    "position": "WR",
-    "team": "BUF",
-    "rank": 294,
-    "tier": 25,
-    "projected_points": 52.6,
-    "custom_value": 3,
-    "adp": 280.1,
-    "is_estimated": false
-  },
-  {
     "player_id": "6826",
     "name": "Cole Kmet",
     "position": "TE",
     "team": "CHI",
-    "rank": 295,
+    "rank": 294,
     "tier": 25,
     "projected_points": 88.2,
     "custom_value": 3,
     "adp": 280.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13402",
+    "name": "Skyler Bell",
+    "position": "WR",
+    "team": "BUF",
+    "rank": 295,
+    "tier": 25,
+    "projected_points": 52.6,
+    "custom_value": 3,
+    "adp": 280.6,
     "is_estimated": false
   },
   {
@@ -3548,7 +3548,7 @@
     "tier": 25,
     "projected_points": 26.7,
     "custom_value": 3,
-    "adp": 281.7,
+    "adp": 281.0,
     "is_estimated": false
   },
   {
@@ -3560,7 +3560,7 @@
     "tier": 25,
     "projected_points": 48.5,
     "custom_value": 3,
-    "adp": 282.5,
+    "adp": 281.5,
     "is_estimated": false
   },
   {
@@ -3620,7 +3620,7 @@
     "tier": 26,
     "projected_points": 54.1,
     "custom_value": 3,
-    "adp": 285.9,
+    "adp": 285.4,
     "is_estimated": false
   },
   {
@@ -3644,7 +3644,7 @@
     "tier": 26,
     "projected_points": 76.5,
     "custom_value": 3,
-    "adp": 286.8,
+    "adp": 286.9,
     "is_estimated": false
   },
   {
@@ -3672,26 +3672,14 @@
     "is_estimated": false
   },
   {
-    "player_id": "7090",
-    "name": "Darnell Mooney",
-    "position": "WR",
-    "team": "NYG",
-    "rank": 307,
-    "tier": 26,
-    "projected_points": 60.9,
-    "custom_value": 3,
-    "adp": 287.3,
-    "is_estimated": false
-  },
-  {
     "player_id": "9757",
     "name": "Kendre Miller",
     "position": "RB",
     "team": "NO",
-    "rank": 308,
+    "rank": 307,
     "tier": 26,
     "projected_points": 4.6,
-    "custom_value": 109,
+    "custom_value": 96,
     "adp": 287.3,
     "is_estimated": false
   },
@@ -3700,11 +3688,23 @@
     "name": "Elijah Sarratt",
     "position": "WR",
     "team": "BAL",
-    "rank": 309,
+    "rank": 308,
     "tier": 26,
     "projected_points": 50.4,
     "custom_value": 3,
     "adp": 287.4,
+    "is_estimated": false
+  },
+  {
+    "player_id": "7090",
+    "name": "Darnell Mooney",
+    "position": "WR",
+    "team": "NYG",
+    "rank": 309,
+    "tier": 26,
+    "projected_points": 60.9,
+    "custom_value": 3,
+    "adp": 287.8,
     "is_estimated": false
   },
   {
@@ -3727,7 +3727,7 @@
     "rank": 311,
     "tier": 26,
     "projected_points": 12.9,
-    "custom_value": 287,
+    "custom_value": 163,
     "adp": 289.1,
     "is_estimated": false
   },
@@ -3847,7 +3847,7 @@
     "rank": 321,
     "tier": 27,
     "projected_points": 51.0,
-    "custom_value": 114,
+    "custom_value": 337,
     "adp": 293.0,
     "is_estimated": false
   },
@@ -3979,7 +3979,7 @@
     "rank": 332,
     "tier": 28,
     "projected_points": 21.7,
-    "custom_value": 402,
+    "custom_value": 422,
     "adp": 300.0,
     "is_estimated": false
   },
@@ -4171,7 +4171,7 @@
     "rank": 348,
     "tier": 29,
     "projected_points": 13.1,
-    "custom_value": 295,
+    "custom_value": 285,
     "adp": 314.1,
     "is_estimated": false
   },
@@ -4200,28 +4200,28 @@
     "is_estimated": false
   },
   {
+    "player_id": "1737",
+    "name": "Case Keenum",
+    "position": "QB",
+    "team": "CHI",
+    "rank": 351,
+    "tier": 30,
+    "projected_points": 10.8,
+    "custom_value": 3,
+    "adp": 317.7,
+    "is_estimated": false
+  },
+  {
     "player_id": "12476",
     "name": "Devin Neal",
     "position": "RB",
     "team": "MIN",
-    "rank": 351,
+    "rank": 352,
     "tier": 30,
     "projected_points": 28.4,
     "custom_value": 3,
     "adp": 319.5,
     "is_estimated": false
-  },
-  {
-    "player_id": "10220",
-    "name": "Will Mallory",
-    "position": "TE",
-    "team": "IND",
-    "rank": 352,
-    "tier": 30,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 321.1,
-    "is_estimated": true
   },
   {
     "player_id": "11626",
@@ -4236,16 +4236,16 @@
     "is_estimated": false
   },
   {
-    "player_id": "1737",
-    "name": "Case Keenum",
-    "position": "QB",
-    "team": "CHI",
+    "player_id": "10220",
+    "name": "Will Mallory",
+    "position": "TE",
+    "team": "IND",
     "rank": 354,
     "tier": 30,
-    "projected_points": 10.8,
+    "projected_points": 10,
     "custom_value": 3,
-    "adp": 325.0,
-    "is_estimated": false
+    "adp": 322.1,
+    "is_estimated": true
   },
   {
     "player_id": "6136",
@@ -4356,27 +4356,27 @@
     "is_estimated": true
   },
   {
-    "player_id": "2118",
-    "name": "Eric Ebron",
-    "position": "TE",
-    "team": "PIT",
-    "rank": 364,
-    "tier": 31,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 335.3,
-    "is_estimated": true
-  },
-  {
     "player_id": "10983",
     "name": "Sean Clifford",
     "position": "QB",
     "team": "CIN",
+    "rank": 364,
+    "tier": 31,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 335.1,
+    "is_estimated": true
+  },
+  {
+    "player_id": "2118",
+    "name": "Eric Ebron",
+    "position": "TE",
+    "team": "PIT",
     "rank": 365,
     "tier": 31,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 336.9,
+    "adp": 335.3,
     "is_estimated": true
   },
   {
@@ -4392,15 +4392,27 @@
     "is_estimated": false
   },
   {
+    "player_id": "11157",
+    "name": "Brycen Tremayne",
+    "position": "WR",
+    "team": "CAR",
+    "rank": 367,
+    "tier": 31,
+    "projected_points": 9.6,
+    "custom_value": 3,
+    "adp": 343.5,
+    "is_estimated": false
+  },
+  {
     "player_id": "11636",
     "name": "Johnny Wilson",
     "position": "WR",
     "team": "PHI",
-    "rank": 367,
+    "rank": 368,
     "tier": 31,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 346.0,
+    "adp": 347.0,
     "is_estimated": true
   },
   {
@@ -4408,7 +4420,7 @@
     "name": "Ryan Fitzgerald",
     "position": "K",
     "team": "CAR",
-    "rank": 368,
+    "rank": 369,
     "tier": 31,
     "projected_points": 92.0,
     "custom_value": 3,
@@ -4420,11 +4432,11 @@
     "name": "Jake Haener",
     "position": "QB",
     "team": "NYG",
-    "rank": 369,
+    "rank": 370,
     "tier": 31,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 354.3,
+    "adp": 355.3,
     "is_estimated": true
   },
   {
@@ -4432,7 +4444,7 @@
     "name": "Nick Kallerup",
     "position": "TE",
     "team": "SEA",
-    "rank": 370,
+    "rank": 371,
     "tier": 31,
     "projected_points": 10,
     "custom_value": 3,
@@ -4444,7 +4456,7 @@
     "name": "Drew Allar",
     "position": "QB",
     "team": "PIT",
-    "rank": 371,
+    "rank": 372,
     "tier": 31,
     "projected_points": 22.0,
     "custom_value": 3,
@@ -4456,8 +4468,8 @@
     "name": "Jake Moody",
     "position": "K",
     "team": "FA",
-    "rank": 372,
-    "tier": 31,
+    "rank": 373,
+    "tier": 32,
     "projected_points": 34.0,
     "custom_value": 3,
     "adp": 363.0,
@@ -4468,11 +4480,11 @@
     "name": "Levine Toilolo",
     "position": "TE",
     "team": "NYG",
-    "rank": 373,
+    "rank": 374,
     "tier": 32,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 364.9,
+    "adp": 365.9,
     "is_estimated": true
   },
   {
@@ -4480,7 +4492,7 @@
     "name": "Andre Szmyt",
     "position": "K",
     "team": "CLE",
-    "rank": 374,
+    "rank": 375,
     "tier": 32,
     "projected_points": 84.0,
     "custom_value": 3,
@@ -4492,7 +4504,7 @@
     "name": "DJ Rogers",
     "position": "TE",
     "team": "DAL",
-    "rank": 375,
+    "rank": 376,
     "tier": 32,
     "projected_points": 10,
     "custom_value": 3,
@@ -4504,23 +4516,11 @@
     "name": "Chad Ryland",
     "position": "K",
     "team": "ARI",
-    "rank": 376,
+    "rank": 377,
     "tier": 32,
     "projected_points": 89.0,
     "custom_value": 3,
     "adp": 378.0,
-    "is_estimated": false
-  },
-  {
-    "player_id": "7531",
-    "name": "Feleipe Franks",
-    "position": "TE",
-    "team": "CAR",
-    "rank": 377,
-    "tier": 32,
-    "projected_points": 2.1,
-    "custom_value": 3,
-    "adp": 379.3,
     "is_estimated": false
   },
   {
@@ -4536,11 +4536,23 @@
     "is_estimated": false
   },
   {
+    "player_id": "7531",
+    "name": "Feleipe Franks",
+    "position": "TE",
+    "team": "CAR",
+    "rank": 379,
+    "tier": 32,
+    "projected_points": 2.1,
+    "custom_value": 3,
+    "adp": 380.3,
+    "is_estimated": false
+  },
+  {
     "player_id": "13066",
     "name": "Ben Sauls",
     "position": "K",
     "team": "FA",
-    "rank": 379,
+    "rank": 380,
     "tier": 32,
     "projected_points": 31.0,
     "custom_value": 3,
@@ -4552,7 +4564,7 @@
     "name": "Tavien Feaster",
     "position": "RB",
     "team": "ARI",
-    "rank": 380,
+    "rank": 381,
     "tier": 32,
     "projected_points": 10,
     "custom_value": 3,
@@ -4564,11 +4576,11 @@
     "name": "Hunter Long",
     "position": "TE",
     "team": "ARI",
-    "rank": 381,
+    "rank": 382,
     "tier": 32,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 384.6,
+    "adp": 385.6,
     "is_estimated": true
   },
   {
@@ -4576,7 +4588,7 @@
     "name": "Cade York",
     "position": "K",
     "team": "FA",
-    "rank": 382,
+    "rank": 383,
     "tier": 32,
     "projected_points": 9.0,
     "custom_value": 3,
@@ -4588,7 +4600,7 @@
     "name": "Cam Grandy",
     "position": "TE",
     "team": "MIN",
-    "rank": 383,
+    "rank": 384,
     "tier": 32,
     "projected_points": 10,
     "custom_value": 3,
@@ -4600,11 +4612,11 @@
     "name": "DJ Uiagalelei",
     "position": "QB",
     "team": "LAC",
-    "rank": 384,
-    "tier": 32,
+    "rank": 385,
+    "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 388.7,
+    "adp": 389.7,
     "is_estimated": true
   },
   {
@@ -4612,7 +4624,7 @@
     "name": "E.J. Jenkins",
     "position": "TE",
     "team": "PHI",
-    "rank": 385,
+    "rank": 386,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4624,7 +4636,7 @@
     "name": "Jeremiah Webb",
     "position": "WR",
     "team": "NE",
-    "rank": 386,
+    "rank": 387,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4636,7 +4648,7 @@
     "name": "Chris Brazzell",
     "position": "WR",
     "team": "CAR",
-    "rank": 387,
+    "rank": 388,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4648,7 +4660,7 @@
     "name": "Bronson Kaufusi",
     "position": "TE",
     "team": "GB",
-    "rank": 388,
+    "rank": 389,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4660,7 +4672,7 @@
     "name": "David Sills",
     "position": "WR",
     "team": "TB",
-    "rank": 389,
+    "rank": 390,
     "tier": 33,
     "projected_points": 22.4,
     "custom_value": 3,
@@ -4672,7 +4684,7 @@
     "name": "Drake Dabney",
     "position": "TE",
     "team": "GB",
-    "rank": 390,
+    "rank": 391,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4684,7 +4696,7 @@
     "name": "Caleb Lohner",
     "position": "TE",
     "team": "DEN",
-    "rank": 391,
+    "rank": 392,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4696,7 +4708,7 @@
     "name": "Travis Homer",
     "position": "RB",
     "team": "PIT",
-    "rank": 392,
+    "rank": 393,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4708,7 +4720,7 @@
     "name": "Evan Svoboda",
     "position": "TE",
     "team": "LAC",
-    "rank": 393,
+    "rank": 394,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4720,11 +4732,11 @@
     "name": "Jacardia Wright",
     "position": "RB",
     "team": "SEA",
-    "rank": 394,
+    "rank": 395,
     "tier": 33,
     "projected_points": 3.3,
     "custom_value": 3,
-    "adp": 425.7,
+    "adp": 425.3,
     "is_estimated": false
   },
   {
@@ -4732,7 +4744,7 @@
     "name": "Alex Bachman",
     "position": "WR",
     "team": "LAR",
-    "rank": 395,
+    "rank": 396,
     "tier": 33,
     "projected_points": 10,
     "custom_value": 3,
@@ -4744,8 +4756,8 @@
     "name": "Austin Hooper",
     "position": "TE",
     "team": "ATL",
-    "rank": 396,
-    "tier": 33,
+    "rank": 397,
+    "tier": 34,
     "projected_points": 36.7,
     "custom_value": 3,
     "adp": 430,
@@ -4756,23 +4768,11 @@
     "name": "Michael Bandy",
     "position": "WR",
     "team": "DEN",
-    "rank": 397,
-    "tier": 34,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 430.0,
-    "is_estimated": true
-  },
-  {
-    "player_id": "12765",
-    "name": "Keleki Latu",
-    "position": "TE",
-    "team": "BUF",
     "rank": 398,
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 431.3,
+    "adp": 431.0,
     "is_estimated": true
   },
   {
@@ -4784,7 +4784,19 @@
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 431.7,
+    "adp": 431.3,
+    "is_estimated": true
+  },
+  {
+    "player_id": "12765",
+    "name": "Keleki Latu",
+    "position": "TE",
+    "team": "BUF",
+    "rank": 400,
+    "tier": 34,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 431.3,
     "is_estimated": true
   },
   {
@@ -4792,7 +4804,7 @@
     "name": "Matthew Caldwell",
     "position": "QB",
     "team": "LAR",
-    "rank": 400,
+    "rank": 401,
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
@@ -4804,7 +4816,7 @@
     "name": "Jared Wiley",
     "position": "TE",
     "team": "KC",
-    "rank": 401,
+    "rank": 402,
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
@@ -4816,11 +4828,11 @@
     "name": "Chris Collier",
     "position": "RB",
     "team": "LV",
-    "rank": 402,
+    "rank": 403,
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 435.3,
+    "adp": 436.3,
     "is_estimated": true
   },
   {
@@ -4828,24 +4840,12 @@
     "name": "Carter Runyon",
     "position": "TE",
     "team": "LV",
-    "rank": 403,
+    "rank": 404,
     "tier": 34,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 440,
     "is_estimated": true
-  },
-  {
-    "player_id": "12548",
-    "name": "Lenny Krieg",
-    "position": "K",
-    "team": "GB",
-    "rank": 404,
-    "tier": 34,
-    "projected_points": 6.0,
-    "custom_value": 3,
-    "adp": 442.0,
-    "is_estimated": false
   },
   {
     "player_id": "8800",
@@ -4860,11 +4860,23 @@
     "is_estimated": true
   },
   {
+    "player_id": "12548",
+    "name": "Lenny Krieg",
+    "position": "K",
+    "team": "GB",
+    "rank": 406,
+    "tier": 34,
+    "projected_points": 6.0,
+    "custom_value": 3,
+    "adp": 443.0,
+    "is_estimated": false
+  },
+  {
     "player_id": "7536",
     "name": "Quintin Morris",
     "position": "TE",
     "team": "JAX",
-    "rank": 406,
+    "rank": 407,
     "tier": 34,
     "projected_points": 9.0,
     "custom_value": 3,
@@ -4876,24 +4888,12 @@
     "name": "Allen Lazard",
     "position": "WR",
     "team": "FA",
-    "rank": 407,
+    "rank": 408,
     "tier": 34,
     "projected_points": 4.9,
     "custom_value": 3,
-    "adp": 448.0,
+    "adp": 449.0,
     "is_estimated": false
-  },
-  {
-    "player_id": "4490",
-    "name": "Wyatt Houston",
-    "position": "TE",
-    "team": "CAR",
-    "rank": 408,
-    "tier": 34,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 454.0,
-    "is_estimated": true
   },
   {
     "player_id": "6001",
@@ -4908,11 +4908,23 @@
     "is_estimated": false
   },
   {
+    "player_id": "4490",
+    "name": "Wyatt Houston",
+    "position": "TE",
+    "team": "CAR",
+    "rank": 410,
+    "tier": 35,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 455.0,
+    "is_estimated": true
+  },
+  {
     "player_id": "4443",
     "name": "Pharaoh Brown",
     "position": "TE",
     "team": "IND",
-    "rank": 410,
+    "rank": 411,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
@@ -4924,7 +4936,7 @@
     "name": "Brittain Brown",
     "position": "RB",
     "team": "CHI",
-    "rank": 411,
+    "rank": 412,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
@@ -4936,11 +4948,11 @@
     "name": "Tyler Lockett",
     "position": "WR",
     "team": "FA",
-    "rank": 412,
+    "rank": 413,
     "tier": 35,
     "projected_points": 22.8,
     "custom_value": 3,
-    "adp": 460.8,
+    "adp": 461.8,
     "is_estimated": false
   },
   {
@@ -4948,7 +4960,7 @@
     "name": "Julian Hill",
     "position": "TE",
     "team": "NE",
-    "rank": 413,
+    "rank": 414,
     "tier": 35,
     "projected_points": 6.3,
     "custom_value": 3,
@@ -4960,7 +4972,7 @@
     "name": "Blake Whiteheart",
     "position": "TE",
     "team": "CLE",
-    "rank": 414,
+    "rank": 415,
     "tier": 35,
     "projected_points": 4.9,
     "custom_value": 3,
@@ -4972,7 +4984,7 @@
     "name": "Anthony Smith",
     "position": "WR",
     "team": "DAL",
-    "rank": 415,
+    "rank": 416,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
@@ -4984,7 +4996,7 @@
     "name": "CJ Donaldson",
     "position": "RB",
     "team": "NO",
-    "rank": 416,
+    "rank": 417,
     "tier": 35,
     "projected_points": 4.7,
     "custom_value": 3,
@@ -4996,7 +5008,7 @@
     "name": "Brennan Presley",
     "position": "WR",
     "team": "LAR",
-    "rank": 417,
+    "rank": 418,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
@@ -5008,7 +5020,7 @@
     "name": "Tommy Stevens",
     "position": "TE",
     "team": "NYG",
-    "rank": 418,
+    "rank": 419,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
@@ -5020,11 +5032,11 @@
     "name": "Jeshaun Jones",
     "position": "WR",
     "team": "MIN",
-    "rank": 419,
+    "rank": 420,
     "tier": 35,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 469.0,
+    "adp": 470.0,
     "is_estimated": true
   },
   {
@@ -5032,8 +5044,8 @@
     "name": "Bryce Lance",
     "position": "WR",
     "team": "NO",
-    "rank": 420,
-    "tier": 35,
+    "rank": 421,
+    "tier": 36,
     "projected_points": 31.2,
     "custom_value": 3,
     "adp": 470,
@@ -5044,7 +5056,7 @@
     "name": "Bauer Sharp",
     "position": "TE",
     "team": "TB",
-    "rank": 421,
+    "rank": 422,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5056,11 +5068,11 @@
     "name": "Barrett Burns",
     "position": "TE",
     "team": "BAL",
-    "rank": 422,
+    "rank": 423,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 472.0,
+    "adp": 473.0,
     "is_estimated": true
   },
   {
@@ -5068,7 +5080,7 @@
     "name": "Kyrese Rowan",
     "position": "WR",
     "team": "NO",
-    "rank": 423,
+    "rank": 424,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5080,7 +5092,7 @@
     "name": "Cole Payton",
     "position": "QB",
     "team": "PHI",
-    "rank": 424,
+    "rank": 425,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5092,7 +5104,7 @@
     "name": "Chandler Brayboy",
     "position": "WR",
     "team": "NE",
-    "rank": 425,
+    "rank": 426,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5104,7 +5116,7 @@
     "name": "Aaron Bailey",
     "position": "QB",
     "team": "BAL",
-    "rank": 426,
+    "rank": 427,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5116,7 +5128,7 @@
     "name": "Clayton Thorson",
     "position": "QB",
     "team": "NYG",
-    "rank": 427,
+    "rank": 428,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5128,11 +5140,11 @@
     "name": "Lake McRee",
     "position": "TE",
     "team": "PIT",
-    "rank": 428,
+    "rank": 429,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 478.3,
+    "adp": 479.3,
     "is_estimated": true
   },
   {
@@ -5140,7 +5152,7 @@
     "name": "Tyler Goodson",
     "position": "RB",
     "team": "DAL",
-    "rank": 429,
+    "rank": 430,
     "tier": 36,
     "projected_points": 3.8,
     "custom_value": 3,
@@ -5152,7 +5164,7 @@
     "name": "Thomas Yassmin",
     "position": "TE",
     "team": "GB",
-    "rank": 430,
+    "rank": 431,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5164,7 +5176,7 @@
     "name": "Josh Kelly",
     "position": "WR",
     "team": "HOU",
-    "rank": 431,
+    "rank": 432,
     "tier": 36,
     "projected_points": 10,
     "custom_value": 3,
@@ -5176,8 +5188,8 @@
     "name": "DeaMonte Trayanum",
     "position": "RB",
     "team": "NYJ",
-    "rank": 432,
-    "tier": 36,
+    "rank": 433,
+    "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 482.8,
@@ -5188,7 +5200,7 @@
     "name": "Brenden Bates",
     "position": "TE",
     "team": "JAX",
-    "rank": 433,
+    "rank": 434,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5200,7 +5212,7 @@
     "name": "Carlos Washington",
     "position": "RB",
     "team": "MIA",
-    "rank": 434,
+    "rank": 435,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5212,7 +5224,7 @@
     "name": "David Martin-Robinson",
     "position": "TE",
     "team": "TEN",
-    "rank": 435,
+    "rank": 436,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5224,7 +5236,7 @@
     "name": "Payne Durham",
     "position": "TE",
     "team": "TB",
-    "rank": 436,
+    "rank": 437,
     "tier": 37,
     "projected_points": 9.1,
     "custom_value": 3,
@@ -5236,7 +5248,7 @@
     "name": "Brevin Jordan",
     "position": "TE",
     "team": "HOU",
-    "rank": 437,
+    "rank": 438,
     "tier": 37,
     "projected_points": 7.1,
     "custom_value": 3,
@@ -5248,7 +5260,7 @@
     "name": "John FitzPatrick",
     "position": "TE",
     "team": "CLE",
-    "rank": 438,
+    "rank": 439,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5260,7 +5272,7 @@
     "name": "Luke Farrell",
     "position": "TE",
     "team": "SF",
-    "rank": 439,
+    "rank": 440,
     "tier": 37,
     "projected_points": 11.3,
     "custom_value": 3,
@@ -5272,7 +5284,7 @@
     "name": "Eli Heidenreich",
     "position": "RB",
     "team": "PIT",
-    "rank": 440,
+    "rank": 441,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5284,11 +5296,11 @@
     "name": "Blake Bortles",
     "position": "QB",
     "team": "NO",
-    "rank": 441,
+    "rank": 442,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 494.4,
+    "adp": 495.4,
     "is_estimated": true
   },
   {
@@ -5296,7 +5308,7 @@
     "name": "Jordan Moore",
     "position": "WR",
     "team": "CIN",
-    "rank": 442,
+    "rank": 443,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5308,7 +5320,7 @@
     "name": "Nick Vannett",
     "position": "TE",
     "team": "BAL",
-    "rank": 443,
+    "rank": 444,
     "tier": 37,
     "projected_points": 10,
     "custom_value": 3,
@@ -5320,8 +5332,8 @@
     "name": "J'Mari Taylor",
     "position": "RB",
     "team": "JAX",
-    "rank": 444,
-    "tier": 37,
+    "rank": 445,
+    "tier": 38,
     "projected_points": 28.2,
     "custom_value": 3,
     "adp": 498,
@@ -5332,23 +5344,11 @@
     "name": "Miller Moss",
     "position": "QB",
     "team": "CHI",
-    "rank": 445,
-    "tier": 38,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 501.2,
-    "is_estimated": true
-  },
-  {
-    "player_id": "11381",
-    "name": "Travis Vokolek",
-    "position": "TE",
-    "team": "ARI",
     "rank": 446,
     "tier": 38,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 502.0,
+    "adp": 501.2,
     "is_estimated": true
   },
   {
@@ -5364,11 +5364,23 @@
     "is_estimated": false
   },
   {
+    "player_id": "11381",
+    "name": "Travis Vokolek",
+    "position": "TE",
+    "team": "ARI",
+    "rank": 448,
+    "tier": 38,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 503.0,
+    "is_estimated": true
+  },
+  {
     "player_id": "12471",
     "name": "DJ Giddens",
     "position": "RB",
     "team": "IND",
-    "rank": 448,
+    "rank": 449,
     "tier": 38,
     "projected_points": 27.0,
     "custom_value": 3,
@@ -5380,7 +5392,7 @@
     "name": "Beaux Collins",
     "position": "WR",
     "team": "ATL",
-    "rank": 449,
+    "rank": 450,
     "tier": 38,
     "projected_points": 10,
     "custom_value": 3,
@@ -5392,7 +5404,7 @@
     "name": "Dallen Bentley",
     "position": "TE",
     "team": "DEN",
-    "rank": 450,
+    "rank": 451,
     "tier": 38,
     "projected_points": 10,
     "custom_value": 3,
@@ -5404,7 +5416,7 @@
     "name": "Qadir Ismail",
     "position": "WR",
     "team": "CHI",
-    "rank": 451,
+    "rank": 452,
     "tier": 38,
     "projected_points": 10,
     "custom_value": 3,
@@ -5416,23 +5428,11 @@
     "name": "Matt Hibner",
     "position": "TE",
     "team": "BAL",
-    "rank": 452,
+    "rank": 453,
     "tier": 38,
     "projected_points": 35.0,
     "custom_value": 3,
     "adp": 504,
-    "is_estimated": false
-  },
-  {
-    "player_id": "10217",
-    "name": "Clayton Tune",
-    "position": "QB",
-    "team": "FA",
-    "rank": 453,
-    "tier": 38,
-    "projected_points": 12.4,
-    "custom_value": 3,
-    "adp": 505.7,
     "is_estimated": false
   },
   {
@@ -5448,11 +5448,23 @@
     "is_estimated": true
   },
   {
+    "player_id": "10217",
+    "name": "Clayton Tune",
+    "position": "QB",
+    "team": "FA",
+    "rank": 455,
+    "tier": 38,
+    "projected_points": 12.4,
+    "custom_value": 3,
+    "adp": 506.7,
+    "is_estimated": false
+  },
+  {
     "player_id": "7087",
     "name": "Jonathan Ward",
     "position": "RB",
     "team": "BAL",
-    "rank": 455,
+    "rank": 456,
     "tier": 38,
     "projected_points": 10,
     "custom_value": 3,
@@ -5464,8 +5476,8 @@
     "name": "Jack Endries",
     "position": "TE",
     "team": "CIN",
-    "rank": 456,
-    "tier": 38,
+    "rank": 457,
+    "tier": 39,
     "projected_points": 58.5,
     "custom_value": 3,
     "adp": 508,
@@ -5476,7 +5488,7 @@
     "name": "Sam Ehlinger",
     "position": "QB",
     "team": "DEN",
-    "rank": 457,
+    "rank": 458,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5488,7 +5500,7 @@
     "name": "Michael Briscoe",
     "position": "WR",
     "team": "MIN",
-    "rank": 458,
+    "rank": 459,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5500,7 +5512,7 @@
     "name": "Thomas Gordon",
     "position": "TE",
     "team": "DET",
-    "rank": 459,
+    "rank": 460,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5512,11 +5524,11 @@
     "name": "Wendell Smallwood",
     "position": "RB",
     "team": "WAS",
-    "rank": 460,
+    "rank": 461,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 512.7,
+    "adp": 513.7,
     "is_estimated": true
   },
   {
@@ -5524,7 +5536,7 @@
     "name": "Vinny Anthony",
     "position": "WR",
     "team": "ATL",
-    "rank": 461,
+    "rank": 462,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5536,7 +5548,7 @@
     "name": "Josiah Deguara",
     "position": "TE",
     "team": "PHI",
-    "rank": 462,
+    "rank": 463,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5548,7 +5560,7 @@
     "name": "Tyrell Shavers",
     "position": "WR",
     "team": "BUF",
-    "rank": 463,
+    "rank": 464,
     "tier": 39,
     "projected_points": 3.0,
     "custom_value": 3,
@@ -5560,7 +5572,7 @@
     "name": "Jared Wayne",
     "position": "WR",
     "team": "HOU",
-    "rank": 464,
+    "rank": 465,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5572,7 +5584,7 @@
     "name": "Harrison Wallace",
     "position": "WR",
     "team": "ARI",
-    "rank": 465,
+    "rank": 466,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5584,7 +5596,7 @@
     "name": "Kurtis Rourke",
     "position": "QB",
     "team": "SF",
-    "rank": 466,
+    "rank": 467,
     "tier": 39,
     "projected_points": 10,
     "custom_value": 3,
@@ -5596,7 +5608,7 @@
     "name": "Taylen Green",
     "position": "QB",
     "team": "CLE",
-    "rank": 467,
+    "rank": 468,
     "tier": 39,
     "projected_points": 30.3,
     "custom_value": 3,
@@ -5608,8 +5620,8 @@
     "name": "Kevin Coleman",
     "position": "WR",
     "team": "MIA",
-    "rank": 468,
-    "tier": 39,
+    "rank": 469,
+    "tier": 40,
     "projected_points": 26.4,
     "custom_value": 3,
     "adp": 523,
@@ -5620,7 +5632,7 @@
     "name": "Dante Pettis",
     "position": "WR",
     "team": "SF",
-    "rank": 469,
+    "rank": 470,
     "tier": 40,
     "projected_points": 5.8,
     "custom_value": 3,
@@ -5632,7 +5644,7 @@
     "name": "DeAndre Thompkins",
     "position": "WR",
     "team": "GB",
-    "rank": 470,
+    "rank": 471,
     "tier": 40,
     "projected_points": 10,
     "custom_value": 3,
@@ -5644,7 +5656,7 @@
     "name": "Elijah McGuire",
     "position": "RB",
     "team": "KC",
-    "rank": 471,
+    "rank": 472,
     "tier": 40,
     "projected_points": 10,
     "custom_value": 3,
@@ -5656,7 +5668,7 @@
     "name": "Hayden Rucci",
     "position": "TE",
     "team": "LAC",
-    "rank": 472,
+    "rank": 473,
     "tier": 40,
     "projected_points": 10,
     "custom_value": 3,
@@ -5668,7 +5680,7 @@
     "name": "Charlie Woerner",
     "position": "TE",
     "team": "ATL",
-    "rank": 473,
+    "rank": 474,
     "tier": 40,
     "projected_points": 9.0,
     "custom_value": 3,
@@ -5680,7 +5692,7 @@
     "name": "Sione Vaki",
     "position": "RB",
     "team": "DET",
-    "rank": 474,
+    "rank": 475,
     "tier": 40,
     "projected_points": 3.0,
     "custom_value": 3,
@@ -5692,7 +5704,7 @@
     "name": "Mo Alie-Cox",
     "position": "TE",
     "team": "IND",
-    "rank": 475,
+    "rank": 476,
     "tier": 40,
     "projected_points": 17.4,
     "custom_value": 3,
@@ -5704,23 +5716,11 @@
     "name": "Salvon Ahmed",
     "position": "RB",
     "team": "CHI",
-    "rank": 476,
-    "tier": 40,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 528,
-    "is_estimated": true
-  },
-  {
-    "player_id": "13407",
-    "name": "Carson Towt",
-    "position": "TE",
-    "team": "IND",
     "rank": 477,
     "tier": 40,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 530,
+    "adp": 528,
     "is_estimated": true
   },
   {
@@ -5736,15 +5736,27 @@
     "is_estimated": false
   },
   {
+    "player_id": "13407",
+    "name": "Carson Towt",
+    "position": "TE",
+    "team": "IND",
+    "rank": 479,
+    "tier": 40,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 532,
+    "is_estimated": true
+  },
+  {
     "player_id": "4666",
     "name": "Younghoe Koo",
     "position": "K",
     "team": "FA",
-    "rank": 479,
+    "rank": 480,
     "tier": 40,
     "projected_points": 18.0,
     "custom_value": 3,
-    "adp": 532.5,
+    "adp": 533.5,
     "is_estimated": false
   },
   {
@@ -5752,8 +5764,8 @@
     "name": "Kedon Slovis",
     "position": "QB",
     "team": "GB",
-    "rank": 480,
-    "tier": 40,
+    "rank": 481,
+    "tier": 41,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 534.0,
@@ -5764,7 +5776,7 @@
     "name": "Ty Johnson",
     "position": "RB",
     "team": "BUF",
-    "rank": 481,
+    "rank": 482,
     "tier": 41,
     "projected_points": 47.3,
     "custom_value": 3,
@@ -5776,7 +5788,7 @@
     "name": "Chris Manhertz",
     "position": "TE",
     "team": "NYG",
-    "rank": 482,
+    "rank": 483,
     "tier": 41,
     "projected_points": 2.5,
     "custom_value": 3,
@@ -5784,15 +5796,15 @@
     "is_estimated": false
   },
   {
-    "player_id": "13173",
-    "name": "Jimmy Holiday",
-    "position": "WR",
-    "team": "KC",
-    "rank": 483,
+    "player_id": "4314",
+    "name": "Johnny Mundt",
+    "position": "TE",
+    "team": "PHI",
+    "rank": 484,
     "tier": 41,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 543.0,
+    "adp": 541.2,
     "is_estimated": true
   },
   {
@@ -5800,7 +5812,7 @@
     "name": "Davis Mills",
     "position": "QB",
     "team": "HOU",
-    "rank": 484,
+    "rank": 485,
     "tier": 41,
     "projected_points": 12.0,
     "custom_value": 3,
@@ -5812,7 +5824,7 @@
     "name": "Josh Johnson",
     "position": "QB",
     "team": "CIN",
-    "rank": 485,
+    "rank": 486,
     "tier": 41,
     "projected_points": 11.3,
     "custom_value": 3,
@@ -5820,11 +5832,23 @@
     "is_estimated": false
   },
   {
+    "player_id": "13173",
+    "name": "Jimmy Holiday",
+    "position": "WR",
+    "team": "KC",
+    "rank": 487,
+    "tier": 41,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 545.0,
+    "is_estimated": true
+  },
+  {
     "player_id": "6866",
     "name": "KJ Hill",
     "position": "WR",
     "team": "LAC",
-    "rank": 486,
+    "rank": 488,
     "tier": 41,
     "projected_points": 10,
     "custom_value": 3,
@@ -5836,7 +5860,7 @@
     "name": "Velus Jones",
     "position": "WR",
     "team": "SEA",
-    "rank": 487,
+    "rank": 489,
     "tier": 41,
     "projected_points": 10,
     "custom_value": 3,
@@ -5848,7 +5872,7 @@
     "name": "CJ Daniels",
     "position": "WR",
     "team": "LAR",
-    "rank": 488,
+    "rank": 490,
     "tier": 41,
     "projected_points": 31.8,
     "custom_value": 3,
@@ -5860,7 +5884,7 @@
     "name": "Irv Charles",
     "position": "WR",
     "team": "SEA",
-    "rank": 489,
+    "rank": 491,
     "tier": 41,
     "projected_points": 10,
     "custom_value": 3,
@@ -5868,23 +5892,11 @@
     "is_estimated": true
   },
   {
-    "player_id": "11168",
-    "name": "Xavier Smith",
-    "position": "WR",
-    "team": "LAR",
-    "rank": 490,
-    "tier": 41,
-    "projected_points": 20.6,
-    "custom_value": 3,
-    "adp": 551,
-    "is_estimated": false
-  },
-  {
     "player_id": "6960",
     "name": "Tyler Johnson",
     "position": "WR",
     "team": "NYJ",
-    "rank": 491,
+    "rank": 492,
     "tier": 41,
     "projected_points": 5.0,
     "custom_value": 3,
@@ -5896,8 +5908,8 @@
     "name": "Stephen Gosnell",
     "position": "WR",
     "team": "BUF",
-    "rank": 492,
-    "tier": 41,
+    "rank": 493,
+    "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 552.0,
@@ -5908,7 +5920,7 @@
     "name": "Joe Royer",
     "position": "TE",
     "team": "CLE",
-    "rank": 493,
+    "rank": 494,
     "tier": 42,
     "projected_points": 63.5,
     "custom_value": 3,
@@ -5920,7 +5932,7 @@
     "name": "Spencer Shrader",
     "position": "K",
     "team": "IND",
-    "rank": 494,
+    "rank": 495,
     "tier": 42,
     "projected_points": 75.0,
     "custom_value": 3,
@@ -5932,7 +5944,7 @@
     "name": "Treyton Welch",
     "position": "TE",
     "team": "NO",
-    "rank": 495,
+    "rank": 496,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -5944,7 +5956,7 @@
     "name": "Cameron Dorner",
     "position": "WR",
     "team": "NE",
-    "rank": 496,
+    "rank": 497,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -5956,7 +5968,7 @@
     "name": "Jordan Waters",
     "position": "RB",
     "team": "LAR",
-    "rank": 497,
+    "rank": 498,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -5968,7 +5980,7 @@
     "name": "Joel Wilson",
     "position": "TE",
     "team": "TEN",
-    "rank": 498,
+    "rank": 499,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -5980,7 +5992,7 @@
     "name": "Kyle McCord",
     "position": "QB",
     "team": "MIA",
-    "rank": 499,
+    "rank": 500,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -5992,7 +6004,7 @@
     "name": "AJ Henning",
     "position": "WR",
     "team": "MIA",
-    "rank": 500,
+    "rank": 501,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -6004,7 +6016,7 @@
     "name": "K.J. Osborn",
     "position": "WR",
     "team": "TEN",
-    "rank": 501,
+    "rank": 502,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -6016,7 +6028,7 @@
     "name": "Tanner Arkin",
     "position": "TE",
     "team": "NE",
-    "rank": 502,
+    "rank": 503,
     "tier": 42,
     "projected_points": 10,
     "custom_value": 3,
@@ -6028,18 +6040,6 @@
     "name": "Chris Myarick",
     "position": "TE",
     "team": "LV",
-    "rank": 503,
-    "tier": 42,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 564.5,
-    "is_estimated": true
-  },
-  {
-    "player_id": "8414",
-    "name": "Britain Covey",
-    "position": "WR",
-    "team": "PHI",
     "rank": 504,
     "tier": 42,
     "projected_points": 10,
@@ -6060,16 +6060,16 @@
     "is_estimated": true
   },
   {
-    "player_id": "11157",
-    "name": "Brycen Tremayne",
+    "player_id": "8414",
+    "name": "Britain Covey",
     "position": "WR",
-    "team": "CAR",
+    "team": "PHI",
     "rank": 506,
     "tier": 43,
-    "projected_points": 9.6,
+    "projected_points": 10,
     "custom_value": 3,
-    "adp": 569.0,
-    "is_estimated": false
+    "adp": 566.5,
+    "is_estimated": true
   },
   {
     "player_id": "4464",
@@ -6084,23 +6084,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "11280",
-    "name": "Brady Russell",
-    "position": "RB",
-    "team": "SEA",
-    "rank": 508,
-    "tier": 43,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 571.0,
-    "is_estimated": true
-  },
-  {
     "player_id": "4082",
     "name": "Curtis Samuel",
     "position": "WR",
     "team": "FA",
-    "rank": 509,
+    "rank": 508,
     "tier": 43,
     "projected_points": 4.3,
     "custom_value": 3,
@@ -6112,11 +6100,23 @@
     "name": "Isaac Nauta",
     "position": "TE",
     "team": "GB",
-    "rank": 510,
+    "rank": 509,
     "tier": 43,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 571,
+    "is_estimated": true
+  },
+  {
+    "player_id": "11280",
+    "name": "Brady Russell",
+    "position": "RB",
+    "team": "SEA",
+    "rank": 510,
+    "tier": 43,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 572.0,
     "is_estimated": true
   },
   {
@@ -6176,7 +6176,7 @@
     "tier": 43,
     "projected_points": 15.6,
     "custom_value": 3,
-    "adp": 573.5,
+    "adp": 574.5,
     "is_estimated": false
   },
   {
@@ -6276,27 +6276,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "CIN",
-    "name": "Cincinnati Bengals",
-    "position": "DEF",
-    "team": "CIN",
-    "rank": 524,
-    "tier": 44,
-    "projected_points": 79.0,
-    "custom_value": 3,
-    "adp": 584.7,
-    "is_estimated": false
-  },
-  {
     "player_id": "5970",
     "name": "Greg Dortch",
     "position": "WR",
     "team": "BUF",
-    "rank": 525,
+    "rank": 524,
     "tier": 44,
     "projected_points": 37.6,
     "custom_value": 3,
     "adp": 585,
+    "is_estimated": false
+  },
+  {
+    "player_id": "CIN",
+    "name": "Cincinnati Bengals",
+    "position": "DEF",
+    "team": "CIN",
+    "rank": 525,
+    "tier": 44,
+    "projected_points": 79.0,
+    "custom_value": 3,
+    "adp": 586.3,
     "is_estimated": false
   },
   {
@@ -6380,7 +6380,7 @@
     "tier": 45,
     "projected_points": 2.1,
     "custom_value": 3,
-    "adp": 595.0,
+    "adp": 596.0,
     "is_estimated": false
   },
   {
@@ -6420,23 +6420,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "138",
-    "name": "Ben Roethlisberger",
-    "position": "QB",
-    "team": "PIT",
-    "rank": 536,
-    "tier": 45,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 597.6,
-    "is_estimated": true
-  },
-  {
     "player_id": "8145",
     "name": "Jeremy Ruckert",
     "position": "TE",
     "team": "NYJ",
-    "rank": 537,
+    "rank": 536,
     "tier": 45,
     "projected_points": 10.6,
     "custom_value": 3,
@@ -6444,15 +6432,15 @@
     "is_estimated": false
   },
   {
-    "player_id": "13437",
-    "name": "Noah Whittington",
-    "position": "RB",
-    "team": "HOU",
-    "rank": 538,
+    "player_id": "138",
+    "name": "Ben Roethlisberger",
+    "position": "QB",
+    "team": "PIT",
+    "rank": 537,
     "tier": 45,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 598.8,
+    "adp": 598.6,
     "is_estimated": true
   },
   {
@@ -6460,7 +6448,7 @@
     "name": "Jamaal Pritchett",
     "position": "WR",
     "team": "NYJ",
-    "rank": 539,
+    "rank": 538,
     "tier": 45,
     "projected_points": 10,
     "custom_value": 3,
@@ -6472,12 +6460,24 @@
     "name": "Ameer Abdullah",
     "position": "RB",
     "team": "JAX",
-    "rank": 540,
+    "rank": 539,
     "tier": 45,
     "projected_points": 3.8,
     "custom_value": 3,
     "adp": 599,
     "is_estimated": false
+  },
+  {
+    "player_id": "13437",
+    "name": "Noah Whittington",
+    "position": "RB",
+    "team": "HOU",
+    "rank": 540,
+    "tier": 45,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 599.8,
+    "is_estimated": true
   },
   {
     "player_id": "13770",
@@ -6572,7 +6572,7 @@
     "tier": 46,
     "projected_points": 65.0,
     "custom_value": 3,
-    "adp": 605.3,
+    "adp": 605.7,
     "is_estimated": false
   },
   {
@@ -6668,7 +6668,7 @@
     "tier": 47,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 609.6,
+    "adp": 610.6,
     "is_estimated": true
   },
   {
@@ -6732,28 +6732,28 @@
     "is_estimated": false
   },
   {
-    "player_id": "MIA",
-    "name": "Miami Dolphins",
-    "position": "DEF",
-    "team": "MIA",
-    "rank": 562,
-    "tier": 47,
-    "projected_points": 62.0,
-    "custom_value": 3,
-    "adp": 612.0,
-    "is_estimated": false
-  },
-  {
     "player_id": "13898",
     "name": "Corey Rucker",
     "position": "WR",
     "team": "LV",
-    "rank": 563,
+    "rank": 562,
     "tier": 47,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 613,
     "is_estimated": true
+  },
+  {
+    "player_id": "MIA",
+    "name": "Miami Dolphins",
+    "position": "DEF",
+    "team": "MIA",
+    "rank": 563,
+    "tier": 47,
+    "projected_points": 62.0,
+    "custom_value": 3,
+    "adp": 613.0,
+    "is_estimated": false
   },
   {
     "player_id": "12658",
@@ -6792,27 +6792,27 @@
     "is_estimated": true
   },
   {
-    "player_id": "11640",
-    "name": "Jermaine Burton",
-    "position": "WR",
-    "team": "FA",
-    "rank": 567,
-    "tier": 48,
-    "projected_points": 22.0,
-    "custom_value": 3,
-    "adp": 615.9,
-    "is_estimated": false
-  },
-  {
     "player_id": "7587",
     "name": "Dyami Brown",
     "position": "WR",
     "team": "WAS",
-    "rank": 568,
+    "rank": 567,
     "tier": 48,
     "projected_points": 3.9,
     "custom_value": 3,
     "adp": 616,
+    "is_estimated": false
+  },
+  {
+    "player_id": "11640",
+    "name": "Jermaine Burton",
+    "position": "WR",
+    "team": "FA",
+    "rank": 568,
+    "tier": 48,
+    "projected_points": 22.0,
+    "custom_value": 3,
+    "adp": 616.9,
     "is_estimated": false
   },
   {
@@ -6920,7 +6920,7 @@
     "tier": 49,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 620.5,
+    "adp": 621.5,
     "is_estimated": true
   },
   {
@@ -6948,27 +6948,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "13433",
-    "name": "Riley Nowakowski",
-    "position": "TE",
-    "team": "PIT",
-    "rank": 580,
-    "tier": 49,
-    "projected_points": 10.8,
-    "custom_value": 3,
-    "adp": 622.3,
-    "is_estimated": false
-  },
-  {
     "player_id": "13121",
     "name": "Ben Yurosek",
     "position": "TE",
     "team": "MIN",
-    "rank": 581,
+    "rank": 580,
     "tier": 49,
     "projected_points": 4.5,
     "custom_value": 3,
     "adp": 623.1,
+    "is_estimated": false
+  },
+  {
+    "player_id": "13433",
+    "name": "Riley Nowakowski",
+    "position": "TE",
+    "team": "PIT",
+    "rank": 581,
+    "tier": 49,
+    "projected_points": 10.8,
+    "custom_value": 3,
+    "adp": 623.3,
     "is_estimated": false
   },
   {
@@ -7032,23 +7032,11 @@
     "is_estimated": true
   },
   {
-    "player_id": "13295",
-    "name": "Behren Morton",
-    "position": "QB",
-    "team": "NE",
-    "rank": 587,
-    "tier": 49,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 626.4,
-    "is_estimated": true
-  },
-  {
     "player_id": "6451",
     "name": "Stephen Carlson",
     "position": "TE",
     "team": "CHI",
-    "rank": 588,
+    "rank": 587,
     "tier": 49,
     "projected_points": 10,
     "custom_value": 3,
@@ -7060,11 +7048,23 @@
     "name": "Kolbe Katsis",
     "position": "WR",
     "team": "DEN",
+    "rank": 588,
+    "tier": 49,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 626.9,
+    "is_estimated": true
+  },
+  {
+    "player_id": "13295",
+    "name": "Behren Morton",
+    "position": "QB",
+    "team": "NE",
     "rank": 589,
     "tier": 50,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 626.9,
+    "adp": 627.4,
     "is_estimated": true
   },
   {
@@ -7092,23 +7092,11 @@
     "is_estimated": true
   },
   {
-    "player_id": "4930",
-    "name": "Franko House",
-    "position": "TE",
-    "team": "CHI",
-    "rank": 592,
-    "tier": 50,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 628.8,
-    "is_estimated": true
-  },
-  {
     "player_id": "12817",
     "name": "Jake Briningstool",
     "position": "TE",
     "team": "KC",
-    "rank": 593,
+    "rank": 592,
     "tier": 50,
     "projected_points": 10,
     "custom_value": 3,
@@ -7120,7 +7108,7 @@
     "name": "Brandon Johnson",
     "position": "WR",
     "team": "PIT",
-    "rank": 594,
+    "rank": 593,
     "tier": 50,
     "projected_points": 10,
     "custom_value": 3,
@@ -7128,15 +7116,15 @@
     "is_estimated": true
   },
   {
-    "player_id": "13428",
-    "name": "Joey Aguilar",
-    "position": "QB",
-    "team": "JAX",
-    "rank": 595,
+    "player_id": "4930",
+    "name": "Franko House",
+    "position": "TE",
+    "team": "CHI",
+    "rank": 594,
     "tier": 50,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 629.7,
+    "adp": 629.8,
     "is_estimated": true
   },
   {
@@ -7144,7 +7132,7 @@
     "name": "Sam Roush",
     "position": "TE",
     "team": "CHI",
-    "rank": 596,
+    "rank": 595,
     "tier": 50,
     "projected_points": 37.0,
     "custom_value": 3,
@@ -7156,7 +7144,7 @@
     "name": "Marquez Valdes-Scantling",
     "position": "WR",
     "team": "LAC",
-    "rank": 597,
+    "rank": 596,
     "tier": 50,
     "projected_points": 22.9,
     "custom_value": 3,
@@ -7168,7 +7156,7 @@
     "name": "Lil'Jordan Humphrey",
     "position": "WR",
     "team": "DEN",
-    "rank": 598,
+    "rank": 597,
     "tier": 50,
     "projected_points": 20.0,
     "custom_value": 3,
@@ -7180,7 +7168,7 @@
     "name": "Pierre Strong",
     "position": "RB",
     "team": "GB",
-    "rank": 599,
+    "rank": 598,
     "tier": 50,
     "projected_points": 6.5,
     "custom_value": 3,
@@ -7192,11 +7180,23 @@
     "name": "Lucky Jackson",
     "position": "WR",
     "team": "DET",
-    "rank": 600,
+    "rank": 599,
     "tier": 50,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 631.1,
+    "is_estimated": true
+  },
+  {
+    "player_id": "13428",
+    "name": "Joey Aguilar",
+    "position": "QB",
+    "team": "JAX",
+    "rank": 600,
+    "tier": 50,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 631.3,
     "is_estimated": true
   },
   {
@@ -7404,27 +7404,27 @@
     "is_estimated": false
   },
   {
-    "player_id": "12775",
-    "name": "Max Brosmer",
-    "position": "QB",
-    "team": "MIN",
-    "rank": 618,
-    "tier": 52,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 638.9,
-    "is_estimated": true
-  },
-  {
     "player_id": "13339",
     "name": "Davon Booth",
     "position": "RB",
     "team": "IND",
-    "rank": 619,
+    "rank": 618,
     "tier": 52,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 639,
+    "is_estimated": true
+  },
+  {
+    "player_id": "12775",
+    "name": "Max Brosmer",
+    "position": "QB",
+    "team": "MIN",
+    "rank": 619,
+    "tier": 52,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 639.9,
     "is_estimated": true
   },
   {
@@ -7579,7 +7579,7 @@
     "rank": 632,
     "tier": 53,
     "projected_points": 23.2,
-    "custom_value": 457,
+    "custom_value": 414,
     "adp": 645,
     "is_estimated": false
   },
@@ -7620,24 +7620,12 @@
     "is_estimated": false
   },
   {
-    "player_id": "6323",
-    "name": "Andrew Beck",
-    "position": "RB",
-    "team": "NYJ",
-    "rank": 636,
-    "tier": 53,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 646.0,
-    "is_estimated": true
-  },
-  {
     "player_id": "8755",
     "name": "Kaden Davis",
     "position": "WR",
     "team": "CHI",
-    "rank": 637,
-    "tier": 54,
+    "rank": 636,
+    "tier": 53,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 646,
@@ -7648,7 +7636,7 @@
     "name": "Josh Oliver",
     "position": "TE",
     "team": "MIN",
-    "rank": 638,
+    "rank": 637,
     "tier": 54,
     "projected_points": 34.6,
     "custom_value": 3,
@@ -7656,28 +7644,40 @@
     "is_estimated": false
   },
   {
-    "player_id": "10210",
-    "name": "Cameron Latu",
-    "position": "TE",
-    "team": "NE",
-    "rank": 639,
+    "player_id": "6323",
+    "name": "Andrew Beck",
+    "position": "RB",
+    "team": "NYJ",
+    "rank": 638,
     "tier": 54,
-    "projected_points": 4.5,
+    "projected_points": 10,
     "custom_value": 3,
-    "adp": 647.1,
-    "is_estimated": false
+    "adp": 647.0,
+    "is_estimated": true
   },
   {
     "player_id": "12715",
     "name": "Thomas Fidone",
     "position": "TE",
     "team": "NYG",
-    "rank": 640,
+    "rank": 639,
     "tier": 54,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 647.7,
     "is_estimated": true
+  },
+  {
+    "player_id": "10210",
+    "name": "Cameron Latu",
+    "position": "TE",
+    "team": "NE",
+    "rank": 640,
+    "tier": 54,
+    "projected_points": 4.5,
+    "custom_value": 3,
+    "adp": 647.9,
+    "is_estimated": false
   },
   {
     "player_id": "11623",
@@ -7824,23 +7824,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "6699",
-    "name": "Gunner Olszewski",
-    "position": "WR",
-    "team": "NYG",
-    "rank": 653,
-    "tier": 55,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 651.3,
-    "is_estimated": true
-  },
-  {
     "player_id": "11994",
     "name": "Kameron Johnson",
     "position": "WR",
     "team": "TB",
-    "rank": 654,
+    "rank": 653,
     "tier": 55,
     "projected_points": 3.8,
     "custom_value": 3,
@@ -7852,12 +7840,24 @@
     "name": "Tyler Higbee",
     "position": "TE",
     "team": "LAR",
-    "rank": 655,
+    "rank": 654,
     "tier": 55,
     "projected_points": 36.4,
     "custom_value": 3,
     "adp": 652,
     "is_estimated": false
+  },
+  {
+    "player_id": "6699",
+    "name": "Gunner Olszewski",
+    "position": "WR",
+    "team": "NYG",
+    "rank": 655,
+    "tier": 55,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 652.3,
+    "is_estimated": true
   },
   {
     "player_id": "13779",
@@ -7908,24 +7908,12 @@
     "is_estimated": true
   },
   {
-    "player_id": "17",
-    "name": "Matt Prater",
-    "position": "K",
-    "team": "FA",
-    "rank": 660,
-    "tier": 55,
-    "projected_points": 14.0,
-    "custom_value": 3,
-    "adp": 654.7,
-    "is_estimated": false
-  },
-  {
     "player_id": "2028",
     "name": "Derek Carr",
     "position": "QB",
     "team": "FA",
-    "rank": 661,
-    "tier": 56,
+    "rank": 660,
+    "tier": 55,
     "projected_points": 27.2,
     "custom_value": 3,
     "adp": 654.8,
@@ -7936,7 +7924,7 @@
     "name": "Josh Williams",
     "position": "RB",
     "team": "TB",
-    "rank": 662,
+    "rank": 661,
     "tier": 56,
     "projected_points": 3.1,
     "custom_value": 3,
@@ -7948,7 +7936,7 @@
     "name": "Mitchell Trubisky",
     "position": "QB",
     "team": "TEN",
-    "rank": 663,
+    "rank": 662,
     "tier": 56,
     "projected_points": 11.9,
     "custom_value": 3,
@@ -7960,7 +7948,7 @@
     "name": "Mason Rudolph",
     "position": "QB",
     "team": "PIT",
-    "rank": 664,
+    "rank": 663,
     "tier": 56,
     "projected_points": 11.7,
     "custom_value": 3,
@@ -7972,7 +7960,7 @@
     "name": "Ben Skowronek",
     "position": "WR",
     "team": "PIT",
-    "rank": 665,
+    "rank": 664,
     "tier": 56,
     "projected_points": 0.6,
     "custom_value": 3,
@@ -7984,7 +7972,7 @@
     "name": "Camden Brown",
     "position": "WR",
     "team": "DAL",
-    "rank": 666,
+    "rank": 665,
     "tier": 56,
     "projected_points": 10,
     "custom_value": 3,
@@ -7996,12 +7984,24 @@
     "name": "Laquon Treadwell",
     "position": "WR",
     "team": "IND",
-    "rank": 667,
+    "rank": 666,
     "tier": 56,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 655.6,
     "is_estimated": true
+  },
+  {
+    "player_id": "17",
+    "name": "Matt Prater",
+    "position": "K",
+    "team": "FA",
+    "rank": 667,
+    "tier": 56,
+    "projected_points": 14.0,
+    "custom_value": 3,
+    "adp": 655.7,
+    "is_estimated": false
   },
   {
     "player_id": "13491",
@@ -8052,24 +8052,12 @@
     "is_estimated": true
   },
   {
-    "player_id": "CHI",
-    "name": "Chicago Bears",
-    "position": "DEF",
-    "team": "CHI",
-    "rank": 672,
-    "tier": 56,
-    "projected_points": 85.0,
-    "custom_value": 3,
-    "adp": 656.0,
-    "is_estimated": false
-  },
-  {
     "player_id": "10857",
     "name": "Stetson Bennett",
     "position": "QB",
     "team": "LAR",
-    "rank": 673,
-    "tier": 57,
+    "rank": 672,
+    "tier": 56,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 656.8,
@@ -8080,7 +8068,7 @@
     "name": "Athan Kaliakmanis",
     "position": "QB",
     "team": "WAS",
-    "rank": 674,
+    "rank": 673,
     "tier": 57,
     "projected_points": 10,
     "custom_value": 3,
@@ -8092,7 +8080,7 @@
     "name": "Jacob Saylors",
     "position": "RB",
     "team": "DET",
-    "rank": 675,
+    "rank": 674,
     "tier": 57,
     "projected_points": 23.5,
     "custom_value": 3,
@@ -8104,7 +8092,7 @@
     "name": "Kendall Milton",
     "position": "RB",
     "team": "CIN",
-    "rank": 676,
+    "rank": 675,
     "tier": 57,
     "projected_points": 10,
     "custom_value": 3,
@@ -8116,11 +8104,23 @@
     "name": "Andy Dalton",
     "position": "QB",
     "team": "PHI",
-    "rank": 677,
+    "rank": 676,
     "tier": 57,
     "projected_points": 11.8,
     "custom_value": 3,
     "adp": 657,
+    "is_estimated": false
+  },
+  {
+    "player_id": "CHI",
+    "name": "Chicago Bears",
+    "position": "DEF",
+    "team": "CHI",
+    "rank": 677,
+    "tier": 57,
+    "projected_points": 85.0,
+    "custom_value": 3,
+    "adp": 657.0,
     "is_estimated": false
   },
   {
@@ -8160,23 +8160,11 @@
     "is_estimated": true
   },
   {
-    "player_id": "6992",
-    "name": "Michael Warren",
-    "position": "RB",
-    "team": "DET",
-    "rank": 681,
-    "tier": 57,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 658.4,
-    "is_estimated": true
-  },
-  {
     "player_id": "7559",
     "name": "Ihmir Smith-Marsette",
     "position": "WR",
     "team": "CAR",
-    "rank": 682,
+    "rank": 681,
     "tier": 57,
     "projected_points": 10,
     "custom_value": 3,
@@ -8188,7 +8176,7 @@
     "name": "Devin Culp",
     "position": "TE",
     "team": "TB",
-    "rank": 683,
+    "rank": 682,
     "tier": 57,
     "projected_points": 8.3,
     "custom_value": 3,
@@ -8200,11 +8188,23 @@
     "name": "Cash Jones",
     "position": "RB",
     "team": "ATL",
+    "rank": 683,
+    "tier": 57,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 659.4,
+    "is_estimated": true
+  },
+  {
+    "player_id": "6992",
+    "name": "Michael Warren",
+    "position": "RB",
+    "team": "DET",
     "rank": 684,
     "tier": 57,
     "projected_points": 10,
     "custom_value": 3,
-    "adp": 659.6,
+    "adp": 659.4,
     "is_estimated": true
   },
   {
@@ -8556,23 +8556,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "13427",
-    "name": "Diego Pavia",
-    "position": "QB",
-    "team": "FA",
-    "rank": 714,
-    "tier": 60,
-    "projected_points": 12.5,
-    "custom_value": 3,
-    "adp": 666.0,
-    "is_estimated": false
-  },
-  {
     "player_id": "5127",
     "name": "Kyle Allen",
     "position": "QB",
     "team": "BUF",
-    "rank": 715,
+    "rank": 714,
     "tier": 60,
     "projected_points": 12.0,
     "custom_value": 3,
@@ -8584,7 +8572,7 @@
     "name": "Dee Eskridge",
     "position": "WR",
     "team": "FA",
-    "rank": 716,
+    "rank": 715,
     "tier": 60,
     "projected_points": 3.9,
     "custom_value": 3,
@@ -8596,7 +8584,7 @@
     "name": "Dameon Pierce",
     "position": "RB",
     "team": "PHI",
-    "rank": 717,
+    "rank": 716,
     "tier": 60,
     "projected_points": 3.8,
     "custom_value": 3,
@@ -8608,7 +8596,7 @@
     "name": "Kenny Pickett",
     "position": "QB",
     "team": "CAR",
-    "rank": 718,
+    "rank": 717,
     "tier": 60,
     "projected_points": 10,
     "custom_value": 3,
@@ -8620,7 +8608,7 @@
     "name": "Cole Turner",
     "position": "TE",
     "team": "MIA",
-    "rank": 719,
+    "rank": 718,
     "tier": 60,
     "projected_points": 10,
     "custom_value": 3,
@@ -8632,7 +8620,7 @@
     "name": "James Proche",
     "position": "WR",
     "team": "FA",
-    "rank": 720,
+    "rank": 719,
     "tier": 60,
     "projected_points": 0.6,
     "custom_value": 3,
@@ -8644,8 +8632,8 @@
     "name": "Cedric Tillman",
     "position": "WR",
     "team": "NO",
-    "rank": 721,
-    "tier": 61,
+    "rank": 720,
+    "tier": 60,
     "projected_points": 5.1,
     "custom_value": 3,
     "adp": 667,
@@ -8656,12 +8644,24 @@
     "name": "Gavin Bartholomew",
     "position": "TE",
     "team": "MIN",
-    "rank": 722,
+    "rank": 721,
     "tier": 61,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 667,
     "is_estimated": true
+  },
+  {
+    "player_id": "13427",
+    "name": "Diego Pavia",
+    "position": "QB",
+    "team": "FA",
+    "rank": 722,
+    "tier": 61,
+    "projected_points": 12.5,
+    "custom_value": 3,
+    "adp": 667.0,
+    "is_estimated": false
   },
   {
     "player_id": "12475",
@@ -8880,23 +8880,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "5781",
-    "name": "Malik Turner",
-    "position": "WR",
-    "team": "SF",
-    "rank": 741,
-    "tier": 62,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 672.5,
-    "is_estimated": true
-  },
-  {
     "player_id": "10225",
     "name": "Jonathan Mingo",
     "position": "WR",
     "team": "DAL",
-    "rank": 742,
+    "rank": 741,
     "tier": 62,
     "projected_points": 10,
     "custom_value": 3,
@@ -8908,7 +8896,7 @@
     "name": "Luke Altmyer",
     "position": "QB",
     "team": "DET",
-    "rank": 743,
+    "rank": 742,
     "tier": 62,
     "projected_points": 10,
     "custom_value": 3,
@@ -8920,12 +8908,24 @@
     "name": "Kendrick Bourne",
     "position": "WR",
     "team": "ARI",
-    "rank": 744,
+    "rank": 743,
     "tier": 62,
     "projected_points": 61.9,
     "custom_value": 3,
     "adp": 673,
     "is_estimated": false
+  },
+  {
+    "player_id": "5781",
+    "name": "Malik Turner",
+    "position": "WR",
+    "team": "SF",
+    "rank": 744,
+    "tier": 62,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 673.5,
+    "is_estimated": true
   },
   {
     "player_id": "8253",
@@ -8952,23 +8952,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "NYJ",
-    "name": "New York Jets",
-    "position": "DEF",
-    "team": "NYJ",
-    "rank": 747,
-    "tier": 63,
-    "projected_points": 64.0,
-    "custom_value": 3,
-    "adp": 673.9,
-    "is_estimated": false
-  },
-  {
     "player_id": "12485",
     "name": "Tez Johnson",
     "position": "WR",
     "team": "TB",
-    "rank": 748,
+    "rank": 747,
     "tier": 63,
     "projected_points": 31.4,
     "custom_value": 3,
@@ -8980,7 +8968,7 @@
     "name": "Nate Boerkircher",
     "position": "TE",
     "team": "JAX",
-    "rank": 749,
+    "rank": 748,
     "tier": 63,
     "projected_points": 30.1,
     "custom_value": 3,
@@ -8992,7 +8980,7 @@
     "name": "Trey Palmer",
     "position": "WR",
     "team": "NO",
-    "rank": 750,
+    "rank": 749,
     "tier": 63,
     "projected_points": 10,
     "custom_value": 3,
@@ -9004,7 +8992,7 @@
     "name": "Jabari Small",
     "position": "RB",
     "team": "DET",
-    "rank": 751,
+    "rank": 750,
     "tier": 63,
     "projected_points": 10,
     "custom_value": 3,
@@ -9016,7 +9004,7 @@
     "name": "Jimmy Garoppolo",
     "position": "QB",
     "team": "FA",
-    "rank": 752,
+    "rank": 751,
     "tier": 63,
     "projected_points": 12.3,
     "custom_value": 3,
@@ -9028,7 +9016,7 @@
     "name": "Noah Brown",
     "position": "WR",
     "team": "FA",
-    "rank": 753,
+    "rank": 752,
     "tier": 63,
     "projected_points": 7.3,
     "custom_value": 3,
@@ -9040,12 +9028,24 @@
     "name": "Corey Kiner",
     "position": "RB",
     "team": "NE",
-    "rank": 754,
+    "rank": 753,
     "tier": 63,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 674.4,
     "is_estimated": true
+  },
+  {
+    "player_id": "NYJ",
+    "name": "New York Jets",
+    "position": "DEF",
+    "team": "NYJ",
+    "rank": 754,
+    "tier": 63,
+    "projected_points": 64.0,
+    "custom_value": 3,
+    "adp": 674.9,
+    "is_estimated": false
   },
   {
     "player_id": "13074",
@@ -9799,7 +9799,7 @@
     "rank": 817,
     "tier": 69,
     "projected_points": 22.3,
-    "custom_value": 6,
+    "custom_value": 10,
     "adp": 688,
     "is_estimated": false
   },
@@ -9884,7 +9884,7 @@
     "tier": 69,
     "projected_points": 66.0,
     "custom_value": 3,
-    "adp": 689.4,
+    "adp": 689.6,
     "is_estimated": false
   },
   {
@@ -10116,23 +10116,11 @@
     "is_estimated": false
   },
   {
-    "player_id": "TB",
-    "name": "Tampa Bay Buccaneers",
-    "position": "DEF",
-    "team": "TB",
-    "rank": 844,
-    "tier": 71,
-    "projected_points": 81.0,
-    "custom_value": 3,
-    "adp": 692.9,
-    "is_estimated": false
-  },
-  {
     "player_id": "12496",
     "name": "Tai Felton",
     "position": "WR",
     "team": "MIN",
-    "rank": 845,
+    "rank": 844,
     "tier": 71,
     "projected_points": 24.2,
     "custom_value": 3,
@@ -10144,7 +10132,7 @@
     "name": "Jacob Cowing",
     "position": "WR",
     "team": "SF",
-    "rank": 846,
+    "rank": 845,
     "tier": 71,
     "projected_points": 1.2,
     "custom_value": 3,
@@ -10156,7 +10144,7 @@
     "name": "Eli Pancol",
     "position": "WR",
     "team": "IND",
-    "rank": 847,
+    "rank": 846,
     "tier": 71,
     "projected_points": 10,
     "custom_value": 3,
@@ -10168,7 +10156,7 @@
     "name": "Will Pauling",
     "position": "WR",
     "team": "SF",
-    "rank": 848,
+    "rank": 847,
     "tier": 71,
     "projected_points": 10,
     "custom_value": 3,
@@ -10180,7 +10168,7 @@
     "name": "Zamir White",
     "position": "RB",
     "team": "NO",
-    "rank": 849,
+    "rank": 848,
     "tier": 71,
     "projected_points": 4.1,
     "custom_value": 3,
@@ -10188,23 +10176,23 @@
     "is_estimated": false
   },
   {
-    "player_id": "6453",
-    "name": "D.J. Montgomery",
-    "position": "WR",
-    "team": "IND",
-    "rank": 850,
+    "player_id": "TB",
+    "name": "Tampa Bay Buccaneers",
+    "position": "DEF",
+    "team": "TB",
+    "rank": 849,
     "tier": 71,
-    "projected_points": 10,
+    "projected_points": 81.0,
     "custom_value": 3,
-    "adp": 694.5,
-    "is_estimated": true
+    "adp": 694.1,
+    "is_estimated": false
   },
   {
     "player_id": "TEN",
     "name": "Tennessee Titans",
     "position": "DEF",
     "team": "TEN",
-    "rank": 851,
+    "rank": 850,
     "tier": 71,
     "projected_points": 67.0,
     "custom_value": 3,
@@ -10216,7 +10204,7 @@
     "name": "Eric Rivers",
     "position": "WR",
     "team": "TB",
-    "rank": 852,
+    "rank": 851,
     "tier": 71,
     "projected_points": 23.9,
     "custom_value": 3,
@@ -10228,8 +10216,8 @@
     "name": "Jonnu Smith",
     "position": "TE",
     "team": "GB",
-    "rank": 853,
-    "tier": 72,
+    "rank": 852,
+    "tier": 71,
     "projected_points": 39.6,
     "custom_value": 3,
     "adp": 695,
@@ -10240,11 +10228,23 @@
     "name": "Tyler Scott",
     "position": "WR",
     "team": "LV",
-    "rank": 854,
+    "rank": 853,
     "tier": 72,
     "projected_points": 10,
     "custom_value": 3,
     "adp": 695,
+    "is_estimated": true
+  },
+  {
+    "player_id": "12732",
+    "name": "Dominic Lovett",
+    "position": "WR",
+    "team": "DET",
+    "rank": 854,
+    "tier": 72,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 695.3,
     "is_estimated": true
   },
   {
@@ -10284,28 +10284,28 @@
     "is_estimated": true
   },
   {
+    "player_id": "6453",
+    "name": "D.J. Montgomery",
+    "position": "WR",
+    "team": "IND",
+    "rank": 858,
+    "tier": 72,
+    "projected_points": 10,
+    "custom_value": 3,
+    "adp": 695.5,
+    "is_estimated": true
+  },
+  {
     "player_id": "11034",
     "name": "Jalen Brooks",
     "position": "WR",
     "team": "ARI",
-    "rank": 858,
+    "rank": 859,
     "tier": 72,
     "projected_points": 5.0,
     "custom_value": 3,
     "adp": 695.7,
     "is_estimated": false
-  },
-  {
-    "player_id": "12732",
-    "name": "Dominic Lovett",
-    "position": "WR",
-    "team": "DET",
-    "rank": 859,
-    "tier": 72,
-    "projected_points": 10,
-    "custom_value": 3,
-    "adp": 695.7,
-    "is_estimated": true
   },
   {
     "player_id": "CLE",
@@ -10351,7 +10351,7 @@
     "rank": 863,
     "tier": 72,
     "projected_points": 47.6,
-    "custom_value": 15,
+    "custom_value": 21,
     "adp": 697,
     "is_estimated": false
   },
@@ -10584,23 +10584,11 @@
     "is_estimated": true
   },
   {
-    "player_id": "4314",
-    "name": "Johnny Mundt",
-    "position": "TE",
-    "team": "PHI",
-    "rank": 883,
-    "tier": 74,
-    "projected_points": 10,
-    "custom_value": 2.2,
-    "adp": 700.0,
-    "is_estimated": true
-  },
-  {
     "player_id": "7720",
     "name": "Kene Nwangwu",
     "position": "RB",
     "team": "NYJ",
-    "rank": 884,
+    "rank": 883,
     "tier": 74,
     "projected_points": 10,
     "custom_value": 2.2,
@@ -10612,7 +10600,7 @@
     "name": "Joshua Perkins",
     "position": "TE",
     "team": "NYJ",
-    "rank": 885,
+    "rank": 884,
     "tier": 74,
     "projected_points": 10,
     "custom_value": 2.2,
@@ -10624,10 +10612,10 @@
     "name": "Gregory Desrosiers",
     "position": "RB",
     "team": "LAC",
-    "rank": 886,
+    "rank": 885,
     "tier": 74,
     "projected_points": 10,
-    "custom_value": 2.1,
+    "custom_value": 2.2,
     "adp": 700.7,
     "is_estimated": true
   },
@@ -10636,7 +10624,7 @@
     "name": "Carolina Panthers",
     "position": "DEF",
     "team": "CAR",
-    "rank": 887,
+    "rank": 886,
     "tier": 74,
     "projected_points": 81.0,
     "custom_value": 2.1,
@@ -10648,7 +10636,7 @@
     "name": "Daniel Carlson",
     "position": "K",
     "team": "NO",
-    "rank": 888,
+    "rank": 887,
     "tier": 74,
     "projected_points": 104.0,
     "custom_value": 2.1,
@@ -10660,10 +10648,10 @@
     "name": "Jordan Watkins",
     "position": "WR",
     "team": "SF",
-    "rank": 889,
-    "tier": 75,
+    "rank": 888,
+    "tier": 74,
     "projected_points": 1.9,
-    "custom_value": 2.0,
+    "custom_value": 2.1,
     "adp": 999,
     "is_estimated": false
   },
@@ -10672,7 +10660,7 @@
     "name": "Marshall Lang",
     "position": "TE",
     "team": "MIN",
-    "rank": 890,
+    "rank": 889,
     "tier": 75,
     "projected_points": 10,
     "custom_value": 2.0,
@@ -10684,10 +10672,10 @@
     "name": "Tanner Koziol",
     "position": "TE",
     "team": "JAX",
-    "rank": 891,
+    "rank": 890,
     "tier": 75,
     "projected_points": 36.3,
-    "custom_value": 1.9,
+    "custom_value": 2.0,
     "adp": 999,
     "is_estimated": false
   },
@@ -10696,7 +10684,7 @@
     "name": "Kevin Austin",
     "position": "WR",
     "team": "NO",
-    "rank": 892,
+    "rank": 891,
     "tier": 75,
     "projected_points": 5.0,
     "custom_value": 1.9,
@@ -10708,7 +10696,7 @@
     "name": "Skylar Thompson",
     "position": "QB",
     "team": "BAL",
-    "rank": 893,
+    "rank": 892,
     "tier": 75,
     "projected_points": 10,
     "custom_value": 1.9,
@@ -10720,10 +10708,10 @@
     "name": "Zaire Mitchell-Paden",
     "position": "TE",
     "team": "HOU",
-    "rank": 894,
+    "rank": 893,
     "tier": 75,
     "projected_points": 10,
-    "custom_value": 1.8,
+    "custom_value": 1.9,
     "adp": 999,
     "is_estimated": true
   },
@@ -10732,7 +10720,7 @@
     "name": "Shaq Roland",
     "position": "WR",
     "team": "CHI",
-    "rank": 895,
+    "rank": 894,
     "tier": 75,
     "projected_points": 10,
     "custom_value": 1.8,
@@ -10744,12 +10732,24 @@
     "name": "Dax Raymond",
     "position": "TE",
     "team": "PIT",
-    "rank": 896,
+    "rank": 895,
     "tier": 75,
     "projected_points": 10,
-    "custom_value": 1.7,
+    "custom_value": 1.8,
     "adp": 1593,
     "is_estimated": true
+  },
+  {
+    "player_id": "11168",
+    "name": "Xavier Smith",
+    "position": "WR",
+    "team": "FA",
+    "rank": 896,
+    "tier": 75,
+    "projected_points": 20.6,
+    "custom_value": 1.7,
+    "adp": null,
+    "is_estimated": false
   },
   {
     "player_id": "11606",
