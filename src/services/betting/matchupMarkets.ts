@@ -18,6 +18,7 @@ import {
   sideDistribution,
   winProbability,
   SideDistribution,
+  REGULATION_MINUTES,
 } from '@/services/betting/liveOdds';
 import type { NflGamesResponse } from '@/app/api/betting/nfl-games/route';
 
@@ -61,6 +62,15 @@ export type LineupSlot = {
   points: number;
   projectedPoints: number;
   gameState: 'pre' | 'in' | 'post' | 'unknown';
+  /** NFL team code, when known. */
+  team: string | null;
+  /**
+   * Where this slot is heading: the projection before kickoff, points banked plus the unplayed
+   * share of the projection during the game, the points themselves once final. Comparing two
+   * slots on this rather than on points alone keeps the comparison meaningful before kickoff,
+   * when every slot is 0-0, and it converges to the real result at the whistle.
+   */
+  expectedPoints: number;
 };
 
 export type MarketSide = {
@@ -256,19 +266,34 @@ function buildLineup(
   return startingSlots.map((slot, i) => {
     const pid = ids[i];
     if (!pid || pid === '0') {
-      return { slot, playerId: null, name: null, position: null, points: 0, projectedPoints: 0, gameState: 'unknown' as const };
+      return {
+        slot, playerId: null, name: null, position: null, points: 0, projectedPoints: 0,
+        gameState: 'unknown' as const, team: null, expectedPoints: 0,
+      };
     }
     const team = playerTeam(pid);
     const gameId = team ? games.teamToGame[team] : undefined;
     const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+    const points = pts[i] ?? 0;
+    const projectedPoints = calculateProjectedPoints(projections[pid], scoringSettings);
+    const unplayed =
+      !game || game.state === 'post'
+        ? 0
+        : game.state === 'pre'
+          ? 1
+          : Math.min(1, Math.max(0, game.remainingMinutes / REGULATION_MINUTES));
     return {
       slot,
       playerId: pid,
       name: playerName(pid),
       position: PLAYERS[pid]?.position ?? null,
-      points: pts[i] ?? 0,
-      projectedPoints: calculateProjectedPoints(projections[pid], scoringSettings),
+      points,
+      projectedPoints,
       gameState: game ? game.state : ('unknown' as const),
+      team: PLAYERS[pid]?.team ?? null,
+      // Before kickoff the projection IS the expectation; banked points only count once the game
+      // has started, so a pre-game 0 does not drag it down.
+      expectedPoints: game?.state === 'pre' ? projectedPoints : points + Math.max(0, projectedPoints) * unplayed,
     };
   });
 }

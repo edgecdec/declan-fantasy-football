@@ -253,3 +253,59 @@ export function adminWhois(
 ): Promise<SiteResult<{ linked: { username: string; displayName: string } | null }>> {
   return call(`/api/bot/admin/link?discordUserId=${encodeURIComponent(discordUserId)}`);
 }
+
+export type MatchupSlot = {
+  slot: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  points: number;
+  projectedPoints: number;
+  expectedPoints: number;
+  gameState: 'pre' | 'in' | 'post' | 'unknown';
+};
+
+export type MatchupSide = {
+  rosterId: number;
+  displayName: string;
+  teamName: string | null;
+  banked: number;
+  projected: number;
+  playersRemaining: number;
+  lineup: MatchupSlot[];
+  assumedPromotions: string[];
+  assumedStreams: string[];
+};
+
+export type MatchupResponse = {
+  league: { leagueId: string; name: string; season: string };
+  week: number;
+  rosterId: number;
+  displayName: string;
+} & (
+  | { headToHead: false }
+  | {
+      headToHead: true;
+      winProbability: number;
+      remainingMinutes: number;
+      status: 'not_started' | 'live' | 'between' | 'final';
+      me: MatchupSide;
+      opponent: MatchupSide;
+    }
+);
+
+/** Exactly one of rosterId, discordUserId or player identifies whose matchup it is. */
+export function fetchMatchup(args: {
+  leagueId: string;
+  week?: number;
+  rosterId?: number;
+  discordUserId?: string;
+  player?: string;
+}): Promise<SiteResult<MatchupResponse>> {
+  const params = new URLSearchParams({ leagueId: args.leagueId });
+  if (args.week) params.set('week', String(args.week));
+  if (args.rosterId) params.set('rosterId', String(args.rosterId));
+  if (args.discordUserId) params.set('discordUserId', args.discordUserId);
+  if (args.player) params.set('player', args.player);
+  return call<MatchupResponse>(`/api/bot/matchup?${params}`);
+}

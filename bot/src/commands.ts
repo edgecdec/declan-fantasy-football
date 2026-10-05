@@ -32,11 +32,20 @@ import {
   fetchLeaderboard,
   fetchLuck,
   fetchMarkets,
+  fetchMatchup,
   fetchMe,
+  type MatchupResponse,
   placeBet,
   type LeaderboardStanding,
 } from './siteApi';
 import { americanOdds, meter, money, pad, padLeft, percent } from './format';
+import {
+  matchupButtonId,
+  parseMatchupButtonId,
+  renderMatchupDetail,
+  renderMatchupSummary,
+  type MatchupView,
+} from './matchupView';
 
 /**
  * Slash commands.
@@ -132,6 +141,22 @@ export const commandDefinitions = [
     .setDescription('Expected wins vs actual wins — who has been lucky')
     .addStringOption(o =>
       o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
+    ),
+  new SlashCommandBuilder()
+    .setName('matchup')
+    .setDescription('A manager’s matchup this week, with a slot-by-slot breakdown')
+    .addStringOption(o =>
+      o
+        .setName('player')
+        .setDescription('Sleeper name or username. Defaults to you.')
+        .setAutocomplete(true),
+    )
+    .addUserOption(o => o.setName('user').setDescription('Or a Discord user, if they are linked'))
+    .addStringOption(o =>
+      o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
+    )
+    .addIntegerOption(o =>
+      o.setName('week').setDescription('Defaults to the current week').setMinValue(1).setMaxValue(18),
     ),
   new SlashCommandBuilder()
     .setName('website')
@@ -779,6 +804,10 @@ export async function handlePageButton(i: ButtonInteraction): Promise<void> {
     await i.deferUpdate();
     return;
   }
+  if (i.customId.startsWith('mu:')) {
+    await handleMatchupButton(i);
+    return;
+  }
   const [kind, leagueId, rawPage, sort, rawUser] = i.customId.split(':');
   if (kind !== 'ob' && kind !== 'bh') return;
 
@@ -1128,6 +1157,10 @@ async function handleAdmin(i: ChatInputCommandInteraction): Promise<void> {
  * invites the refusal rather than preventing it.
  */
 export async function handleAutocomplete(i: AutocompleteInteraction): Promise<void> {
+  if (i.commandName === 'matchup' && i.guildId) {
+    await autocompleteManagers(i);
+    return;
+  }
   if (i.commandName !== 'bet' || !i.guildId) {
     await i.respond([]);
     return;
@@ -1229,6 +1262,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'standings': return await handleStandings(i);
       case 'website': return await handleWebsite(i);
       case 'luck': return await handleLuck(i);
+      case 'matchup': return await handleMatchup(i);
       case 'openbets': return await handleOpenBets(i);
       case 'bethistory': return await handleBetHistory(i);
       case 'watching': return await handleWatching(i);
@@ -1243,4 +1277,161 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       .editReply(`Something broke running that: ${err instanceof Error ? err.message : 'unknown'}`)
       .catch(() => undefined);
   }
+}
+
+/**
+ * /matchup — one manager's matchup, scoreboard first, breakdown behind a button.
+ *
+ * Like /luck, `league` accepts ANY Sleeper league id: a matchup is public Sleeper data with no money
+ * in it. Without one, every league this channel watches is tried and each league the player is in
+ * gets its own message, so someone in two watched leagues sees both rather than whichever was first.
+ *
+ * Who it is about, in order: an @mention (resolved through the Declan Dollars link), a Sleeper name,
+ * or — with no player given — the person who ran it, if they are linked.
+ */
+const MAX_MATCHUP_LEAGUES = 4;
+
+async function handleMatchup(i: ChatInputCommandInteraction): Promise<void> {
+  const raw = i.options.getString('player')?.trim() || null;
+  const explicitLeague = i.options.getString('league')?.trim() || null;
+  const week = i.options.getInteger('week') ?? undefined;
+
+  // The user option first; a string that is a raw `<@123>` mention takes the same linked path.
+  const mention = i.options.getUser('user')?.id ?? raw?.match(/^<@!?(\d+)>$/)?.[1] ?? null;
+  const who = mention
+    ? { discordUserId: mention }
+    : raw
+      ? { player: raw }
+      : { discordUserId: i.user.id };
+
+  let leagueIds: string[];
+  if (explicitLeague) {
+    leagueIds = [explicitLeague];
+  } else {
+    const resolved = resolveLeagues(i.guildId!, i.channelId, null);
+    if ('error' in resolved) {
+      await i.editReply(`${resolved.error}\nOr pass a league id: \`/matchup league:<id>\``);
+      return;
+    }
+    leagueIds = resolved.map(l => l.leagueId);
+  }
+
+  const found: Extract<MatchupResponse, { headToHead: true }>[] = [];
+  const noOpponent: string[] = [];
+  let lastError: string | null = null;
+  for (const leagueId of leagueIds) {
+    if (found.length >= MAX_MATCHUP_LEAGUES) break;
+    const res = await fetchMatchup({ leagueId, week, ...who });
+    if (!res.ok) {
+      // Not in this league is the expected miss when trying every league in the channel.
+      if (res.error !== 'not_in_league') lastError = res.error;
+      continue;
+    }
+    if (res.data.headToHead) found.push(res.data);
+    else noOpponent.push(res.data.league.name);
+  }
+
+  if (found.length === 0) {
+    const subject = mention ? `<@${mention}>` : raw ? `**${raw}**` : 'You';
+    const message = noOpponent.length
+      ? `${subject} ${raw || mention ? 'has' : 'have'} no head-to-head opponent this week in ${noOpponent.join(', ')} — that format has no matchups.`
+      : lastError
+        ? `Could not load that matchup: ${lastError}`
+        : !raw && !mention
+          ? 'You are not linked to a Sleeper account, so pass a player: `/matchup player:<name>`.'
+          : `${subject} is not in ${explicitLeague ? 'that league' : 'any league this channel watches'}.`
+            + (mention ? ' (An @mention only works for linked accounts — try their Sleeper name.)' : '');
+    await i.editReply({ content: message, allowedMentions: { parse: [] } });
+    return;
+  }
+
+  const [first, ...rest] = found;
+  await i.editReply(matchupMessage(first, 'sum'));
+  for (const m of rest) {
+    await i.followUp(matchupMessage(m, 'sum')).catch(err => console.error('[bot] matchup followUp failed', err));
+  }
+}
+
+function matchupMessage(
+  m: Extract<MatchupResponse, { headToHead: true }>,
+  view: MatchupView,
+): { embeds: APIEmbed[]; components: ActionRowBuilder<ButtonBuilder>[]; allowedMentions: { parse: [] } } {
+  const embeds = [renderMatchupSummary(m)];
+  if (view !== 'sum') embeds.push(renderMatchupDetail(m, view));
+
+  const id = (v: MatchupView) => matchupButtonId(m.league.leagueId, m.rosterId, m.week, v);
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  if (view === 'sum') {
+    row.addComponents(
+      new ButtonBuilder().setCustomId(id('slot')).setLabel('Details').setStyle(ButtonStyle.Primary),
+    );
+  } else {
+    // The active sort is shown disabled, so the buttons double as a label for the current view.
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(id('slot')).setLabel('By slot').setStyle(ButtonStyle.Secondary).setDisabled(view === 'slot'),
+      new ButtonBuilder()
+        .setCustomId(id('edge')).setLabel('By edge').setStyle(ButtonStyle.Secondary).setDisabled(view === 'edge'),
+      new ButtonBuilder().setCustomId(id('sum')).setLabel('Hide details').setStyle(ButtonStyle.Secondary),
+    );
+  }
+  return { embeds, components: [row], allowedMentions: { parse: [] } };
+}
+
+/**
+ * A matchup button. Re-fetches rather than re-rendering stale numbers, so opening the details
+ * mid-game shows the score as it is now — every click doubles as a refresh.
+ */
+async function handleMatchupButton(i: ButtonInteraction): Promise<void> {
+  const parsed = parseMatchupButtonId(i.customId);
+  if (!parsed) return;
+  await i.deferUpdate();
+  const res = await fetchMatchup({ leagueId: parsed.leagueId, rosterId: parsed.rosterId, week: parsed.week });
+  if (!res.ok || !res.data.headToHead) {
+    await i
+      .followUp({ content: `Could not refresh that matchup${res.ok ? '' : `: ${res.error}`}`, ephemeral: true })
+      .catch(() => undefined);
+    return;
+  }
+  await i.editReply(matchupMessage(res.data, parsed.view)).catch(err => console.error('[bot] matchup update failed', err));
+}
+
+/**
+ * Managers in the channel's leagues, for the `player` option. Straight from Sleeper and cached
+ * briefly: autocomplete must answer within three seconds and fires on every keystroke.
+ */
+const managerListCache = new Map<string, { at: number; names: string[] }>();
+
+async function leagueManagerNames(leagueId: string): Promise<string[]> {
+  const hit = managerListCache.get(leagueId);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.names;
+  try {
+    const users = (await fetch(`https://api.sleeper.app/v1/league/${leagueId}/users`).then(r => r.json())) as {
+      display_name?: string;
+    }[];
+    const names = users.map(u => u.display_name).filter((n): n is string => Boolean(n));
+    managerListCache.set(leagueId, { at: Date.now(), names });
+    return names;
+  } catch {
+    return hit?.names ?? [];
+  }
+}
+
+async function autocompleteManagers(i: AutocompleteInteraction): Promise<void> {
+  const explicit = i.options.getString('league')?.trim();
+  const leagues = explicit
+    ? [{ leagueId: explicit }]
+    : (() => {
+        const r = resolveLeagues(i.guildId!, i.channelId, null);
+        return 'error' in r ? [] : r;
+      })();
+  const typed = i.options.getFocused().toLowerCase();
+  const all = new Set<string>();
+  for (const { leagueId } of leagues) for (const n of await leagueManagerNames(leagueId)) all.add(n);
+  const choices = [...all]
+    .filter(n => !typed || n.toLowerCase().includes(typed))
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 25)
+    .map(n => ({ name: n.slice(0, 100), value: n.slice(0, 100) }));
+  await i.respond(choices);
 }

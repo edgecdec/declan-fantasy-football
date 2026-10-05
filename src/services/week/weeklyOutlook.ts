@@ -272,7 +272,7 @@ export function remainingProjection(starter: {
   return Math.max(0, starter.projectedPoints) * fraction;
 }
 
-function statusFor(
+export function statusFor(
   remainingMinutes: number,
   anyPointsScored: boolean,
   anyPlaying: boolean,
