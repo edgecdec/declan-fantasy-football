@@ -42,6 +42,14 @@ export type NflGame = {
   clock: string;
   remainingMinutes: number;
   teams: string[];
+  /** ESPN's compact status, e.g. "5:21 - 3rd" during a game. */
+  shortDetail?: string;
+  /** Kickoff, ISO. */
+  startsAt?: string;
+  /** Home team abbreviation, so a player line can say "vs" or "@". */
+  home?: string | null;
+  /** Current score by team abbreviation. */
+  scores?: Record<string, number>;
 };
 
 export type NflGamesResponse = {
@@ -130,6 +138,13 @@ export async function GET(request: Request) {
 
       for (const t of teams) teamToGame[t] = event.id;
 
+      type Competitor = { homeAway?: string; score?: string; team?: { abbreviation?: string } };
+      const competitors: Competitor[] = competition.competitors ?? [];
+      const scores: Record<string, number> = {};
+      for (const c of competitors) {
+        if (c.team?.abbreviation) scores[c.team.abbreviation] = Number(c.score) || 0;
+      }
+
       games.push({
         id: event.id,
         name: event.shortName ?? '',
@@ -139,6 +154,10 @@ export async function GET(request: Request) {
         clock,
         remainingMinutes: remainingMinutes(state, period, clock),
         teams,
+        shortDetail: status.type?.shortDetail ?? undefined,
+        startsAt: event.date ?? undefined,
+        home: competitors.find(c => c.homeAway === 'home')?.team?.abbreviation ?? null,
+        scores,
       });
     }
 

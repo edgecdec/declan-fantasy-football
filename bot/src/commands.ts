@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   SlashCommandBuilder,
@@ -33,6 +34,7 @@ import {
   fetchLuck,
   fetchMarkets,
   fetchMatchup,
+  fetchMatchupImage,
   fetchMe,
   type MatchupResponse,
   placeBet,
@@ -41,6 +43,7 @@ import {
 import { americanOdds, meter, money, pad, padLeft, percent } from './format';
 import {
   matchupButtonId,
+  matchupNotes,
   parseMatchupButtonId,
   renderMatchupDetail,
   renderMatchupSummary,
@@ -1346,18 +1349,56 @@ async function handleMatchup(i: ChatInputCommandInteraction): Promise<void> {
   }
 
   const [first, ...rest] = found;
-  await i.editReply(matchupMessage(first, 'sum'));
+  await i.editReply(await matchupMessage(first, 'sum'));
   for (const m of rest) {
-    await i.followUp(matchupMessage(m, 'sum')).catch(err => console.error('[bot] matchup followUp failed', err));
+    await i.followUp(await matchupMessage(m, 'sum')).catch(err => console.error('[bot] matchup followUp failed', err));
   }
 }
 
-function matchupMessage(
+type MatchupMessage = {
+  embeds: APIEmbed[];
+  components: ActionRowBuilder<ButtonBuilder>[];
+  files: AttachmentBuilder[];
+  /** Always set, so switching views replaces the previous picture rather than stacking another. */
+  attachments: [];
+  allowedMentions: { parse: [] };
+};
+
+/**
+ * The scoreboard, or the Details picture.
+ *
+ * Details is an IMAGE laid out like Sleeper's mobile matchup screen (see matchupImage.tsx on the
+ * site): the two-sided, colour-per-player layout cannot be expressed in Discord text. If the
+ * picture cannot be produced, the text breakdown stands in rather than the button doing nothing.
+ */
+async function matchupMessage(
   m: Extract<MatchupResponse, { headToHead: true }>,
   view: MatchupView,
-): { embeds: APIEmbed[]; components: ActionRowBuilder<ButtonBuilder>[]; allowedMentions: { parse: [] } } {
-  const embeds = [renderMatchupSummary(m)];
-  if (view !== 'sum') embeds.push(renderMatchupDetail(m, view));
+): Promise<MatchupMessage> {
+  const summary = renderMatchupSummary(m);
+  const embeds: APIEmbed[] = [];
+  const files: AttachmentBuilder[] = [];
+
+  if (view === 'sum') {
+    embeds.push(summary);
+  } else {
+    const image = await fetchMatchupImage({
+      leagueId: m.league.leagueId, rosterId: m.rosterId, week: m.week, sort: view,
+    });
+    if (image.ok) {
+      files.push(new AttachmentBuilder(image.data, { name: 'matchup.png' }));
+      const notes = matchupNotes(m);
+      embeds.push({
+        title: summary.title,
+        color: summary.color,
+        image: { url: 'attachment://matchup.png' },
+        ...(notes.length ? { description: notes.map(n => `-# ${n}`).join('\n') } : {}),
+      });
+    } else {
+      console.error('[bot] matchup image failed:', image.error);
+      embeds.push(summary, renderMatchupDetail(m, view));
+    }
+  }
 
   const id = (v: MatchupView) => matchupButtonId(m.league.leagueId, m.rosterId, m.week, v);
   const row = new ActionRowBuilder<ButtonBuilder>();
@@ -1375,7 +1416,7 @@ function matchupMessage(
       new ButtonBuilder().setCustomId(id('sum')).setLabel('Hide details').setStyle(ButtonStyle.Secondary),
     );
   }
-  return { embeds, components: [row], allowedMentions: { parse: [] } };
+  return { embeds, components: [row], files, attachments: [], allowedMentions: { parse: [] } };
 }
 
 /**
@@ -1393,7 +1434,7 @@ async function handleMatchupButton(i: ButtonInteraction): Promise<void> {
       .catch(() => undefined);
     return;
   }
-  await i.editReply(matchupMessage(res.data, parsed.view)).catch(err => console.error('[bot] matchup update failed', err));
+  await i.editReply(await matchupMessage(res.data, parsed.view)).catch(err => console.error('[bot] matchup update failed', err));
 }
 
 /**

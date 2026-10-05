@@ -309,3 +309,30 @@ export function fetchMatchup(args: {
   if (args.player) params.set('player', args.player);
   return call<MatchupResponse>(`/api/bot/matchup?${params}`);
 }
+
+/**
+ * The Details picture for a matchup, as PNG bytes. Not through `call`, which expects JSON — an error
+ * still comes back as JSON, so that path is read for its message.
+ */
+export async function fetchMatchupImage(args: {
+  leagueId: string;
+  rosterId: number;
+  week: number;
+  sort: 'slot' | 'edge';
+}): Promise<SiteResult<Buffer>> {
+  const params = new URLSearchParams({
+    leagueId: args.leagueId, rosterId: String(args.rosterId), week: String(args.week), sort: args.sort,
+  });
+  try {
+    const res = await fetch(`${baseUrl()}/api/bot/matchup/image?${params}`, {
+      headers: { 'x-bot-secret': secret() },
+    });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').startsWith('image/')) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, status: res.status, error: body.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, data: Buffer.from(await res.arrayBuffer()) };
+  } catch (err) {
+    return { ok: false, status: 0, error: err instanceof Error ? err.message : 'site unreachable' };
+  }
+}

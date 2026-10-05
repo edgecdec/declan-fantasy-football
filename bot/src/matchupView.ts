@@ -126,14 +126,7 @@ export function renderMatchupDetail(m: HeadToHead, view: 'slot' | 'edge'): APIEm
     rows.push(playerLine(p.theirs));
   }
 
-  const notes: string[] = [];
-  for (const side of [m.me, m.opponent]) {
-    const assumed = [
-      ...side.assumedPromotions.map(n => `${n} starting`),
-      ...side.assumedStreams.map(slot => `a ${slot} off waivers`),
-    ];
-    if (assumed.length) notes.push(`${side.displayName}: projection assumes ${assumed.join(', ')}`);
-  }
+  const notes = matchupNotes(m);
 
   return {
     title: `${m.me.displayName} vs ${m.opponent.displayName} — by ${view === 'edge' ? 'edge' : 'slot'}`,
@@ -151,6 +144,19 @@ export function renderMatchupDetail(m: HeadToHead, view: 'slot' | 'edge'): APIEm
       text: 'edge = projected final difference in the slot · pts / proj · ● playing  ✓ final',
     },
   };
+}
+
+/** What the projection assumes beyond the lineup as set, so a number that disagrees with Sleeper's can be explained. */
+export function matchupNotes(m: HeadToHead): string[] {
+  const notes: string[] = [];
+  for (const side of [m.me, m.opponent]) {
+    const assumed = [
+      ...side.assumedPromotions.map(n => `${n} starting`),
+      ...side.assumedStreams.map(slot => `a ${slot} off waivers`),
+    ];
+    if (assumed.length) notes.push(`${side.displayName}: projection assumes ${assumed.join(', ')}`);
+  }
+  return notes;
 }
 
 /**
