@@ -4,7 +4,10 @@
  * prints a one-time setup link for each.
  *
  * Run manually on the VPS:
- *   cd /var/www/FantasyFootball && node scripts/seed_betting_accounts.mjs
+ *   cd /var/www/FantasyFootball && node scripts/seed_betting_accounts.mjs [--league <leagueId>]
+ *
+ * `--league` limits the run to one league. Use it when enabling a new league: a full run re-issues a
+ * link for EVERY unclaimed account in every league, which invalidates any unused link already sent.
  *
  * Idempotent by design — re-running never resets an existing password and never
  * re-grants the opening balance. It only issues a fresh link for accounts that
@@ -26,6 +29,7 @@ const SETUP_TOKEN_TTL_DAYS = 7;
 const BETTING_LEAGUES = [
   { leagueId: '1383248044669046784', season: '2026', label: "Graham's Football Fantasy" },
   { leagueId: '1387607608562565120', season: '2026', label: 'Silverback League' },
+  { leagueId: '1387602471991414784', season: '2026', label: 'Silverback Dynasty' },
 ];
 
 /** Matches START_BALANCE_CENTS in src/lib/betting/constants.ts. */
@@ -197,13 +201,22 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+function selectedLeagues() {
+  const i = process.argv.indexOf('--league');
+  if (i === -1) return BETTING_LEAGUES;
+  const id = process.argv[i + 1];
+  const match = BETTING_LEAGUES.filter(l => l.leagueId === id);
+  if (match.length === 0) throw new Error(`--league ${id} is not in BETTING_LEAGUES`);
+  return match;
+}
+
 async function main() {
   const db = openDb();
   const links = [];
   let created = 0;
   let existing = 0;
 
-  for (const league of BETTING_LEAGUES) {
+  for (const league of selectedLeagues()) {
     const users = await fetchLeagueUsers(league.leagueId);
     console.log(`\n${league.label} (${league.season}) — ${users.length} members`);
 

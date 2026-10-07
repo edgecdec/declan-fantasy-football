@@ -47,12 +47,15 @@ export const LEDGER_REASON_LABELS: Record<string, string> = {
  * dilute an existing balance and a loss in one cannot restrict staking in another. Scoring settings
  * differ between them and that is fine — every market is priced with its own league's settings.
  *
- * Note there are two Silverback leagues in this user's account, a redraft and a dynasty. This is
- * the redraft one; the dynasty (1387602471991414784) is deliberately not enabled.
+ * There are two Silverback leagues, a redraft and a dynasty, and both are enabled. The dynasty has
+ * no DEF slot and three FLEX; that needs nothing special, because lineups are built from each
+ * league's own roster_positions. Verified before enabling with a real pricing pass against a scratch
+ * database: five markets, odds matching the This Week page's model to the decimal.
  */
 export const BETTING_LEAGUES = [
   { leagueId: '1383248044669046784', season: '2026', label: "Graham's Football Fantasy" },
   { leagueId: '1387607608562565120', season: '2026', label: 'Silverback League' },
+  { leagueId: '1387602471991414784', season: '2026', label: 'Silverback Dynasty' },
 ] as const;
 
 export type BettingLeague = typeof BETTING_LEAGUES[number];
