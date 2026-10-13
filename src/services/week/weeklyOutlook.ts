@@ -1,6 +1,7 @@
 import { SleeperLeague, SleeperService } from '@/services/sleeper/sleeperService';
 import {
   MarketSide,
+  bestLineupsByRoster,
   buildMatchupMarkets,
   playerName,
 } from '@/services/betting/matchupMarkets';
@@ -636,7 +637,18 @@ async function buildNoOpponentLeague(
   };
 
   const mine = matchups.find(m => m.roster_id === myRoster.roster_id);
+  // The lineup AS SET, for display: these are the players actually in the slots.
   const myStarters = mine ? startersOf(mine) : [];
+
+  /*
+   * The elimination odds use each roster's BEST AVAILABLE lineup instead — the same bench promotions
+   * and waiver streams the head-to-head markets assume. Pricing the lineup as set counted every
+   * bye-week or OUT starter as zero, so a manager who had not yet swapped out a bye looked like the
+   * chop favourite all week. Falls back to the lineup as set if the league cannot be priced.
+   */
+  const best = games ? await bestLineupsByRoster(leagueId, week, games).catch(() => null) : null;
+  const pricedStartersOf = (m: (typeof matchups)[number]): StarterInput[] =>
+    best?.get(m.roster_id) ?? startersOf(m);
 
   const lineup: LineupOnlyLeague | null = myStarters.length
     ? {
@@ -666,7 +678,7 @@ async function buildNoOpponentLeague(
     leagueName,
     matchups,
     myRosterId: myRoster.roster_id,
-    startersOf,
+    startersOf: pricedStartersOf,
     nameByRoster,
     eliminatedHere: myStarters.length === 0,
   });

@@ -335,6 +335,45 @@ function buildFreeAgentPool(
 }
 
 /**
+ * Every roster's best available lineup for a week, keyed by roster id — with no pairing.
+ *
+ * The same machinery buildMatchupMarkets prices with (bench promotions, waiver streams, contention
+ * across the whole league), for formats where every roster has its own matchup_id: chopped,
+ * guillotine, survivor. Those used to be priced off the lineup AS SET, so a bye-week or OUT starter
+ * counted as zero for the elimination odds even with a healthy player on the bench.
+ *
+ * A roster with no starters (already eliminated) is left out. Null when the league or the week's
+ * data cannot be loaded, so a caller can fall back to the lineup as set.
+ */
+export async function bestLineupsByRoster(
+  leagueId: string,
+  week: number,
+  games: NflGamesResponse,
+): Promise<Map<number, StarterInput[]> | null> {
+  const league = await SleeperService.getLeague(leagueId);
+  const scoringSettings = league?.scoring_settings;
+  const rosterPositions = league?.roster_positions;
+  if (!league || !scoringSettings || !rosterPositions) return null;
+
+  const [matchups, projections, liveStats, rosters] = await Promise.all([
+    SleeperService.getMatchups(leagueId, week, { skipCache: true }),
+    SleeperService.getWeeklyProjections(league.season, week),
+    SleeperService.getWeeklyStats(league.season, week),
+    SleeperService.getRosters(leagueId),
+  ]);
+  if (!matchups?.length) return null;
+
+  const live = matchups.filter(m => (m.starters ?? []).some(pid => pid && pid !== '0'));
+  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, games);
+  const lineups = priceWithStreamContention(demand =>
+    live.map(m =>
+      buildStarters(m, rosterPositions, projections, scoringSettings, games, liveStats, freeAgents, demand),
+    ),
+  );
+  return new Map(live.map((m, i) => [m.roster_id, lineups[i].starters]));
+}
+
+/**
  * Fetches everything a league week's markets need and prices them.
  *
  * `week` should be the week currently being played, so callers pass
