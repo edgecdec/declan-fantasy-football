@@ -10,11 +10,13 @@ import { BENCH_SLOTS, SLOT_ELIGIBILITY, SLOT_PRIORITY } from '@/services/stats/l
  * expectation is that the good one gets started — so the odds should already
  * reflect it rather than lurching when the swap happens.
  *
- * Two hard rules, matching how Sleeper actually locks:
+ * Three hard rules, matching how Sleeper actually locks:
  *   - A player whose game has started or finished is frozen. He keeps his slot
  *     and his points, and he cannot be moved out or benched.
  *   - Only a player whose own game has not started can be moved into an open
  *     slot. You cannot pull in someone already playing or already done.
+ *   - A player with NO game this week (a bye, or no NFL team) never locks. His slot
+ *     is open all week, and he cannot fill one, because he cannot score.
  */
 
 /**
@@ -65,7 +67,10 @@ export type LineupCandidate = {
   position: string | null;
   projectedPoints: number;
   actualPoints: number;
-  /** 'pre' is swappable; 'in' and 'post' are locked; 'unknown' is treated as locked. */
+  /**
+   * 'pre' is swappable; 'in' and 'post' are locked. 'unknown' means no game this week — a bye or
+   * no team — so the player can neither score nor lock: his slot stays open.
+   */
   gameState: 'pre' | 'in' | 'post' | 'unknown';
   remainingMinutes: number;
   /**
@@ -163,12 +168,20 @@ export function bestAvailableLineup(
 
   startingSlots.forEach((slot, index) => {
     const current = currentStarters[index] ?? null;
-    if (current && current.gameState !== 'pre') {
+    /*
+     * Only a game that has STARTED locks a slot. 'unknown' used to lock too, which is wrong in the
+     * one case it mostly occurs: a starter on BYE. Sleeper never locks a bye-week player, every
+     * manager benches him, but the model left him in the slot at zero all week and never looked at
+     * the bench or the wire for it — week 6 had Junebugge priced with four bye-week starters and
+     * no replacement QB, at 3% to win.
+     */
+    if (current && (current.gameState === 'in' || current.gameState === 'post')) {
       locked.push(current);
       return;
     }
     openSlots.push(slot);
-    if (current) pool.push(current);
+    // A bye-week starter is not a candidate for the slot he is vacating, or any other.
+    if (current && current.gameState === 'pre') pool.push(current);
   });
 
   for (const b of bench) {

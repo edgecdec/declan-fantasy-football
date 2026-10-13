@@ -254,3 +254,40 @@ test('a slot with nothing available anywhere is reported unfilled, not silently 
   assert.deepEqual(result.unfilledSlots, ['DEF']);
   assert.deepEqual(result.streamed, []);
 });
+
+test('a bye-week starter is replaced from the bench, not left in the slot at zero', () => {
+  // Week 6, as seen live: a starter on bye has no game, so his state is 'unknown'.
+  const starters = solidStarters();
+  starters[2] = player('wr-bye', 'WR', 0, { gameState: 'unknown', remainingMinutes: 0 });
+  const bench = [player('wr-bench', 'WR', 11)];
+
+  const result = bestAvailableLineup(SLOTS, starters, bench, FREE_AGENTS);
+
+  assert.ok(result.promoted.some(p => p.playerId === 'wr-bench'), 'the bench WR starts');
+  assert.ok(!result.starters.some(p => p.playerId === 'wr-bye'), 'the bye player is not priced');
+});
+
+test('a bye-week starter with nobody on the bench is streamed from waivers', () => {
+  const starters = solidStarters();
+  starters[0] = player('qb-bye', 'QB', 0, { gameState: 'unknown', remainingMinutes: 0 });
+
+  const result = bestAvailableLineup(SLOTS, starters, [], FREE_AGENTS);
+
+  const qb = result.streamed.find(s => s.slot === 'QB');
+  assert.ok(qb, 'the QB slot is filled off the wire');
+  // Mean of the top five free-agent QBs: 18, 17.5, 17, 16.5, 16.
+  assert.equal(qb.projectedPoints, 17);
+  assert.equal(qb.replaces, undefined, 'a bye player is not a rival to the pickup');
+});
+
+test('a starter whose game has kicked off stays locked, even at zero', () => {
+  // Only a STARTED game locks. A dud who has already played keeps his slot and his points.
+  const starters = solidStarters();
+  starters[2] = player('wr-dud', 'WR', 14, { gameState: 'post', actualPoints: 0, remainingMinutes: 0 });
+  const bench = [player('wr-bench', 'WR', 11)];
+
+  const result = bestAvailableLineup(SLOTS, starters, bench, FREE_AGENTS);
+
+  assert.ok(result.starters.some(p => p.playerId === 'wr-dud'));
+  assert.ok(!result.promoted.some(p => p.playerId === 'wr-bench'));
+});
