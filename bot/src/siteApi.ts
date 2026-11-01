@@ -1,3 +1,5 @@
+import type { BotMarket, BotMarketsResponse } from '@/lib/betting/botMarkets';
+
 /**
  * The bot's client for `/api/bot/*`.
  *
@@ -112,23 +114,12 @@ export function fetchLeaderboard(
   return call<LeaderboardResponse>(`/api/bot/leaderboard?${params}`);
 }
 
-export type MarketRow = {
-  marketId: string;
-  matchupId: number;
-  nameA: string | null;
-  nameB: string | null;
-  probA: number;
-  priceA: number;
-  priceB: number;
-  status: string;
-  remainingMinutes: number;
-};
-
-export type MarketsResponse = {
-  league: { leagueId: string; season: string; label: string };
-  week: number;
-  markets: MarketRow[];
-};
+/*
+ * The site's own type, not a copy: a field renamed in the API becomes a compile error here rather
+ * than an `undefined` in an embed. Type-only, so nothing from the site is loaded at runtime.
+ */
+export type MarketRow = BotMarket;
+export type MarketsResponse = BotMarketsResponse;
 
 export function fetchMarkets(leagueId: string, week?: number): Promise<SiteResult<MarketsResponse>> {
   const params = new URLSearchParams({ leagueId });

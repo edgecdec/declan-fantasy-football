@@ -395,23 +395,36 @@ export async function priceLeagueWeek(
     // Probability too, not just the clock: a matchup can be decided with an hour left.
     const status = isMarketOpen(remaining, probA) ? 'open' : 'closed';
 
+    // The same distributions the probability came from, so a stored scoreline cannot disagree
+    // with the price beside it.
+    const pointsA = a.distribution.banked;
+    const pointsB = b.distribution.banked;
+    const projectedA = a.distribution.mean;
+    const projectedB = b.distribution.mean;
+
     if (existing) {
       db.prepare(
         `UPDATE markets SET prob_a = ?, price_a = ?, price_b = ?, status = ?,
            remaining_minutes = ?, owner_a = ?, owner_b = ?, name_a = ?, name_b = ?,
+           points_a = ?, points_b = ?, projected_a = ?, projected_b = ?,
            priced_at = datetime('now')
          WHERE id = ?`,
-      ).run(probA, pricing.oddsA, pricing.oddsB, status, remaining, ownerA, ownerB, nameA, nameB, id);
+      ).run(
+        probA, pricing.oddsA, pricing.oddsB, status, remaining, ownerA, ownerB, nameA, nameB,
+        pointsA, pointsB, projectedA, projectedB, id,
+      );
     } else {
       db.prepare(
         `INSERT INTO markets
            (id, league_id, season, week, matchup_id, roster_a, roster_b, owner_a, owner_b,
-            name_a, name_b, prob_a, price_a, price_b, status, remaining_minutes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            name_a, name_b, prob_a, price_a, price_b, status, remaining_minutes,
+            points_a, points_b, projected_a, projected_b)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id, leagueId, cfg.season, week, matchupId,
         sides[0].roster_id, sides[1].roster_id, ownerA, ownerB, nameA, nameB,
         probA, pricing.oddsA, pricing.oddsB, status, remaining,
+        pointsA, pointsB, projectedA, projectedB,
       );
     }
 
@@ -427,10 +440,10 @@ export async function priceLeagueWeek(
       priceB: pricing.oddsB,
       remainingMinutes: remaining,
       open: status === 'open',
-      pointsA: a.distribution.banked,
-      pointsB: b.distribution.banked,
-      projectedA: a.distribution.mean,
-      projectedB: b.distribution.mean,
+      pointsA,
+      pointsB,
+      projectedA,
+      projectedB,
       sdA: Math.sqrt(a.distribution.variance),
       sdB: Math.sqrt(b.distribution.variance),
       nameA,

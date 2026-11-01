@@ -40,7 +40,8 @@ import {
   placeBet,
   type LeaderboardStanding,
 } from './siteApi';
-import { americanOdds, meter, money, pad, padLeft, percent } from './format';
+import { americanOdds, money, pad, padLeft, percent } from './format';
+import { renderMarketsEmbed } from './marketsView';
 import {
   matchupButtonId,
   matchupNotes,
@@ -372,11 +373,7 @@ async function handleBalances(i: ChatInputCommandInteraction): Promise<void> {
 }
 
 /**
- * The priced board, one embed per league.
- *
- * Rendered as embed FIELDS rather than an aligned monospace table. Discord lays fields out itself,
- * so a long manager name cannot wrap and break the rows beneath it — which is exactly what happened
- * to the first version of this, where `KarrasKarras` and `Coldst2EvaDoIt` overflowed the block.
+ * The priced board, one embed per league. Layout lives in marketsView.ts so it is testable.
  */
 async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
   const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
@@ -403,20 +400,7 @@ async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
       continue;
     }
 
-    embeds.push({
-      title: `${meta.label} — week ${shown}`,
-      // Closest matchups first, as the API returns them.
-      fields: markets.slice(0, 25).map(m => ({
-        name: `${m.nameA ?? 'A'}  vs  ${m.nameB ?? 'B'}`,
-        value:
-          `\`${meter(m.probA)}\`  **${Math.round(m.probA * 100)}%**\n`
-          + `${americanOdds(m.priceA)} / ${americanOdds(m.priceB)}`
-          + (m.status === 'open' ? '' : `  ·  _${m.status}_`),
-        inline: false,
-      })),
-      color: 0x5865f2,
-      footer: { text: 'bar = chance the left side wins · odds include the house vig' },
-    });
+    embeds.push(renderMarketsEmbed(res.data));
   }
 
   if (embeds.length === 0) {

@@ -32,6 +32,11 @@ export type MarketRow = {
    */
   name_a: string | null;
   name_b: string | null;
+  /** The scoreline the last pricing pass saw (see db.ts). Nullable for the same reason. */
+  points_a: number | null;
+  points_b: number | null;
+  projected_a: number | null;
+  projected_b: number | null;
 };
 
 export type WagerRow = {

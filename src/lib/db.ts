@@ -210,6 +210,16 @@ function initDb(database: Database.Database): void {
   // renames themselves after the bet was struck.
   addColumnIfMissing(database, 'markets', 'name_a', 'TEXT');
   addColumnIfMissing(database, 'markets', 'name_b', 'TEXT');
+  /*
+   * The scoreline behind the price, written by every pricing pass: points banked so far and the
+   * projected final (banked plus expected remaining) that the probability was computed from. Stored
+   * so readers that must not price — the bot's /markets — can show the score the odds came from
+   * rather than re-deriving one that might disagree. NULL on rows priced before this migration.
+   */
+  addColumnIfMissing(database, 'markets', 'points_a', 'REAL');
+  addColumnIfMissing(database, 'markets', 'points_b', 'REAL');
+  addColumnIfMissing(database, 'markets', 'projected_a', 'REAL');
+  addColumnIfMissing(database, 'markets', 'projected_b', 'REAL');
 
   /*
    * Per-league bankrolls.
