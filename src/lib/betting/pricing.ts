@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
 import { findBettingLeague } from '@/lib/betting/leagues';
 import { calculateProjectedPoints } from '@/services/stats/scoring';
-import { defenceCorrection } from '@/services/betting/defenseBrackets';
+import { applyDefenceModel } from '@/services/betting/defenceModel';
+import { loadDefenceHistory, loadDefenceModel } from '@/services/betting/defenceHistory';
 import {
   bestAvailableLineup,
   priceWithStreamContention,
@@ -221,11 +222,18 @@ export async function priceLeagueWeek(
       `${SLEEPER_BASE}/stats/nfl/regular/${league.season}/${week}`,
     ),
     loadGames(league.season, week),
+    // Warms the memoised DEF history alongside everything else; loadDefenceModel below reuses it.
+    loadDefenceHistory(league.season, week).catch(() => null),
   ]);
 
   if (!rosters || !matchups || !projections || !games) return [];
 
   const scoring = league.scoring_settings;
+  // League-relative DEF pricing, shared with the matchup markets (services/betting/defenceModel).
+  // Null when the history is unavailable: DEFs then price on the repaired projection and the shape.
+  const defenceModel = await loadDefenceModel({
+    season: league.season, week, scoring, projections, label: leagueId,
+  });
   const rosterPositions = league.roster_positions;
   const ownerByRoster = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
   const nameByUser = new Map((users ?? []).map(u => [u.user_id, u.display_name]));
@@ -234,32 +242,22 @@ export async function priceLeagueWeek(
   const defenceNotes = new Map<string, DefenceNote>();
 
   /**
-   * Corrects a defence whose live score contains a bracket bonus earned by nothing.
+   * Prices a defence: the league-relative DEF model, then the live points-allowed bracket
+   * correction (Sleeper credits the bracket from the score SO FAR, so a defence holds the full
+   * shutout bonus from the first snap — +9.5 to +12.4 on average across this user's leagues).
    *
-   * Sleeper credits the points-allowed bracket from the score SO FAR, so a defence holds the full
-   * shutout bonus from the first snap — measured live at +10.00 for Seattle nine minutes into the
-   * 2026 opener, worth +9.5 to +12.4 on average across every one of this user's leagues. The
-   * model and the measurements are in services/betting/defenseBrackets.ts, shared with the This
-   * Week outlook so the two pages cannot disagree about the same defence.
+   * Both live in services/betting (defenceModel.ts, defenseBrackets.ts) and are shared with the
+   * matchup markets and This Week, so the pages cannot disagree about the same defence.
    */
   const correctDefence = (
     c: LineupCandidate,
     rawProjection: Record<string, number> | undefined,
   ): LineupCandidate => {
-    const fix = defenceCorrection(c, scoring, liveStats?.[c.playerId], rawProjection);
-    if (!fix) return c;
-    defenceNotes.set(c.playerId, fix.note);
-    return {
-      ...c,
-      // actualPoints is left ALONE: Sleeper has genuinely credited those points and the manager
-      // genuinely holds them right now, so the live score must match Sleeper's to the cent. The
-      // claim being made here is about the FINAL score. An earlier version subtracted the bracket
-      // here and our scoreboard then disagreed with Sleeper's, which reads as a broken scoreboard
-      // rather than as a projection.
-      meanAdjustment: (c.meanAdjustment ?? 0) + fix.meanAdjustment,
-      projectedPoints: c.projectedPoints - fix.projectedBracket,
-      extraVariance: (c.extraVariance ?? 0) + fix.variance,
-    };
+    const { candidate: priced, note } = applyDefenceModel(
+      c, defenceModel, scoring, liveStats?.[c.playerId], rawProjection,
+    );
+    if (note) defenceNotes.set(c.playerId, note);
+    return priced;
   };
 
   const candidate = (playerId: string, actualPoints: number): LineupCandidate => {
@@ -325,6 +323,7 @@ export async function priceLeagueWeek(
       extraSd: c.extraSd,
       extraVariance: c.extraVariance,
       meanAdjustment: c.meanAdjustment,
+      moments: c.moments,
     }));
     const detail: SideDetail = {
       // Names are not in the slim index, so identify a promotion by id. The UI

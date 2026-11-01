@@ -89,6 +89,8 @@ export type LineupCandidate = {
    * for a defence whose credited points-allowed bracket is unlikely to survive to the whistle.
    */
   meanAdjustment?: number;
+  /** Full-game mean and variance overriding the position shape — see StarterInput.moments. */
+  moments?: { mean: number; variance: number };
 };
 
 /** A slot filled from waivers, as a tier average rather than a named player. */
@@ -276,6 +278,14 @@ export function bestAvailableLineup(
     // Priced as a synthetic player carrying the tier's mean. `spread` is reported
     // separately so the caller can fold it into variance — we know the tier, not
     // the name, and that extra uncertainty is real.
+    // Options priced on their own moments (team defences) carry the tier average of those too:
+    // both are linear in the projection, so averaging them is the model at the average.
+    const moments = window.every(p => p.moments)
+      ? {
+          mean: window.reduce((s, p) => s + p.moments!.mean, 0) / window.length,
+          variance: window.reduce((s, p) => s + p.moments!.variance, 0) / window.length,
+        }
+      : undefined;
     chosen.push({
       playerId: `stream:${slot}:${streamed.length - 1}`,
       position: window[0].position,
@@ -284,6 +294,7 @@ export function bestAvailableLineup(
       gameState: 'pre',
       remainingMinutes: window[0].remainingMinutes,
       extraSd: spread,
+      ...(moments ? { moments } : {}),
     });
   }
 

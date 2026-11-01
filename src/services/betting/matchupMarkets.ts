@@ -1,6 +1,8 @@
 import { SleeperService, SleeperLeague, SleeperMatchup } from '@/services/sleeper/sleeperService';
 import { calculateProjectedPoints } from '@/services/stats/lineupOptimizer';
-import { defenceCorrection } from '@/services/betting/defenseBrackets';
+import { applyDefenceModel, defenceProjectedPoints, type DefenceModel } from '@/services/betting/defenceModel';
+import { loadDefenceHistory, loadDefenceModel } from '@/services/betting/defenceHistory';
+import { isDefenceRow } from '@/services/stats/defenceProjection';
 import {
   bestAvailableLineup,
   priceWithStreamContention,
@@ -129,6 +131,12 @@ export type MarketsResult = {
   league: SleeperLeague;
   week: number;
   markets: MatchupMarket[];
+  /**
+   * The league-relative DEF model the week was priced with, or null when the DEF history could not
+   * be loaded (DEFs then price on the repaired projection and the position shape). Carries the
+   * level guard, for a UI that wants to flag a week whose DEF projections look off.
+   */
+  defenceModel: DefenceModel | null;
   /** True when the whole slate is done — every market settled. */
   allFinal: boolean;
 };
@@ -153,6 +161,7 @@ function buildCandidate(
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
   liveStats: Record<string, Record<string, number>>,
+  defenceModel: DefenceModel | null,
 ): LineupCandidate {
   const team = playerTeam(playerId);
   const gameId = team ? games.teamToGame[team] : undefined;
@@ -170,23 +179,18 @@ function buildCandidate(
   };
 
   /*
-   * A live defence is credited a points-allowed bracket it has not earned — Sleeper reads the
-   * bracket off the score so far, so every defence holds the shutout bonus from the first snap.
-   * The correction goes on the expected REMAINDER, never on the banked score, so the live
+   * A defence is priced by the league-relative DEF model (Sleeper's DEF projections double-count
+   * kick-return yards, and the old shape was fitted on them), and a live one also has the
+   * points-allowed bracket it has not yet earned replaced by the one its game is heading for. The
+   * bracket correction goes on the expected REMAINDER, never on the banked score, so the live
    * scoreboard still matches Sleeper's to the cent.
    *
    * Shared with the betting pricing rather than reimplemented, because these two candidate
    * builders were already near-duplicates and a defence must not be worth different amounts on
    * two pages of the same site.
    */
-  const fix = defenceCorrection(candidate, scoringSettings, liveStats[playerId], rawProjection);
-  if (!fix) return candidate;
-  return {
-    ...candidate,
-    meanAdjustment: (candidate.meanAdjustment ?? 0) + fix.meanAdjustment,
-    projectedPoints: candidate.projectedPoints - fix.projectedBracket,
-    extraVariance: (candidate.extraVariance ?? 0) + fix.variance,
-  };
+  return applyDefenceModel(candidate, defenceModel, scoringSettings, liveStats[playerId], rawProjection)
+    .candidate;
 }
 
 /**
@@ -203,6 +207,7 @@ function buildStarters(
   liveStats: Record<string, Record<string, number>>,
   freeAgents: LineupCandidate[],
   streamsByPosition: Map<string, number>,
+  defenceModel: DefenceModel | null,
 ): {
   starters: StarterInput[];
   promoted: LineupCandidate[];
@@ -216,13 +221,17 @@ function buildStarters(
   const current = starterIds.map((pid, i) =>
     !pid || pid === '0'
       ? null
-      : buildCandidate(pid, starterPoints[i] ?? 0, projections, scoringSettings, games, liveStats),
+      : buildCandidate(
+          pid, starterPoints[i] ?? 0, projections, scoringSettings, games, liveStats, defenceModel,
+        ),
   );
 
   const startingSet = new Set(starterIds.filter(p => p && p !== '0'));
   const bench = (matchup.players ?? [])
     .filter(pid => pid && pid !== '0' && !startingSet.has(pid))
-    .map(pid => buildCandidate(pid, playersPoints[pid] ?? 0, projections, scoringSettings, games, liveStats));
+    .map(pid => buildCandidate(
+      pid, playersPoints[pid] ?? 0, projections, scoringSettings, games, liveStats, defenceModel,
+    ));
 
   const best = bestAvailableLineup(rosterPositions, current, bench, freeAgents, streamsByPosition);
 
@@ -237,6 +246,7 @@ function buildStarters(
       extraSd: c.extraSd,
       extraVariance: c.extraVariance,
       meanAdjustment: c.meanAdjustment,
+      moments: c.moments,
     })),
     promoted: best.promoted,
     streamed: best.streamed,
@@ -258,6 +268,7 @@ function buildLineup(
   projections: Record<string, Record<string, number>>,
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
+  defenceModel: DefenceModel | null,
 ): LineupSlot[] {
   const startingSlots = rosterPositions.filter(s => !BENCH_SLOTS.has(s));
   const ids = matchup.starters ?? [];
@@ -275,7 +286,10 @@ function buildLineup(
     const gameId = team ? games.teamToGame[team] : undefined;
     const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
     const points = pts[i] ?? 0;
-    const projectedPoints = calculateProjectedPoints(projections[pid], scoringSettings);
+    // A defence shows the projection the model priced it from, so the lineup and the price agree.
+    const projectedPoints = defenceModel && isDefenceRow(projections[pid])
+      ? defenceProjectedPoints(projections[pid], defenceModel)
+      : calculateProjectedPoints(projections[pid], scoringSettings);
     const unplayed =
       !game || game.state === 'post'
         ? 0
@@ -316,6 +330,7 @@ function buildFreeAgentPool(
   projections: Record<string, Record<string, number>>,
   scoringSettings: Record<string, number>,
   games: NflGamesResponse,
+  defenceModel: DefenceModel | null,
 ): LineupCandidate[] {
   const rostered = new Set<string>();
   for (const r of rosters) {
@@ -328,7 +343,7 @@ function buildFreeAgentPool(
     if (!projections[playerId]) continue;
     // A free agent has no live game of its own in this pool (actualPoints 0), so an empty stats
     // object is honest rather than a shortcut.
-    const c = buildCandidate(playerId, 0, projections, scoringSettings, games, {});
+    const c = buildCandidate(playerId, 0, projections, scoringSettings, games, {}, defenceModel);
     if (c.projectedPoints > 0) pool.push(c);
   }
   return pool;
@@ -360,14 +375,21 @@ export async function bestLineupsByRoster(
     SleeperService.getWeeklyProjections(league.season, week),
     SleeperService.getWeeklyStats(league.season, week),
     SleeperService.getRosters(leagueId),
+    loadDefenceHistory(league.season, week).catch(() => null),
   ]);
   if (!matchups?.length) return null;
 
+  const defenceModel = await loadDefenceModel({
+    season: league.season, week, scoring: scoringSettings, projections, label: leagueId,
+  });
   const live = matchups.filter(m => (m.starters ?? []).some(pid => pid && pid !== '0'));
-  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, games);
+  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, games, defenceModel);
   const lineups = priceWithStreamContention(demand =>
     live.map(m =>
-      buildStarters(m, rosterPositions, projections, scoringSettings, games, liveStats, freeAgents, demand),
+      buildStarters(
+        m, rosterPositions, projections, scoringSettings, games, liveStats, freeAgents, demand,
+        defenceModel,
+      ),
     ),
   );
   return new Map(live.map((m, i) => [m.roster_id, lineups[i].starters]));
@@ -410,9 +432,15 @@ export async function buildMatchupMarkets(
       // priced week 2's lineups against week 1's finished games — a flat 50/50 on everything.
       : fetch(`/api/betting/nfl-games?season=${league.season}&week=${week}`)
           .then(r => r.json() as Promise<NflGamesResponse>),
+    // Warms the memoised DEF history (shared by every league on the page) alongside the rest.
+    loadDefenceHistory(league.season, week).catch(() => null),
   ]);
 
   if (!gamesRes?.ok) return null;
+
+  const defenceModel = await loadDefenceModel({
+    season: league.season, week, scoring: scoringSettings, projections, label: leagueId,
+  });
 
   const ownerByRoster = new Map(rosters.map(r => [r.roster_id, r.owner_id ?? null]));
   const userById = new Map(users.map(u => [u.user_id, u]));
@@ -425,7 +453,7 @@ export async function buildMatchupMarkets(
     pairs.set(m.matchup_id, list);
   }
 
-  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, gamesRes);
+  const freeAgents = buildFreeAgentPool(rosters, projections, scoringSettings, gamesRes, defenceModel);
 
   /*
    * Every side is built together, repeatedly, until waiver contention settles — how thin the
@@ -439,6 +467,7 @@ export async function buildMatchupMarkets(
     orderedSides.map(m =>
       buildStarters(
         m, rosterPositions, projections, scoringSettings, gamesRes, liveStats, freeAgents, demand,
+        defenceModel,
       ),
     ),
   );
@@ -461,7 +490,7 @@ export async function buildMatchupMarkets(
       avatar: user?.avatar ?? undefined,
       distribution: sideDistribution(starters),
       starters,
-      lineup: buildLineup(m, rosterPositions, projections, scoringSettings, gamesRes),
+      lineup: buildLineup(m, rosterPositions, projections, scoringSettings, gamesRes, defenceModel),
       playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
       assumedPromotions: promoted.map(c => ({
         playerId: c.playerId,
@@ -525,6 +554,7 @@ export async function buildMatchupMarkets(
     league,
     week,
     markets,
+    defenceModel,
     allFinal: markets.length > 0 && markets.every(m => m.remainingMinutes === 0),
   };
 }

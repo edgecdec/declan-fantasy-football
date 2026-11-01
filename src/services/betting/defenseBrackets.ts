@@ -170,27 +170,81 @@ export function bracketMoments(
   sd: number,
   integerValued: boolean,
 ): { mean: number; variance: number } {
-  const edge = integerValued ? 0.5 : 0;
-  // A degenerate sd means the value is known: the bracket is simply the one it lands in.
-  if (!(sd > 0)) {
-    const points = bracketPoints(brackets, scoring, mean);
-    return { mean: points, variance: 0 };
-  }
-
   let expected = 0;
   let second = 0;
+  for (const [key, p] of Object.entries(bracketProbabilities(brackets, mean, sd, integerValued))) {
+    const points = scoring[key] ?? 0;
+    expected += p * points;
+    second += p * points * points;
+  }
+  return { mean: expected, variance: Math.max(0, second - expected * expected) };
+}
+
+/**
+ * P(final value lands in each bracket), given a normal belief about it. Keys are the bracket keys.
+ *
+ * Shared by `bracketMoments` and by the DEF projection normaliser, which swaps Sleeper's single
+ * projected bracket flag for these probabilities — so the bracket a projection carries and the
+ * bracket the live correction later subtracts are the same number by construction.
+ */
+export function bracketProbabilities(
+  brackets: Bracket[],
+  mean: number,
+  sd: number,
+  integerValued: boolean,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  // A degenerate sd means the value is known: the bracket is simply the one it lands in.
+  if (!(sd > 0)) {
+    for (const b of brackets) out[b.key] = 0;
+    out[bracketFor(brackets, mean).key] = 1;
+    return out;
+  }
+  const edge = integerValued ? 0.5 : 0;
   let lower = -Infinity;
   for (const b of brackets) {
     const upper = b.max === Infinity ? Infinity : b.max + edge;
     const pBelowUpper = upper === Infinity ? 1 : normalCdf((upper - mean) / sd);
     const pBelowLower = lower === -Infinity ? 0 : normalCdf((lower - mean) / sd);
-    const p = Math.max(0, pBelowUpper - pBelowLower);
-    const points = scoring[b.key] ?? 0;
-    expected += p * points;
-    second += p * points * points;
+    out[b.key] = Math.max(0, pBelowUpper - pBelowLower);
     lower = upper;
   }
-  return { mean: expected, variance: Math.max(0, second - expected * expected) };
+  return out;
+}
+
+/**
+ * The bracket points a FULL-GAME DEF projection carries, and their variance.
+ *
+ * Sleeper's projection row sets one flag at its projected mean (`pts_allow_21_27: 1`), a plug-in
+ * estimate. The projection scorer (`normalizeDefenceProjection`) replaces that flag with bracket
+ * probabilities from N(pts_allow, PTS_ALLOW_SD) and N(yds_allow, YDS_ALLOW_SD), which is the
+ * expectation the live model starts from at kickoff. This returns exactly what went in, so the live
+ * correction can take it back out without leaving a residue.
+ *
+ * Falls back to the plug-in flags when the row carries no `pts_allow` / `yds_allow` to centre a
+ * distribution on — which is also what the normaliser does in that case.
+ */
+export function projectedBracketMoments(
+  rawProjection: Record<string, number>,
+  scoring: Record<string, number>,
+): { mean: number; variance: number } {
+  let mean = 0;
+  let variance = 0;
+  const parts: [Bracket[], number | undefined, number, boolean][] = [
+    [PTS_ALLOW_BRACKETS, rawProjection.pts_allow, PTS_ALLOW_SD, true],
+    [YDS_ALLOW_BRACKETS, rawProjection.yds_allow, YDS_ALLOW_SD, false],
+  ];
+  for (const [brackets, centre, sd, integerValued] of parts) {
+    if (!pricesBrackets(brackets, scoring)) continue;
+    if (typeof centre === 'number') {
+      const m = bracketMoments(brackets, scoring, centre, sd, integerValued);
+      mean += m.mean;
+      variance += m.variance;
+    } else {
+      for (const b of brackets) mean += (rawProjection[b.key] ?? 0) * (scoring[b.key] ?? 0);
+    }
+  }
+  return { mean, variance };
 }
 
 export type DefenseBracketInput = {
@@ -301,6 +355,12 @@ export type DefenceCorrection = {
   meanAdjustment: number;
   /** Bracket points to remove from the full-game projection, so it is not counted twice. */
   projectedBracket: number;
+  /**
+   * The variance those projected bracket points carried. Removed alongside them by the league-
+   * relative DEF model, whose full-game variance includes the bracket — the live bracket
+   * variance (`variance`) replaces it.
+   */
+  projectedBracketVariance: number;
   /** Variance of the bracket, already conditioned on the time left. */
   variance: number;
   /** For explaining the number in the UI. */
@@ -352,16 +412,17 @@ export function defenceCorrection(
     minutesRemaining: candidate.remainingMinutes,
   });
 
-  // Sleeper's projection sets the bracket flag it expects (`pts_allow_21_27: 1`) and the
-  // projection scorer counted it, so this subtracts exactly what went in.
-  const projectedBracket = rawProjection
-    ? bracketPoints(PTS_ALLOW_BRACKETS, scoring, rawProjection.pts_allow ?? 0)
-      + bracketPoints(YDS_ALLOW_BRACKETS, scoring, rawProjection.yds_allow ?? 0)
-    : 0;
+  // The projection scorer replaced Sleeper's single bracket flag with bracket probabilities, so
+  // this subtracts exactly what went in — the same expectation the live model starts from at
+  // kickoff. (It used to subtract the plug-in flag, which was right while the scorer counted it.)
+  const projected = rawProjection
+    ? projectedBracketMoments(rawProjection, scoring)
+    : { mean: 0, variance: 0 };
 
   return {
     meanAdjustment: adjustment.correction,
-    projectedBracket,
+    projectedBracket: projected.mean,
+    projectedBracketVariance: projected.variance,
     variance: adjustment.variance,
     note: {
       playerId: candidate.playerId,

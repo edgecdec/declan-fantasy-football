@@ -11,7 +11,8 @@ import {
   StarterInput,
   sideDistribution,
 } from '@/services/betting/liveOdds';
-import { defenceCorrection } from '@/services/betting/defenseBrackets';
+import { applyDefenceModel } from '@/services/betting/defenceModel';
+import { loadDefenceModel } from '@/services/betting/defenceHistory';
 import {
   CHOPPED_LEAGUE_TYPE,
   LeagueFormat,
@@ -594,6 +595,10 @@ async function buildNoOpponentLeague(
   if (!myRoster) return nothing;
 
   const projections = await SleeperService.getWeeklyProjections(season, week);
+  // Memoised and shared with the head-to-head leagues on the same page, so no extra fetches.
+  const defenceModel = await loadDefenceModel({
+    season, week, scoring, projections, label: leagueId,
+  });
 
   /** One roster's starters, as the odds model wants them. */
   const startersOf = (m: (typeof matchups)[number]): StarterInput[] => {
@@ -616,23 +621,18 @@ async function buildNoOpponentLeague(
           remainingMinutes: game ? game.remainingMinutes : 0,
         };
         /*
-         * Same defence correction the head-to-head path applies. Without it a live defence
-         * carries a points-allowed bracket it has not earned, and here that feeds straight into
-         * an elimination probability rather than just a projection.
+         * Same defence pricing the head-to-head path applies: the league-relative DEF model and
+         * the live bracket correction. Without them a defence carries phantom return yards and a
+         * points-allowed bracket it has not earned, and here that feeds straight into an
+         * elimination probability rather than just a projection.
          */
-        const fix = defenceCorrection(
+        return applyDefenceModel(
           { ...base, position: base.position ?? null },
+          defenceModel,
           scoring,
           undefined,
           raw,
-        );
-        if (!fix) return base;
-        return {
-          ...base,
-          projectedPoints: base.projectedPoints - fix.projectedBracket,
-          meanAdjustment: (base.meanAdjustment ?? 0) + fix.meanAdjustment,
-          extraVariance: (base.extraVariance ?? 0) + fix.variance,
-        };
+        ).candidate;
       });
   };
 

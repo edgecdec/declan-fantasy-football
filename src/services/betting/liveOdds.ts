@@ -159,6 +159,15 @@ export type StarterInput = {
    * spread across that tier is real uncertainty the position model can't see.
    */
   extraSd?: number;
+  /**
+   * Full-game mean and variance of this starter's score, replacing the position shape below.
+   *
+   * Set for a team defence by services/betting/defenceModel.ts, which prices DEFs league-relative
+   * rather than off the projection's level: the DEF shape here was fitted on Sleeper projections
+   * that double-counted kick-return yards, so it cannot price a repaired one. Scaled by the time
+   * left exactly as the shape's moments are.
+   */
+  moments?: { mean: number; variance: number };
 };
 
 export type SideDistribution = {
@@ -282,6 +291,10 @@ const POSITION_SHAPE: Record<string, PositionShape> = {
     scoreMean: 6.75, scoreMeanSlope: 0.285,
     scoreSd: 5.38, scoreSdSlope: -0.080,
   },
+  // FALLBACK ONLY for defences. Fitted on Sleeper DEF projections that double-counted kick-return
+  // yards, so it absorbed the phantom; a priced DEF normally carries `moments` from the
+  // league-relative model (services/betting/defenceModel.ts) and never reaches this entry. It is
+  // used when that model's history cannot be loaded.
   DEF: {
     zeroIntercept: -0.085, zeroSlope: -0.7126,
     negProb: 0.0336, negMean: -1.53, negSd: 1.06,
@@ -353,7 +366,7 @@ export function sideDistribution(starters: StarterInput[]): SideDistribution {
 
     if (fraction <= 0) continue;
 
-    const m = starterMoments(s.projectedPoints, s.position ?? null);
+    const m = s.moments ?? starterMoments(s.projectedPoints, s.position ?? null);
     remaining += m.mean * fraction;
     // Independent sources of error add in quadrature, so square-sum rather than
     // summing the sds.

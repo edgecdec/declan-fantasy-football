@@ -111,6 +111,24 @@ Verify with `npm run verify:plays -- <season> <week> --user <name> [--players <g
 fetches plays once and re-scores every league that user is in. Test more than one league: a
 single-league check reported 100% while five real bugs were hiding in the other seventeen.
 
+## Team-defence projections are broken at the source
+
+Sleeper's DEF projection `def_pr_yd` is punt **plus kick** return yards (`def_pr_yd == pr_yd +
+def_kr_yd` on every DEF row since 2018), DEF rows also carry offence keys (`pr_yd`, `pass_int_td`),
+and actual DEF stats use `def_pr_yd` for punts only. Leagues scoring return yards over-project
+every defence by ~4.7/wk (Guillotine ~11.7) since the 2026 kick-return projection caught up.
+
+- **Score projections only through `calculateProjectedPoints`**, which repairs DEF rows
+  (`stats/defenceProjection.ts`). Multiplying a raw DEF row by scoring settings brings the
+  phantom back.
+- **Price a DEF only through `applyDefenceModel`** (`betting/defenceModel.ts`): a league-relative
+  model centred on what defences actually score in that league. The old `POSITION_SHAPE.DEF` was
+  fitted on the inflated rows and is a fallback only; repaired rows on it backtest *worse* than
+  doing nothing. Every candidate builder (betting pricing, matchup markets, This Week) calls it,
+  so the pages cannot disagree.
+
+Backtests and the full write-up: `SessionSwarm/runs/2026-10-13_180705/work/ff-def-projections/REPORT.md`.
+
 ## Live play capture (The Zone) — operational
 
 The Zone is a **tab on `/week`**, not a page of its own — `/zone` is a middleware redirect kept
