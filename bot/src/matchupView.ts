@@ -146,6 +146,22 @@ export function renderMatchupDetail(m: HeadToHead, view: 'slot' | 'edge'): APIEm
   };
 }
 
+/**
+ * The frame for a /matchup picture — summary card or breakdown — which carries its own header and
+ * legend. The title and colour are the text scoreboard's, so the embed's colour bar still says who
+ * is winning at a glance; the model's assumptions ride along beneath, as they do on the text view.
+ */
+export function matchupImageEmbed(m: HeadToHead, fileName: string): APIEmbed {
+  const summary = renderMatchupSummary(m);
+  const notes = matchupNotes(m);
+  return {
+    title: summary.title,
+    color: summary.color,
+    image: { url: `attachment://${fileName}` },
+    ...(notes.length ? { description: notes.map(n => `-# ${n}`).join('\n') } : {}),
+  };
+}
+
 /** What the projection assumes beyond the lineup as set, so a number that disagrees with Sleeper's can be explained. */
 export function matchupNotes(m: HeadToHead): string[] {
   const notes: string[] = [];

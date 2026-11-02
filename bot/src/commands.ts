@@ -52,9 +52,9 @@ import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marke
 import { renderScheduleText, scheduleImageEmbed } from './scheduleView';
 import {
   matchupButtonId,
-  matchupNotes,
   parseMatchupButtonId,
   renderMatchupDetail,
+  matchupImageEmbed,
   renderMatchupSummary,
   type MatchupView,
 } from './matchupView';
@@ -1443,46 +1443,36 @@ type MatchupMessage = {
 };
 
 /**
- * The scoreboard, or the Details picture.
- *
- * Details is an IMAGE laid out like Sleeper's mobile matchup screen (see matchupImage.tsx on the
- * site): the two-sided, colour-per-player layout cannot be expressed in Discord text. If the
- * picture cannot be produced, the text breakdown stands in rather than the button doing nothing.
+ * The matchup as a picture: the compact summary card by default, the per-slot breakdown on "By slot"
+ * / "By edge" (both matchupImage.tsx on the site). Pictures because the two-sided, colour-per-player
+ * layout cannot be expressed in Discord text. If a picture cannot be produced the text version of
+ * the same view stands in, so a button never does nothing.
  */
 async function matchupMessage(
   m: Extract<MatchupResponse, { headToHead: true }>,
   view: MatchupView,
 ): Promise<MatchupMessage> {
-  const summary = renderMatchupSummary(m);
   const embeds: APIEmbed[] = [];
   const files: AttachmentBuilder[] = [];
 
-  if (view === 'sum') {
-    embeds.push(summary);
+  const image = await fetchMatchupImage({
+    leagueId: m.league.leagueId, rosterId: m.rosterId, week: m.week, view,
+  });
+  if (image.ok) {
+    files.push(new AttachmentBuilder(image.data, { name: 'matchup.png' }));
+    embeds.push(matchupImageEmbed(m, 'matchup.png'));
   } else {
-    const image = await fetchMatchupImage({
-      leagueId: m.league.leagueId, rosterId: m.rosterId, week: m.week, sort: view,
-    });
-    if (image.ok) {
-      files.push(new AttachmentBuilder(image.data, { name: 'matchup.png' }));
-      const notes = matchupNotes(m);
-      embeds.push({
-        title: summary.title,
-        color: summary.color,
-        image: { url: 'attachment://matchup.png' },
-        ...(notes.length ? { description: notes.map(n => `-# ${n}`).join('\n') } : {}),
-      });
-    } else {
-      console.error('[bot] matchup image failed:', image.error);
-      embeds.push(summary, renderMatchupDetail(m, view));
-    }
+    console.error(`[bot] matchup ${view} image failed:`, image.error);
+    const summary = renderMatchupSummary(m);
+    embeds.push(...(view === 'sum' ? [summary] : [summary, renderMatchupDetail(m, view)]));
   }
 
   const id = (v: MatchupView) => matchupButtonId(m.league.leagueId, m.rosterId, m.week, v);
   const row = new ActionRowBuilder<ButtonBuilder>();
   if (view === 'sum') {
     row.addComponents(
-      new ButtonBuilder().setCustomId(id('slot')).setLabel('Details').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(id('slot')).setLabel('By slot').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(id('edge')).setLabel('By edge').setStyle(ButtonStyle.Secondary),
     );
   } else {
     // The active sort is shown disabled, so the buttons double as a label for the current view.

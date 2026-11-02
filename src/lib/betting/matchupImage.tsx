@@ -113,13 +113,20 @@ export type ImageAssets = Record<string, string | null>;
 const playerKey = (s: ImageSlot) =>
   s.position === 'DEF' ? `team:${s.team ?? s.playerId}` : `player:${s.playerId}`;
 
-/** Every picture the card can use, keyed, for the route to fetch through imageAssets. */
-export function matchupAssetUrls(m: ImageMatchup): Record<string, string | null> {
+/**
+ * Every picture the card can use, keyed, for the route to fetch through imageAssets. The summary
+ * card draws only the avatars and each side's top performers, so it asks for only those — six
+ * headshots rather than twenty-odd.
+ */
+export function matchupAssetUrls(m: ImageMatchup, view: 'sum' | 'slot' | 'edge' = 'slot'): Record<string, string | null> {
   const urls: Record<string, string | null> = {
     'avatar:me': avatarUrl(m.me.avatar),
     'avatar:opponent': avatarUrl(m.opponent.avatar),
   };
-  for (const s of [...m.me.lineup, ...m.opponent.lineup, m.me.bestBench, m.opponent.bestBench]) {
+  const players = view === 'sum'
+    ? [...topPerformers(m.me, m.status), ...topPerformers(m.opponent, m.status)]
+    : [...m.me.lineup, ...m.opponent.lineup, m.me.bestBench, m.opponent.bestBench];
+  for (const s of players) {
     if (!s?.name || !s.playerId) continue;
     urls[playerKey(s)] = s.position === 'DEF' ? teamLogoUrl(s.team ?? s.playerId) : headshotUrl(s.playerId);
   }
@@ -261,6 +268,13 @@ function SlotPill({ slot, edge, swing, sub }: { slot: string; edge: number | nul
   );
 }
 
+/** "proj 145.0 · 1 to play (+8.2)" — the projected final, who is left, and what they are expected to add. */
+export function liveSubLine(s: Pick<ImageSide, 'projected' | 'banked' | 'playersRemaining'>): string {
+  if (s.playersRemaining === 0) return `proj ${pts(s.projected)} · all played`;
+  const toCome = Math.max(0, s.projected - s.banked);
+  return `proj ${pts(s.projected)} · ${s.playersRemaining} to play (+${pts(toCome)})`;
+}
+
 const STATUS: Record<ImageMatchup['status'], { text: string; tone: StatusTone }> = {
   live: { text: 'LIVE', tone: 'live' },
   between: { text: 'BETWEEN GAMES', tone: 'upcoming' },
@@ -292,7 +306,7 @@ function Header({ m, assets }: { m: ImageMatchup; assets: ImageAssets }) {
         {pts(notStarted ? s.projected : s.banked)}
       </div>
       <div style={{ fontSize: T.body, color: C.muted, marginTop: 6, whiteSpace: 'nowrap' }}>
-        {final ? 'final' : notStarted ? `projected · ${s.playersRemaining} to play` : `proj ${pts(s.projected)} · ${s.playersRemaining} to play`}
+        {final ? 'final' : notStarted ? `projected · ${s.playersRemaining} to play` : liveSubLine(s)}
       </div>
     </div>
   );
@@ -420,12 +434,18 @@ export function renderMatchupImage(m: ImageMatchup, sort: 'slot' | 'edge', asset
  * a broken file. If drawing with pictures fails for any reason, the card is drawn again with
  * initials — the pictures are decoration, the card is not.
  */
-export async function renderMatchupPng(m: ImageMatchup, sort: 'slot' | 'edge', assets: ImageAssets): Promise<ArrayBuffer> {
+export async function renderMatchupPng(
+  m: ImageMatchup,
+  view: 'sum' | 'slot' | 'edge',
+  assets: ImageAssets,
+): Promise<ArrayBuffer> {
+  const draw = (a: ImageAssets) =>
+    (view === 'sum' ? renderMatchupSummaryImage(m, a) : renderMatchupImage(m, view, a)).arrayBuffer();
   try {
-    return await renderMatchupImage(m, sort, assets).arrayBuffer();
+    return await draw(assets);
   } catch (err) {
     console.error('[matchup image] render with pictures failed, retrying without:', err);
-    return renderMatchupImage(m, sort, {}).arrayBuffer();
+    return draw({});
   }
 }
 
@@ -440,5 +460,147 @@ export function matchupImageHeight(m: ImageMatchup, sort: 'slot' | 'edge' = 'slo
     + rows.length * ROW_H
     + (m.me.bestBench || m.opponent.bestBench ? BENCH_H : 0)
     + (biggestSwing(rows, m.status) ? SWING_H : 0)
+    + FOOTER_H;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The summary card — /matchup's default view.
+ *
+ * The same header as the detailed card (avatars, the score duel or projected finals, the win bar,
+ * the state pill), then only what a glance needs: one line saying where it stands, each side's top
+ * performers, the biggest swing and the best bench. About half the detailed card's height, so it
+ * sits in a channel without taking the screen; "By slot" / "By edge" open the full breakdown.
+ * ---------------------------------------------------------------------------------------------- */
+
+const STATUS_LINE_H = 50;
+const TOP_N = 3;
+const TOP_ROW_H = 52;
+const BENCH_LINE_H = 42;
+const TOP_PHOTO = 34;
+
+/**
+ * Where it stands, in one line, and in whose colour.
+ *
+ *  - not started: who is projected to win, and by how much;
+ *  - live / between: who leads on points banked, and how many players are still to play;
+ *  - final: who won, by how much.
+ */
+export function summaryStatus(m: ImageMatchup): { text: string; side: 'me' | 'opponent' | null } {
+  const me = m.me.displayName;
+  const them = m.opponent.displayName;
+  if (m.status === 'not_started') {
+    const d = m.me.projected - m.opponent.projected;
+    if (Math.abs(d) < 0.05) return { text: 'Projected dead even', side: null };
+    return { text: `${d > 0 ? me : them} projected to win by ${pts(Math.abs(d))}`, side: d > 0 ? 'me' : 'opponent' };
+  }
+  const d = m.me.banked - m.opponent.banked;
+  if (m.status === 'final') {
+    if (Math.abs(d) < 0.005) return { text: `Tied at ${pts(m.me.banked)}`, side: null };
+    return { text: `${d > 0 ? me : them} won by ${pts(Math.abs(d))}`, side: d > 0 ? 'me' : 'opponent' };
+  }
+  const left = m.me.playersRemaining + m.opponent.playersRemaining;
+  const tail = left === 0 ? 'with everyone played' : `with ${left} to play`;
+  if (Math.abs(d) < 0.05) return { text: `Tied at ${pts(m.me.banked)} ${tail}`, side: null };
+  return { text: `${d > 0 ? me : them} leads by ${pts(Math.abs(d))} ${tail}`, side: d > 0 ? 'me' : 'opponent' };
+}
+
+/**
+ * A side's best few: by points once anyone has played, by projection before kickoff — the number
+ * the card shows for each, so the order and the figures agree.
+ */
+export function topPerformers(side: ImageSide, status: ImageMatchup['status'], n = TOP_N): ImageSlot[] {
+  const value = (s: ImageSlot) => (status === 'not_started' ? s.projectedPoints : s.points);
+  return side.lineup
+    .filter(s => s.name)
+    .sort((a, b) => value(b) - value(a))
+    .slice(0, n);
+}
+
+function TopPerformer({ s, right, status, assets }: { s: ImageSlot; right: boolean; status: ImageMatchup['status']; assets: ImageAssets }) {
+  const pre = status === 'not_started' || s.gameState === 'pre';
+  const value = status === 'not_started' ? s.projectedPoints : s.points;
+  const half = (W - PAD_X * 2) / 2 - 12;
+  const sub = s.live
+    ? `${s.live.clock}${s.live.where ? ` ${s.live.where}` : ''}`
+    : [s.slot !== s.position ? `${s.slot} · ${s.position}` : s.position, s.team].filter(Boolean).join(' · ');
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', height: TOP_ROW_H, width: half, flexShrink: 0, flexDirection: right ? 'row-reverse' : 'row' }}>
+      <Avatar src={assets[playerKey(s)]} label={s.name!} size={TOP_PHOTO} />
+      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, alignItems: right ? 'flex-end' : 'flex-start', margin: '0 10px' }}>
+        <div style={{ fontSize: T.small, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{playerLabel(s.name!, 18, s.team, s.position)}</div>
+        <div style={{ fontSize: T.micro, color: s.live ? C.live : C.muted, whiteSpace: 'nowrap' }}>{clip(sub, 22)}</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: right ? 'flex-start' : 'flex-end' }}>
+        <div style={{ fontSize: T.name, fontWeight: 700, color: pre ? C.upcoming : s.live ? C.live : C.text, whiteSpace: 'nowrap' }}>{pts(value)}</div>
+        {pre ? <div style={{ fontSize: 12, color: C.muted }}>proj</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function BenchLine({ m }: { m: ImageMatchup }) {
+  const one = (s: ImageSlot | null | undefined, right: boolean) => {
+    if (!s?.name) return <div style={{ display: 'flex', width: (W - PAD_X * 2) / 2 - 40, justifyContent: right ? 'flex-end' : 'flex-start', color: C.dim }}>—</div>;
+    const pre = s.gameState === 'pre';
+    const text = `${playerLabel(s.name, 18, s.team, s.position)} ${pts(pre ? s.projectedPoints : s.points)}${pre ? ' proj' : ''}`;
+    return <div style={{ display: 'flex', width: (W - PAD_X * 2) / 2 - 40, justifyContent: right ? 'flex-end' : 'flex-start', whiteSpace: 'nowrap' }}>{text}</div>;
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', height: BENCH_LINE_H, flexShrink: 0, padding: `0 ${PAD_X}px`, fontSize: T.small, color: C.muted, borderBottom: `1px solid ${C.divider}` }}>
+      {one(m.me.bestBench, false)}
+      <div style={{ display: 'flex', justifyContent: 'center', width: 80, fontSize: T.micro, fontWeight: 700, color: C.dim }}>BEST BN</div>
+      {one(m.opponent.bestBench, true)}
+    </div>
+  );
+}
+
+export function renderMatchupSummaryImage(m: ImageMatchup, assets: ImageAssets = {}): ImageResponse {
+  const rows = buildRows(m, 'slot');
+  const swing = biggestSwing(rows, m.status);
+  const status = summaryStatus(m);
+  const mine = topPerformers(m.me, m.status);
+  const theirs = topPerformers(m.opponent, m.status);
+  const n = Math.max(mine.length, theirs.length);
+  const colour = status.side === 'me' ? C.sideA : status.side === 'opponent' ? C.sideB : C.text;
+
+  // A real element, not a fragment: satori renders only the first child of a fragment root.
+  return renderCard(
+    <div style={{ display: 'flex', flexDirection: 'column', width: W }}>
+      <Header m={m} assets={assets} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: STATUS_LINE_H, flexShrink: 0, borderBottom: `1px solid ${C.divider}`, fontSize: T.body + 1, fontWeight: 700, color: colour, whiteSpace: 'nowrap' }}>
+        {status.text}
+      </div>
+      {n > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', padding: `6px ${PAD_X}px`, borderBottom: `1px solid ${C.divider}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: C.dim }}>
+            <div>{m.status === 'not_started' ? 'TOP PROJECTED' : 'TOP PERFORMERS'}</div>
+            <div>{m.status === 'not_started' ? 'TOP PROJECTED' : 'TOP PERFORMERS'}</div>
+          </div>
+          {/* Two lists, not pairs: a rule down the middle so 21.7 and 30.4 do not read as a duel. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            {[mine, theirs].map((list, side) => (
+              <div key={side} style={{ display: 'flex', flexDirection: 'column', ...(side === 0 ? { borderRight: `1px solid ${C.divider}`, paddingRight: 11 } : { paddingLeft: 11 }) }}>
+                {list.map(p => <TopPerformer key={p.playerId ?? p.name} s={p} right={side === 1} status={m.status} assets={assets} />)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {swing ? <SwingBand swing={swing} m={m} /> : null}
+      {m.me.bestBench || m.opponent.bestBench ? <BenchLine m={m} /> : null}
+      <Footer note="By slot / By edge for every player" />
+    </div>,
+    matchupSummaryHeight(m),
+  );
+}
+
+/** The summary card's height: header, status line, top performers, and the swing and bench lines if any. */
+export function matchupSummaryHeight(m: ImageMatchup): number {
+  const n = Math.max(topPerformers(m.me, m.status).length, topPerformers(m.opponent, m.status).length);
+  return headerHeight(m.status === 'final')
+    + STATUS_LINE_H
+    + (n > 0 ? 12 + 16 + n * TOP_ROW_H + 1 : 0)
+    + (biggestSwing(buildRows(m, 'slot'), m.status) ? SWING_H : 0)
+    + (m.me.bestBench || m.opponent.bestBench ? BENCH_LINE_H : 0)
     + FOOTER_H;
 }

@@ -329,16 +329,17 @@ async function fetchPng(path: string, params: URLSearchParams): Promise<SiteResu
   }
 }
 
-/** The Details picture for a matchup. */
+/** A /matchup picture: the compact summary card (`sum`) or the per-slot breakdown (`slot` / `edge`). */
 export function fetchMatchupImage(args: {
   leagueId: string;
   rosterId: number;
   week: number;
-  sort: 'slot' | 'edge';
+  view: 'sum' | 'slot' | 'edge';
 }): Promise<SiteResult<Buffer>> {
-  return fetchPng('/api/bot/matchup/image', new URLSearchParams({
-    leagueId: args.leagueId, rosterId: String(args.rosterId), week: String(args.week), sort: args.sort,
-  }));
+  const params = new URLSearchParams({ leagueId: args.leagueId, rosterId: String(args.rosterId), week: String(args.week) });
+  if (args.view === 'sum') params.set('view', 'sum');
+  else params.set('sort', args.view);
+  return fetchPng('/api/bot/matchup/image', params);
 }
 
 /** The /markets board for one league week. Pass the week the JSON answered with, so the two agree. */

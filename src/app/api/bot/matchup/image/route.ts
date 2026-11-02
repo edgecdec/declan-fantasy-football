@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /**
- * The matchup breakdown as a PNG, for /matchup's Details view. Same parameters as /api/bot/matchup,
- * plus `sort=slot|edge`. Errors come back as JSON so the bot can say what went wrong.
+ * /matchup as a PNG: the compact summary card (`view=sum`, the command's default) or the per-slot
+ * breakdown (`sort=slot|edge`). Same parameters as /api/bot/matchup otherwise. Errors come back as
+ * JSON so the bot can say what went wrong and fall back to text.
  *
  * Avatars and headshots come through imageAssets: capped concurrency, a short timeout, a bounded
  * cache, and initials for anything that does not arrive — so a slow CDN costs a picture, not the
@@ -27,10 +28,11 @@ export async function GET(request: Request) {
     );
   }
   const m = body as unknown as ImageMatchup;
-  const sort = params.get('sort') === 'edge' ? 'edge' : 'slot';
-  const assets = await fetchImages(matchupAssetUrls(m));
+  // `view=sum` is the compact default card; otherwise the breakdown, by `sort` (slot unless edge).
+  const view = params.get('view') === 'sum' ? 'sum' : params.get('sort') === 'edge' ? 'edge' : 'slot';
+  const assets = await fetchImages(matchupAssetUrls(m, view));
   // Rendered to bytes (with an initials-only retry) rather than streamed — see renderMatchupPng.
-  return new Response(await renderMatchupPng(m, sort, assets), {
+  return new Response(await renderMatchupPng(m, view, assets), {
     headers: { 'content-type': 'image/png', 'cache-control': 'no-store' },
   });
 }
