@@ -1,5 +1,6 @@
 import type { BotMarket, BotMarketsResponse } from '@/lib/betting/botMarkets';
 import type { LuckSort, LuckTeam } from '@/lib/betting/luckSort';
+import type { ScheduleSwapResponse } from '@/lib/betting/scheduleSwap';
 
 /**
  * The bot's client for `/api/bot/*`.
@@ -213,6 +214,17 @@ export function fetchLuck(leagueId: string): Promise<SiteResult<LuckResponse>> {
   return call(`/api/bot/luck?leagueId=${encodeURIComponent(leagueId)}`);
 }
 
+function scheduleParams(leagueId: string, season?: string | null): URLSearchParams {
+  const params = new URLSearchParams({ leagueId });
+  if (season) params.set('season', season);
+  return params;
+}
+
+/** The schedule-swap matrix (the site's type — see scheduleSwap.ts). */
+export function fetchScheduleSwap(leagueId: string, season?: string | null): Promise<SiteResult<ScheduleSwapResponse>> {
+  return call<ScheduleSwapResponse>(`/api/bot/schedules?${scheduleParams(leagueId, season)}`);
+}
+
 export function placeBet(args: {
   discordUserId: string;
   marketId: string;
@@ -337,4 +349,9 @@ export function fetchMarketsImage(leagueId: string, week: number): Promise<SiteR
 /** The /luck chart for a league, in the given order. */
 export function fetchLuckImage(leagueId: string, sort: LuckSort): Promise<SiteResult<Buffer>> {
   return fetchPng('/api/bot/luck/image', new URLSearchParams({ leagueId, sort }));
+}
+
+/** The schedule-swap matrix as a picture. */
+export function fetchScheduleImage(leagueId: string, season?: string | null): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/schedules/image', scheduleParams(leagueId, season));
 }

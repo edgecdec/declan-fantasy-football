@@ -38,6 +38,8 @@ import {
   fetchLuckImage,
   fetchMarketsImage,
   fetchMatchupImage,
+  fetchScheduleImage,
+  fetchScheduleSwap,
   fetchMe,
   type MatchupResponse,
   placeBet,
@@ -47,6 +49,7 @@ import {
 import { americanOdds, money, pad, padLeft, percent } from './format';
 import { luckButtons, luckImageEmbed, parseLuckButtonId, renderLuckText } from './luckView';
 import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marketsView';
+import { renderScheduleText, scheduleImageEmbed } from './scheduleView';
 import {
   matchupButtonId,
   matchupNotes,
@@ -150,6 +153,16 @@ export const commandDefinitions = [
     .setDescription('Expected wins vs actual wins — who has been lucky')
     .addStringOption(o =>
       o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
+    ),
+  new SlashCommandBuilder()
+    .setName('schedules')
+    .setDescription('Schedule swap — everyone’s record with everyone else’s schedule')
+    .addStringOption(o =>
+      o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
+    )
+    .addIntegerOption(o =>
+      o.setName('season').setDescription('A past season of the league, e.g. 2025. Defaults to this one.')
+        .setMinValue(2017).setMaxValue(2100),
     ),
   new SlashCommandBuilder()
     .setName('matchup')
@@ -922,6 +935,44 @@ async function handleLuckButton(i: ButtonInteraction): Promise<void> {
   await i.editReply(await luckMessage(res.data, parsed.sort)).catch(err => console.error('[bot] luck update failed', err));
 }
 
+/**
+ * The schedule-swap matrix: what each manager's record would be with every other manager's
+ * schedule. Like /luck, `league` accepts any Sleeper league id — public schedule-and-scores data.
+ * The matrix is a picture (scheduleImage.tsx on the site); if it cannot be drawn, the kindness
+ * ranking and each manager's best and worst schedule stand in as text.
+ */
+async function handleSchedules(i: ChatInputCommandInteraction): Promise<void> {
+  let leagueId = i.options.getString('league')?.trim() || null;
+  const season = i.options.getInteger('season');
+  if (!leagueId) {
+    const resolved = resolveLeagues(i.guildId!, i.channelId, null);
+    if ('error' in resolved) {
+      await i.editReply(`${resolved.error}\nOr pass a league id: \`/schedules league:<id>\``);
+      return;
+    }
+    leagueId = resolved[0].leagueId;
+  }
+
+  const seasonText = season ? String(season) : null;
+  const res = await fetchScheduleSwap(leagueId, seasonText);
+  if (!res.ok) {
+    await i.editReply(`Could not build the schedule swap: ${res.error}`);
+    return;
+  }
+  // The league id the site resolved, which for a past season is that season's own league.
+  const image = await fetchScheduleImage(res.data.league.leagueId);
+  if (image.ok) {
+    await i.editReply({
+      embeds: [scheduleImageEmbed(res.data, 'schedules.png')],
+      files: [new AttachmentBuilder(image.data, { name: 'schedules.png' })],
+      allowedMentions: { parse: [] },
+    });
+    return;
+  }
+  console.error('[bot] schedules image failed:', image.error);
+  await i.editReply({ embeds: [renderScheduleText(res.data)], allowedMentions: { parse: [] } });
+}
+
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {
   const base = (process.env.SITE_URL ?? 'https://fantasyfootball.edgecdec.com').replace(/\/$/, '');
   const resolved = resolveLeagues(i.guildId!, i.channelId, null);
@@ -1291,6 +1342,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'standings': return await handleStandings(i);
       case 'website': return await handleWebsite(i);
       case 'luck': return await handleLuck(i);
+      case 'schedules': return await handleSchedules(i);
       case 'matchup': return await handleMatchup(i);
       case 'openbets': return await handleOpenBets(i);
       case 'bethistory': return await handleBetHistory(i);

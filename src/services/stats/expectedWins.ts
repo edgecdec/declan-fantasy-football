@@ -68,29 +68,8 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
   });
 
   // 3. Determine Schedule
-  const startWeek = league.settings.start_week || 1;
-  const playoffStart = league.settings.playoff_week_start;
-  const settingsEndWeek = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
-
-  /*
-   * Bounded by the weeks that have actually finished, matching every other week-looping service
-   * here — this was the one that never got that guard.
-   *
-   * It rules out the IN-PROGRESS week as well as the future ones, which the points-total check below
-   * cannot: mid-slate a live week has partial scores, so it would pass as played and every all-play
-   * record would be computed against teams whose players had not kicked off yet.
-   */
-  const nflState = await getNflStateOrFallback();
-  const playedWeeks = completedWeekCount(nflState, league.season, league.settings.last_scored_leg);
-  const endWeek = Math.min(settingsEndWeek, playedWeeks);
+  const weeks = await countableWeeks(league);
   const useMedian = league.settings.league_average_match === 1;
-
-  const weeks: number[] = [];
-  if (endWeek >= startWeek) {
-    for (let w = startWeek; w <= endWeek; w++) {
-      weeks.push(w);
-    }
-  }
 
   // 4. Calculate Total Opportunities (Initialize to 0, will increment based on valid weeks)
   // rosterMap.forEach(t => t.totalOpportunities = 0); // Already set in step 2
@@ -181,4 +160,27 @@ export async function analyzeLeague(league: SleeperLeague, userId?: string): Pro
   CacheService.set(cacheKey, result, { storage: 'local', ttl });
 
   return result;
+}
+
+/**
+ * The regular-season weeks that may count: start_week up to the week before the playoffs, bounded by
+ * the weeks that have actually finished. Shared with the schedule-swap matrix so /luck and
+ * /schedules always cover the same weeks.
+ *
+ * Bounded by the weeks that have actually finished, matching every other week-looping service
+ * here. It rules out the IN-PROGRESS week as well as the future ones, which a points-total check
+ * cannot: mid-slate a live week has partial scores, so it would pass as played and every all-play
+ * record would be computed against teams whose players had not kicked off yet. Callers still skip
+ * a week whose scores total zero — Sleeper lists every future week with `points: 0`.
+ */
+export async function countableWeeks(league: SleeperLeague): Promise<number[]> {
+  const startWeek = league.settings.start_week || 1;
+  const playoffStart = league.settings.playoff_week_start;
+  const settingsEndWeek = (playoffStart === 0) ? 18 : (playoffStart || 15) - 1;
+  const nflState = await getNflStateOrFallback();
+  const playedWeeks = completedWeekCount(nflState, league.season, league.settings.last_scored_leg);
+  const endWeek = Math.min(settingsEndWeek, playedWeeks);
+  const weeks: number[] = [];
+  for (let w = startWeek; w <= endWeek; w++) weeks.push(w);
+  return weeks;
 }
