@@ -11,12 +11,18 @@
  * `npm run typecheck`, which reads tsconfig.json — see bot/src/permissions.ts.
  */
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, 'bot', 'dist');
-const SRC_ROOT = path.join(ROOT, 'src');
+/*
+ * Where `@/x` must point: the COMPILED copy of the site module, which tsc emits into bot/dist/src
+ * because rootDir is the repo root. Pointing at ROOT/src (the TypeScript sources) went unnoticed
+ * while every `@/` import in the bot was type-only and erased; the first runtime import of a site
+ * module resolved to a .ts file Node cannot load, and the bot would have died at startup.
+ */
+const SRC_ROOT = path.join(OUT, 'src');
 
 rmSync(OUT, { recursive: true, force: true });
 
@@ -48,11 +54,19 @@ try {
 }
 
 let rewritten = 0;
+const unresolved = [];
+const resolvable = target =>
+  ['.js', '.json', '/index.js', ''].some(ext => existsSync(target + ext) && (ext !== '' || statSync(target).isFile()));
 for (const file of emitted) {
   const before = readFileSync(file, 'utf8');
   // Resolved against each file's own directory rather than assuming a depth.
   const after = before.replace(/(['"])@\/([^'"]+)\1/g, (_m, q, rest) => {
-    let rel = path.relative(path.dirname(file), path.join(SRC_ROOT, rest)).split(path.sep).join('/');
+    const target = path.join(SRC_ROOT, rest);
+    // Checked only for modules the bot can actually load: anything reachable from its own code.
+    if (file.startsWith(path.join(OUT, 'bot')) && !resolvable(target)) {
+      unresolved.push(`${path.relative(ROOT, file)} -> @/${rest}`);
+    }
+    let rel = path.relative(path.dirname(file), target).split(path.sep).join('/');
     if (!rel.startsWith('.')) rel = './' + rel;
     return `${q}${rel}${q}`;
   });
@@ -60,6 +74,12 @@ for (const file of emitted) {
     writeFileSync(file, after);
     rewritten += 1;
   }
+}
+
+if (unresolved.length) {
+  // A require that cannot resolve is a bot that crashes on start, and the deploy restarts it.
+  console.error(`build-bot: unresolvable site imports in the bot:\n  ${unresolved.join('\n  ')}`);
+  process.exit(1);
 }
 
 const entry = path.join(OUT, 'bot', 'src', 'index.js');
