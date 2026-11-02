@@ -10,6 +10,7 @@ import {
   type ChatInputCommandInteraction,
   type TextBasedChannel,
 } from 'discord.js';
+import type { LuckSort } from '@/lib/betting/luckSort';
 import { adminRefusalReason, canAdminGuild } from './permissions';
 import {
   DEFAULT_EVENT_TYPES,
@@ -41,8 +42,10 @@ import {
   type MatchupResponse,
   placeBet,
   type LeaderboardStanding,
+  type LuckResponse,
 } from './siteApi';
 import { americanOdds, money, pad, padLeft, percent } from './format';
+import { luckButtons, luckImageEmbed, parseLuckButtonId, renderLuckText } from './luckView';
 import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marketsView';
 import {
   matchupButtonId,
@@ -809,6 +812,10 @@ export async function handlePageButton(i: ButtonInteraction): Promise<void> {
     await handleMatchupButton(i);
     return;
   }
+  if (i.customId.startsWith('lk:')) {
+    await handleLuckButton(i);
+    return;
+  }
   const [kind, leagueId, rawPage, sort, rawUser] = i.customId.split(':');
   if (kind !== 'ob' && kind !== 'bh') return;
 
@@ -861,50 +868,58 @@ async function handleLuck(i: ChatInputCommandInteraction): Promise<void> {
     return;
   }
 
-  const title = `${league.name} — luck through ${weeksCounted} week${weeksCounted === 1 ? '' : 's'}`;
+  // Expected wins first; the buttons on the reply switch to luckiest-first and back.
+  await i.editReply(await luckMessage(res.data, 'xw'));
+}
 
-  // The chart (luckImage.tsx on the site); the text table below stands in if it cannot be drawn.
-  const image = await fetchLuckImage(leagueId);
+type LuckMessage = {
+  embeds: APIEmbed[];
+  components: ActionRowBuilder<ButtonBuilder>[];
+  files: AttachmentBuilder[];
+  /** Always set, so a sort click replaces the previous picture rather than stacking another. */
+  attachments: [];
+  allowedMentions: { parse: [] };
+};
+
+/**
+ * The chart (luckImage.tsx on the site) in the given order, with the sort buttons. If the chart
+ * cannot be drawn, the text table stands in, in the same order, and the buttons still work.
+ */
+async function luckMessage(data: LuckResponse, sort: LuckSort): Promise<LuckMessage> {
+  const leagueId = data.league.leagueId;
+  const components = [luckButtons(leagueId, sort)];
+  const image = await fetchLuckImage(leagueId, sort);
   if (image.ok) {
-    await i.editReply({
-      embeds: [{ title, color: 0x5865f2, image: { url: 'attachment://luck.png' } }],
+    return {
+      embeds: [luckImageEmbed(data, 'luck.png')],
       files: [new AttachmentBuilder(image.data, { name: 'luck.png' })],
-    });
-    return;
+      components, attachments: [], allowedMentions: { parse: [] },
+    };
   }
   console.error('[bot] luck image failed:', image.error);
+  return {
+    embeds: [renderLuckText(data, sort)],
+    files: [],
+    components, attachments: [], allowedMentions: { parse: [] },
+  };
+}
 
-  const signed = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2);
-  const lines = [
-    `${pad('manager', 13)}${padLeft('W', 4)}${padLeft('exp', 7)}${padLeft('luck', 8)}`,
-  ];
-  for (const t of teams) {
-    lines.push(
-      pad(t.name, 13)
-      + padLeft(String(t.actualWins), 4)
-      + padLeft(t.expectedWins.toFixed(2), 7)
-      + padLeft(signed(t.luck), 8),
-    );
+/**
+ * A /luck sort button. Re-fetches rather than reordering what is on screen, so a click after a week
+ * completes shows the new standings — every click doubles as a refresh, as with /matchup.
+ */
+async function handleLuckButton(i: ButtonInteraction): Promise<void> {
+  const parsed = parseLuckButtonId(i.customId);
+  if (!parsed) return;
+  await i.deferUpdate();
+  const res = await fetchLuck(parsed.leagueId);
+  if (!res.ok || res.data.teams.length === 0 || res.data.weeksCounted === 0) {
+    await i
+      .followUp({ content: `Could not refresh that table${res.ok ? '' : `: ${res.error}`}`, ephemeral: true })
+      .catch(() => undefined);
+    return;
   }
-
-  await i.editReply({
-    embeds: [{
-      title,
-      description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
-      color: 0x5865f2,
-      footer: {
-        text:
-          'exp = wins you would expect from your scores against a random opponent each week'
-          + ' · luck = actual minus expected'
-          /*
-           * Said plainly, because the number invites over-reading. Half a win of "luck" after two
-           * weeks is noise; the same figure after twelve is a real story, and nothing else on the
-           * line tells you which you are looking at.
-           */
-          + (weeksCounted < 4 ? ' · few weeks so far, treat as noise' : ''),
-      },
-    }],
-  });
+  await i.editReply(await luckMessage(res.data, parsed.sort)).catch(err => console.error('[bot] luck update failed', err));
 }
 
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {

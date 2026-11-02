@@ -4,7 +4,8 @@ import { getDb } from '@/lib/db';
 import { marketPhase, type BotMarket, type BotMarketsResponse } from '@/lib/betting/botMarkets';
 import { loadMarkets } from '@/lib/betting/marketsData';
 import { boardPhase, marketsImageHeight, renderMarketsImage } from '@/lib/betting/marketsImage';
-import { luckImageHeight, luckScale, renderLuckImage, signedLuck, sortByLuck } from '@/lib/betting/luckImage';
+import { luckImageHeight, luckScale, renderLuckImage, signedLuck } from '@/lib/betting/luckImage';
+import { parseLuckSort, sortLuckTeams } from '@/lib/betting/luckSort';
 import type { LuckResponse, LuckTeam } from '@/lib/betting/luckData';
 import { matchupImageHeight, renderMatchupImage, type ImageMatchup, type ImageSlot } from '@/lib/betting/matchupImage';
 import { CARD_W } from '@/lib/betting/imageKit';
@@ -96,9 +97,16 @@ const luckTeam = (name: string, actualWins: number, expectedWins: number): LuckT
   name, teamName: `${name} FC`, actualWins, expectedWins, luck: actualWins - expectedWins, pointsFor: 1000, pointsAgainst: 1000,
 });
 
-test('luck: luckiest first, scale floors at one win, signs are real minus signs', () => {
+test('luck: expected wins by default, luckiest first on request; scale floors at one win; real minus signs', () => {
   const teams = [luckTeam('a', 3, 4.2), luckTeam('b', 5, 3.33), luckTeam('c', 4, 4), luckTeam('d', 4, 3.9)];
-  assert.deepEqual(sortByLuck(teams).map(t => t.name), ['b', 'd', 'c', 'a']);
+  assert.deepEqual(sortLuckTeams(teams, 'xw').map(t => t.name), ['a', 'c', 'd', 'b']);
+  assert.deepEqual(sortLuckTeams(teams, 'luck').map(t => t.name), ['b', 'd', 'c', 'a']);
+  assert.equal(parseLuckSort('luck'), 'luck');
+  assert.equal(parseLuckSort(null), 'xw', 'no sort param means the power ranking');
+  assert.equal(parseLuckSort('nonsense'), 'xw');
+  // Equal expected wins break on points scored, as the JSON route always has.
+  const tied = [{ ...luckTeam('low', 3, 3), pointsFor: 900 }, { ...luckTeam('high', 3, 3), pointsFor: 1100 }];
+  assert.deepEqual(sortLuckTeams(tied, 'xw').map(t => t.name), ['high', 'low']);
   assert.ok(Math.abs(luckScale(teams) - 1.67) < 1e-9);
   assert.equal(luckScale([luckTeam('x', 2, 1.9)]), 1);
   assert.equal(signedLuck(1.666), '+1.67');
@@ -106,7 +114,7 @@ test('luck: luckiest first, scale floors at one win, signs are real minus signs'
   assert.equal(signedLuck(0.001), '0.00');
 });
 
-test('luck picture: a PNG with a row per team', async () => {
+test('luck picture: a PNG with a row per team, in either order', async () => {
   const data: LuckResponse = {
     league: { leagueId: 'L', name: "Graham's Football Fantasy", season: '2026' },
     weeksCounted: 7,
@@ -116,6 +124,12 @@ test('luck picture: a PNG with a row per team', async () => {
   assert.equal(w, CARD_W);
   assert.equal(h, luckImageHeight(12));
   assert.ok(bytes > 10_000);
+  // The other order is the same card reordered: same size, different picture.
+  const byLuck = renderLuckImage(data, 'luck');
+  const byLuckBuf = Buffer.from(await byLuck.clone().arrayBuffer());
+  assert.equal((await png(byLuck)).h, h);
+  const byXw = Buffer.from(await renderLuckImage(data, 'xw').arrayBuffer());
+  assert.ok(!byLuckBuf.equals(byXw), 'sorting by luck changed nothing');
   // Few weeks in still renders (the subtitle changes, not the layout).
   const early = await png(renderLuckImage({ ...data, weeksCounted: 2 }));
   assert.equal(early.h, h);

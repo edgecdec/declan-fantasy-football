@@ -1,17 +1,17 @@
 import type { ImageResponse } from 'next/og';
-import type { LuckResponse, LuckTeam } from '@/lib/betting/luckData';
+import type { LuckResponse } from '@/lib/betting/luckData';
+import { sortLuckTeams, type LuckSort, type LuckTeam } from '@/lib/betting/luckSort';
 import {
   C, CARD_W, FOOTER_H, Footer, HEADER_STRIP_H, HeaderStrip, ManagerName, PAD_X, T, clip, renderCard,
 } from '@/lib/betting/imageKit';
 
 /**
- * /luck as a picture: actual wins, expected wins, and the gap between them, luckiest first.
+ * /luck as a picture: actual wins, expected wins, and the gap between them.
  *
- * Sorted by LUCK here, unlike the JSON and the text table, which rank by expected wins (see
- * luckData.ts for why). The picture's subject is the gap itself, drawn as a diverging bar from zero,
- * and sorted by that gap the bars form one readable slope from the luckiest to the unluckiest —
- * sorted any other way they zig-zag and the chart stops saying anything at a glance. Expected wins
- * stays on every row, so the power ranking is still there to read.
+ * Two orders, chosen by the bot's sort buttons (luckSort.ts): by expected wins by default — a power
+ * ranking, with luck read as each team's deviation from it — or luckiest first, where the diverging
+ * bars form one slope from the luckiest to the unluckiest. Either way every column is on every row,
+ * so switching only reorders.
  *
  * Green is better than the scores deserved and red is worse. Those two colours mean nothing else on
  * this card; the side blue and pink are not used, because luck has no sides.
@@ -24,11 +24,6 @@ const ROW_H = 62;
 
 /** Column widths, left to right. They sum to the inner width. */
 const COL = { rank: 40, name: 260, w: 64, xw: 82, bar: 180, luck: 86 } as const;
-
-/** The luckiest first; equal luck breaks on expected wins, the better team first. */
-export function sortByLuck(teams: LuckTeam[]): LuckTeam[] {
-  return [...teams].sort((a, b) => b.luck - a.luck || b.expectedWins - a.expectedWins);
-}
 
 /**
  * The bar scale: the biggest gap in the league fills its half, but never less than one win, so a
@@ -99,8 +94,14 @@ export function luckImageHeight(teams: number): number {
   return 4 + HEADER_STRIP_H + TITLE_H + COLS_H + teams * ROW_H + FOOTER_H;
 }
 
-export function renderLuckImage(data: LuckResponse): ImageResponse {
-  const teams = sortByLuck(data.teams);
+/** What the order is, in the subtitle, so a reordered card is never mistaken for the other one. */
+const ORDER_TEXT: Record<LuckSort, string> = {
+  xw: 'ranked by expected wins',
+  luck: 'luckiest first',
+};
+
+export function renderLuckImage(data: LuckResponse, sort: LuckSort = 'xw'): ImageResponse {
+  const teams = sortLuckTeams(data.teams, sort);
   const scale = luckScale(teams);
   const weeks = data.weeksCounted;
   // Said plainly, because the number invites over-reading: half a win of luck after two weeks is
@@ -114,7 +115,7 @@ export function renderLuckImage(data: LuckResponse): ImageResponse {
         <div style={{ display: 'flex', alignItems: 'center', height: TITLE_H }}>
           <div style={{ fontSize: T.title, fontWeight: 700, color: C.text }}>Luck</div>
           <div style={{ fontSize: T.small, color: noise ? C.upcoming : C.muted, marginLeft: 12 }}>
-            {noise ? 'luckiest first · few weeks in, mostly noise' : 'actual wins vs expected · luckiest first'}
+            {noise ? `${ORDER_TEXT[sort]} · few weeks in, mostly noise` : `actual wins vs expected · ${ORDER_TEXT[sort]}`}
           </div>
         </div>
       </div>

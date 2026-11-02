@@ -1,4 +1,5 @@
 import type { BotMarket, BotMarketsResponse } from '@/lib/betting/botMarkets';
+import type { LuckSort, LuckTeam } from '@/lib/betting/luckSort';
 
 /**
  * The bot's client for `/api/bot/*`.
@@ -199,21 +200,16 @@ export function fetchHistory(
   return call(`/api/bot/history?leagueId=${encodeURIComponent(leagueId)}&limit=${limit}`);
 }
 
-export type LuckTeam = {
-  name: string;
-  teamName: string | null;
-  actualWins: number;
-  expectedWins: number;
-  luck: number;
-  pointsFor: number;
-  pointsAgainst: number;
-};
+// The site's own types, not copies — see MarketRow above.
+export type { LuckTeam };
 
-export function fetchLuck(leagueId: string): Promise<SiteResult<{
+export type LuckResponse = {
   league: { leagueId: string; name: string; season: string };
   weeksCounted: number;
   teams: LuckTeam[];
-}>> {
+};
+
+export function fetchLuck(leagueId: string): Promise<SiteResult<LuckResponse>> {
   return call(`/api/bot/luck?leagueId=${encodeURIComponent(leagueId)}`);
 }
 
@@ -338,7 +334,7 @@ export function fetchMarketsImage(leagueId: string, week: number): Promise<SiteR
   return fetchPng('/api/bot/markets/image', new URLSearchParams({ leagueId, week: String(week) }));
 }
 
-/** The /luck chart for a league. */
-export function fetchLuckImage(leagueId: string): Promise<SiteResult<Buffer>> {
-  return fetchPng('/api/bot/luck/image', new URLSearchParams({ leagueId }));
+/** The /luck chart for a league, in the given order. */
+export function fetchLuckImage(leagueId: string, sort: LuckSort): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/luck/image', new URLSearchParams({ leagueId, sort }));
 }

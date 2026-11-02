@@ -1,5 +1,6 @@
 import { SleeperService } from '@/services/sleeper/sleeperService';
 import { analyzeLeague } from '@/services/stats/expectedWins';
+import { sortLuckTeams, type LuckTeam } from '@/lib/betting/luckSort';
 
 /**
  * Expected wins against actual wins for a league, for the /luck JSON route and its picture alike,
@@ -9,16 +10,7 @@ import { analyzeLeague } from '@/services/stats/expectedWins';
  * exclusion of the in-progress week are exactly the parts that would be got wrong by a second
  * implementation — and a second implementation would then disagree with the website.
  */
-export type LuckTeam = {
-  name: string;
-  teamName: string | null;
-  actualWins: number;
-  expectedWins: number;
-  /** actualWins − expectedWins */
-  luck: number;
-  pointsFor: number;
-  pointsAgainst: number;
-};
+export type { LuckTeam } from '@/lib/betting/luckSort';
 
 export type LuckResponse = {
   league: { leagueId: string; name: string; season: string };
@@ -43,18 +35,9 @@ export async function loadLuck(leagueId: string | null | undefined): Promise<Luc
       body: {
         league: { leagueId, name: league.name, season: league.season },
         weeksCounted: analysis.weeksCounted,
-        /*
-         * Ordered by EXPECTED wins, descending — a power ranking rather than a luck ranking.
-         *
-         * Sorting by luck put whoever had the flukiest fortnight on top, which reads as a
-         * leaderboard of nothing: luck is noise by construction and reverts. Expected wins is the
-         * durable figure, so the table ranks teams by how good they have actually been and shows
-         * luck as the deviation from it. Ties break on points scored, since two identical
-         * expectations are genuinely separated by that. (The picture re-sorts by luck on purpose
-         * — see luckImage.tsx.)
-         */
-        teams: analysis.standings
-          .map(t => ({
+        // Ordered by expected wins, the default view (see luckSort.ts for why).
+        teams: sortLuckTeams(
+          analysis.standings.map(t => ({
             name: t.name,
             teamName: t.teamName ?? null,
             actualWins: t.actualWins,
@@ -62,8 +45,9 @@ export async function loadLuck(leagueId: string | null | undefined): Promise<Luc
             luck: t.actualWins - t.expectedWins,
             pointsFor: t.pointsFor,
             pointsAgainst: t.pointsAgainst,
-          }))
-          .sort((a, b) => b.expectedWins - a.expectedWins || b.pointsFor - a.pointsFor),
+          })),
+          'xw',
+        ),
       },
     };
   } catch (err) {
