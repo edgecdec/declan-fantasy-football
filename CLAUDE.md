@@ -210,12 +210,56 @@ the output was validated, the code was not. Run the thing.
 
 ## Deploy invariants
 
-Three properties of `deploy_webhook.sh` are load-bearing; each has broken the site or been
+These properties of `deploy_webhook.sh` are load-bearing. Each one has broken the site or been
 silently dead:
 
 1. **It builds into a scratch dir and swaps on success.** Never `rm -rf .next` before
    building — the live server serves out of it.
-2. **The heap cap is deliberately below the box's RAM** (1536MB on 1919MB, shared with ten
-   other pm2 apps). A larger cap means V8 never collects hard and gets OOM-killed.
+2. **The V8 heap cap is 768MB, deliberately low.** A larger cap means V8 never collects hard.
+   It does NOT bound the build, though: most of the build is Turbopack native memory, which
+   ignores `--max-old-space-size`. Measured: the build needs 1.8–2.0GB of RAM+swap however it
+   is configured. `turbopackMemoryLimit`, `cpus: 1`, a single-threaded runtime and
+   `NEXT_TURBOPACK_USE_WORKER=0` change nothing, and webpack is worse.
 3. **Nothing may follow `pm2 restart`.** It restarts the process that launched the script,
    so the process group dies with it. All cleanup goes before the handoff.
+4. **Anything memory-hungry runs through `run_contained`**: `npm install`, `next build`, the
+   bot's `tsc`. That puts it in its own `systemd-run --scope` with
+   `MemoryMax`/`MemorySwapMax` (default 1400M RAM + 1.5G swap) and `oom_score_adj` 1000. Never call
+   those directly from the script. The script runs inside `pm2-root.service`, whose
+   `OOMPolicy=stop` (the systemd default) turns ANY OOM kill in that cgroup into `pm2 kill` +
+   resurrect of all twelve apps. It also kills the deploy, so the retry never ran. This
+   happened 12 times between 2026-09-08 and 2026-11-02, every one during a deploy of this
+   site, and 5 of those times the victim was SuperConnections, not the build.
+5. **The deploy never garbage-collects git.** Every git call goes through `git_`
+   (`gc.auto=0`, `maintenance.auto=false`, `fetch.unpackLimit=1`). `data/sleeper_players.json`
+   is 22MB and committed daily, so an auto-gc is a ~6 min, ~800MB repack. One ran alongside
+   the 2026-11-02 build and pushed it over. gc runs off-slate from a box cron in its own capped
+   unit (see the runbook below).
+6. **Failure is loud and the lock cannot go stale.** A failed deploy logs a greppable
+   `DEPLOY FAILED:` line and writes `/var/lib/fantasy-deploy/status.json`
+   (`running` / `failed` / `deployed` / `skipped`, plus commit and detail). The lock is a `flock` on
+   `/tmp/deploy_fantasy.flock`. The kernel releases it when the holder dies; never delete
+   that file. A push that lands mid-deploy marks `/tmp/deploy_fantasy.pending`, and the
+   running deploy rebuilds from it before swapping (up to 3 passes).
+
+**The first deploy after changing this script still runs the OLD version**: server.js runs the
+file before `git reset` replaces it, and the snapshot re-exec keeps the old copy. Plan
+script changes for a quiet window.
+
+**Test changes end to end before pushing.** `scripts/deploy-sim/` drives the real
+`server.js` webhook → `deploy_webhook.sh` path in a Lima VM that matches the box: Ubuntu 24.04,
+kernel 6.8, systemd 255, 2 CPUs, 2GB RAM + 2GB swap, pm2 under an identical `pm2-root.service`.
+It reproduces the 2026-11-02 mass restart with the old script and checks every protection
+above. See its README.
+
+### Box-side settings this script depends on (not in the repo)
+
+Applied by hand on the VPS. Check before assuming them:
+
+| Setting | Why |
+|---|---|
+| `pm2-root.service` drop-in `OOMPolicy=continue` | an OOM kill restarts only the killed app (pm2 autorestart), not all twelve |
+| repo `gc.auto=0` + `/etc/cron.d/fantasy-git-gc` (Tue 10:00 UTC, own capped unit) | packs accumulate ~1/deploy and need consolidating off-slate |
+| second 2GB swapfile (4GB total) | lets a 1.9GB build push idle apps out instead of running out |
+
+Exact commands, rationale and verification: `docs/DEPLOY_BOX.md`.
