@@ -90,6 +90,8 @@ export type MarketSide = {
   starters: StarterInput[];
   /** The lineup as actually set, in roster-slot order. */
   lineup: LineupSlot[];
+  /** Everyone rostered but not starting, best first (see buildBench). */
+  bench?: LineupSlot[];
   /** Starters still capable of scoring. */
   playersRemaining: number;
   /** Bench players the model assumes will be started before kickoff. */
@@ -274,42 +276,74 @@ function buildLineup(
   const ids = matchup.starters ?? [];
   const pts = matchup.starters_points ?? [];
 
-  return startingSlots.map((slot, i) => {
-    const pid = ids[i];
-    if (!pid || pid === '0') {
-      return {
-        slot, playerId: null, name: null, position: null, points: 0, projectedPoints: 0,
-        gameState: 'unknown' as const, team: null, expectedPoints: 0,
-      };
-    }
-    const team = playerTeam(pid);
-    const gameId = team ? games.teamToGame[team] : undefined;
-    const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
-    const points = pts[i] ?? 0;
-    // A defence shows the projection the model priced it from, so the lineup and the price agree.
-    const projectedPoints = defenceModel && isDefenceRow(projections[pid])
-      ? defenceProjectedPoints(projections[pid], defenceModel)
-      : calculateProjectedPoints(projections[pid], scoringSettings);
-    const unplayed =
-      !game || game.state === 'post'
-        ? 0
-        : game.state === 'pre'
-          ? 1
-          : Math.min(1, Math.max(0, game.remainingMinutes / REGULATION_MINUTES));
+  return startingSlots.map((slot, i) =>
+    lineupEntry(slot, ids[i], pts[i] ?? 0, projections, scoringSettings, games, defenceModel),
+  );
+}
+
+/** One player as a lineup row: points, projection, game state, and where the slot is heading. */
+function lineupEntry(
+  slot: string,
+  pid: string | undefined,
+  points: number,
+  projections: Record<string, Record<string, number>>,
+  scoringSettings: Record<string, number>,
+  games: NflGamesResponse,
+  defenceModel: DefenceModel | null,
+): LineupSlot {
+  if (!pid || pid === '0') {
     return {
-      slot,
-      playerId: pid,
-      name: playerName(pid),
-      position: PLAYERS[pid]?.position ?? null,
-      points,
-      projectedPoints,
-      gameState: game ? game.state : ('unknown' as const),
-      team: PLAYERS[pid]?.team ?? null,
-      // Before kickoff the projection IS the expectation; banked points only count once the game
-      // has started, so a pre-game 0 does not drag it down.
-      expectedPoints: game?.state === 'pre' ? projectedPoints : points + Math.max(0, projectedPoints) * unplayed,
+      slot, playerId: null, name: null, position: null, points: 0, projectedPoints: 0,
+      gameState: 'unknown' as const, team: null, expectedPoints: 0,
     };
-  });
+  }
+  const team = playerTeam(pid);
+  const gameId = team ? games.teamToGame[team] : undefined;
+  const game = gameId ? games.games.find(g => g.id === gameId) : undefined;
+  // A defence shows the projection the model priced it from, so the lineup and the price agree.
+  const projectedPoints = defenceModel && isDefenceRow(projections[pid])
+    ? defenceProjectedPoints(projections[pid], defenceModel)
+    : calculateProjectedPoints(projections[pid], scoringSettings);
+  const unplayed =
+    !game || game.state === 'post'
+      ? 0
+      : game.state === 'pre'
+        ? 1
+        : Math.min(1, Math.max(0, game.remainingMinutes / REGULATION_MINUTES));
+  return {
+    slot,
+    playerId: pid,
+    name: playerName(pid),
+    position: PLAYERS[pid]?.position ?? null,
+    points,
+    projectedPoints,
+    gameState: game ? game.state : ('unknown' as const),
+    team: PLAYERS[pid]?.team ?? null,
+    // Before kickoff the projection IS the expectation; banked points only count once the game
+    // has started, so a pre-game 0 does not drag it down.
+    expectedPoints: game?.state === 'pre' ? projectedPoints : points + Math.max(0, projectedPoints) * unplayed,
+  };
+}
+
+/**
+ * The bench as lineup rows (slot `BN`), best first by where each is heading — the same
+ * expected-points measure the slot edge uses, so "best bench" means the same thing before kickoff
+ * (best projection) as after (most points). IR and taxi players (`notBench`) are left out: they could
+ * not have been started, so "best bench" must not name one.
+ */
+function buildBench(
+  matchup: SleeperMatchup,
+  notBench: Set<string>,
+  projections: Record<string, Record<string, number>>,
+  scoringSettings: Record<string, number>,
+  games: NflGamesResponse,
+  defenceModel: DefenceModel | null,
+): LineupSlot[] {
+  const starters = new Set(matchup.starters ?? []);
+  return (matchup.players ?? [])
+    .filter(pid => pid && pid !== '0' && !starters.has(pid) && !notBench.has(pid))
+    .map(pid => lineupEntry('BN', pid, matchup.players_points?.[pid] ?? 0, projections, scoringSettings, games, defenceModel))
+    .sort((a, b) => b.expectedPoints - a.expectedPoints);
 }
 
 /**
@@ -443,6 +477,7 @@ export async function buildMatchupMarkets(
   });
 
   const ownerByRoster = new Map(rosters.map(r => [r.roster_id, r.owner_id ?? null]));
+  const reserveByRoster = new Map(rosters.map(r => [r.roster_id, new Set([...(r.reserve ?? []), ...(r.taxi ?? [])])]));
   const userById = new Map(users.map(u => [u.user_id, u]));
 
   const pairs = new Map<number, SleeperMatchup[]>();
@@ -491,6 +526,7 @@ export async function buildMatchupMarkets(
       distribution: sideDistribution(starters),
       starters,
       lineup: buildLineup(m, rosterPositions, projections, scoringSettings, gamesRes, defenceModel),
+      bench: buildBench(m, reserveByRoster.get(m.roster_id) ?? new Set(), projections, scoringSettings, gamesRes, defenceModel),
       playersRemaining: starters.filter(s => s.gameState === 'pre' || s.gameState === 'in').length,
       assumedPromotions: promoted.map(c => ({
         playerId: c.playerId,

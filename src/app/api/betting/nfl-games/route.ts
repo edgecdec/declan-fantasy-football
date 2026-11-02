@@ -50,6 +50,9 @@ export type NflGame = {
   home?: string | null;
   /** Current score by team abbreviation. */
   scores?: Record<string, number>;
+  /** While a game is on: the abbreviation of the team with the ball, and whether it is in the red zone. */
+  possession?: string | null;
+  redZone?: boolean;
 };
 
 export type NflGamesResponse = {
@@ -138,7 +141,7 @@ export async function GET(request: Request) {
 
       for (const t of teams) teamToGame[t] = event.id;
 
-      type Competitor = { homeAway?: string; score?: string; team?: { abbreviation?: string } };
+      type Competitor = { homeAway?: string; score?: string; team?: { id?: string; abbreviation?: string } };
       const competitors: Competitor[] = competition.competitors ?? [];
       const scores: Record<string, number> = {};
       for (const c of competitors) {
@@ -158,6 +161,13 @@ export async function GET(request: Request) {
         startsAt: event.date ?? undefined,
         home: competitors.find(c => c.homeAway === 'home')?.team?.abbreviation ?? null,
         scores,
+        // ESPN names the team with the ball by its numeric id, not its abbreviation.
+        ...(state === 'in' && competition.situation
+          ? {
+            possession: competitors.find(c => c.team?.id === competition.situation.possession)?.team?.abbreviation ?? null,
+            redZone: competition.situation.isRedZone === true,
+          }
+          : {}),
       });
     }
 

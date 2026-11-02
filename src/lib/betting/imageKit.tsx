@@ -46,6 +46,8 @@ export const C = {
 
 /** The type scale. Every size used in a card comes from here. */
 export const T = {
+  /** The score duel at the top of /matchup. */
+  hero: 56,
   display: 48,
   score: 30,
   title: 26,
@@ -156,6 +158,34 @@ export function ManagerName({
           {clip(team, 30)}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Up to two initials: "Josh Allen" → "JA", "edgecdec" → "ED", "Los Angeles Rams" → "LR". */
+export function initials(name: string): string {
+  const words = name.replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/**
+ * A round picture — manager avatar, player headshot, team logo — or, when there is none, the
+ * initials on a disc. `src` is a data URI the route fetched (imageAssets.ts); a missing or failed
+ * picture is simply null here, so the card always renders.
+ */
+export function Avatar({ src, label, size, ring }: { src: string | null | undefined; label: string; size: number; ring?: string }) {
+  const border = ring ? `2px solid ${ring}` : `1px solid ${C.divider}`;
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- satori renders <img>, not next/image
+      <img src={src} alt={label} width={size} height={size} style={{ width: size, height: size, borderRadius: size / 2, objectFit: 'cover', backgroundColor: C.divider, border, flexShrink: 0 }} />
+    );
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: size, height: size, borderRadius: size / 2, backgroundColor: C.divider, border, color: C.muted, fontSize: Math.max(T.micro, Math.round(size * 0.36)), fontWeight: 700, flexShrink: 0 }}>
+      {initials(label)}
     </div>
   );
 }

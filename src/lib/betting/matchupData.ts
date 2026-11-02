@@ -136,25 +136,60 @@ export function gameLine(
   return { opponent, gameDetail: [when, where].filter(Boolean).join(' ') };
 }
 
+/**
+ * A live game's state for a badge: the clock as `Q3 3:40` (`OT 5:00`, `HALF`), whether this
+ * player's team has the ball, whether it is in the red zone, and `vs PHI` / `@ SEA`. Null outside a
+ * live game.
+ */
+export function liveGame(
+  team: string | null,
+  games: NflGamesResponse,
+): { clock: string; hasBall: boolean; redZone: boolean; where: string } | null {
+  if (!team) return null;
+  const espn = espnTeamCode(team);
+  const game = games.games.find(g => g.id === games.teamToGame[espn]);
+  if (!game || game.state !== 'in') return null;
+  const detail = (game.shortDetail ?? game.detail ?? '').toLowerCase();
+  const clock = detail.includes('half')
+    ? 'HALF'
+    : detail.startsWith('end')
+      ? `END ${game.period > 4 ? 'OT' : `Q${game.period}`}`
+      : `${game.period > 4 ? 'OT' : `Q${game.period}`} ${game.clock}`;
+  const hasBall = game.possession === espn;
+  const opponent = game.teams.find(t => t !== espn);
+  const where = opponent ? `${game.home === espn ? 'vs' : '@'} ${opponent}` : '';
+  return { clock, hasBall, redZone: hasBall && game.redZone === true, where };
+}
+
+function slotOut(l: MarketSide['lineup'][number], games: NflGamesResponse) {
+  return {
+    slot: l.slot,
+    playerId: l.playerId,
+    name: l.name,
+    position: l.position,
+    team: l.team,
+    points: l.points,
+    projectedPoints: l.projectedPoints,
+    expectedPoints: l.expectedPoints,
+    gameState: l.gameState,
+    ...gameLine(l.team, games),
+    live: liveGame(l.team, games),
+  };
+}
+
 function side(s: MarketSide, games: NflGamesResponse) {
+  const best = s.bench?.[0];
   return {
     rosterId: s.rosterId,
     displayName: s.displayName,
     teamName: s.teamName ?? null,
+    avatar: s.avatar ?? null,
     banked: s.distribution.banked,
     projected: s.distribution.mean,
     playersRemaining: s.playersRemaining,
-    lineup: s.lineup.map(l => ({
-      slot: l.slot,
-      name: l.name,
-      position: l.position,
-      team: l.team,
-      points: l.points,
-      projectedPoints: l.projectedPoints,
-      expectedPoints: l.expectedPoints,
-      gameState: l.gameState,
-      ...gameLine(l.team, games),
-    })),
+    lineup: s.lineup.map(l => slotOut(l, games)),
+    // The one bench player worth a line: the best by where they are heading (see buildBench).
+    bestBench: best ? slotOut(best, games) : null,
     // What the model assumes beyond the lineup as set, so a projection that disagrees with
     // Sleeper's can be explained rather than just doubted.
     assumedPromotions: s.assumedPromotions.map(p => p.name),

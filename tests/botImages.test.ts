@@ -159,10 +159,10 @@ test('matchup picture: same card system, header drops the bar once final', async
   for (const status of ['live', 'not_started', 'final'] as const) {
     const { w, h, bytes } = await png(renderMatchupImage(matchup(status), 'slot'));
     assert.equal(w, CARD_W);
-    assert.equal(h, matchupImageHeight(3, status === 'final'));
+    assert.equal(h, matchupImageHeight(matchup(status)));
     assert.ok(bytes > 10_000);
   }
-  assert.ok(matchupImageHeight(3, true) < matchupImageHeight(3, false));
+  assert.ok(matchupImageHeight(matchup('final')) < matchupImageHeight(matchup('live')));
 });
 
 test('loadMarkets: the shared read behind both markets routes', async () => {

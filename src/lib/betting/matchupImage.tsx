@@ -1,8 +1,9 @@
 import type { ImageResponse } from 'next/og';
 import {
-  C, CARD_W, FOOTER_H, Footer, HeaderStrip, LegendDot, ManagerName, PAD_X, T, WinBar,
+  Avatar, C, CARD_W, FOOTER_H, Footer, HeaderStrip, LegendDot, PAD_X, T, WinBar,
   clip, pts, renderCard, type StatusTone,
 } from '@/lib/betting/imageKit';
+import { avatarUrl, headshotUrl, teamLogoUrl } from '@/lib/betting/imageAssets';
 
 /**
  * The matchup as a picture, laid out like Sleeper's mobile matchup screen.
@@ -13,22 +14,39 @@ import {
  * breakdown is drawn — players left and right, points against the centre, a position pill between
  * them — and Discord shows it the same on every client.
  *
- * Palette, type scale, header, footer, names and the win bar come from imageKit, shared with the
- * /markets and /luck cards so all three read as one set.
+ * What each part says, top to bottom:
+ *  - the duel: each manager's avatar, name and team, the score at hero size, the projected final,
+ *    and the win bar with each side's chance at its end (gone once final: it would only restate
+ *    the score);
+ *  - a row per slot: headshot (team logo for a defence), the player's game — a live clock badge
+ *    with a dot for the team with the ball, the kickoff, or the result — and points. A DECIDED slot
+ *    (both games over) shows its winner bright and the loser dimmed; an undecided one colours
+ *    points by game state instead, because there is no winner yet. The chip under the position
+ *    pill is the projected slot edge in the colour of the side that has it;
+ *  - each side's best bench player, one row;
+ *  - the biggest swing — the slot doing the most to decide it.
+ *
+ * Pictures are fetched by the route (imageAssets.ts) and passed in as data URIs; any that are
+ * missing draw initials, so the card renders the same with no network at all. Palette, type scale,
+ * header and footer come from imageKit, shared with /markets, /luck and /schedules.
  */
 
 const W = CARD_W;
-const ROW_H = 70;
-const HEADER_H = 250;
+const ROW_H = 72;
+const BENCH_H = 64;
+const SWING_H = 50;
+const HEADER_H = 274;
 /** The win bar's band, dropped once the matchup is final. */
 const BAR_BAND_H = 38;
 /** Satori shrinks flex children to nothing unless told otherwise, so every column has a width. */
 const PILL_W = 72;
 const CELL_W = (W - PILL_W) / 2;
-const SCORE_W = 84;
+const SCORE_W = 78;
 const STRIPE_W = 4;
+const PHOTO = 38;
 const CELL_PAD = 8;
-const NAME_W = CELL_W - SCORE_W - STRIPE_W - CELL_PAD * 2;
+const NAME_W = CELL_W - SCORE_W - STRIPE_W - PHOTO - CELL_PAD * 2 - 14;
+const AVATAR = 48;
 
 /** Sleeper's position colours, as its pills use them. Text on them is dark. */
 const SLOT: Record<string, { label: string; color: string }> = {
@@ -46,10 +64,15 @@ const SLOT: Record<string, { label: string; color: string }> = {
   LB: { label: 'LB', color: '#ae9eff' },
   DB: { label: 'DB', color: '#ff7cb6' },
   IDP_FLEX: { label: 'IDP', color: '#a3b0c8' },
+  BN: { label: 'BN', color: '#55607c' },
 };
+
+/** The football's colour, for the "has the ball" dot. */
+const BALL = '#c8823c';
 
 export type ImageSlot = {
   slot: string;
+  playerId?: string | null;
   name: string | null;
   position: string | null;
   team: string | null;
@@ -58,15 +81,21 @@ export type ImageSlot = {
   expectedPoints: number;
   gameState: 'pre' | 'in' | 'post' | 'unknown';
   gameDetail?: string | null;
+  /** "vs PHI" / "@ SEA". */
+  opponent?: string | null;
+  /** Present only while the player's game is on. */
+  live?: { clock: string; hasBall: boolean; redZone: boolean; where?: string } | null;
 };
 
 export type ImageSide = {
   displayName: string;
   teamName: string | null;
+  avatar?: string | null;
   banked: number;
   projected: number;
   playersRemaining: number;
   lineup: ImageSlot[];
+  bestBench?: ImageSlot | null;
 };
 
 export type ImageMatchup = {
@@ -78,6 +107,47 @@ export type ImageMatchup = {
   opponent: ImageSide;
 };
 
+/** Pictures by key (see matchupAssetUrls), as data URIs. A missing key draws the fallback. */
+export type ImageAssets = Record<string, string | null>;
+
+const playerKey = (s: ImageSlot) =>
+  s.position === 'DEF' ? `team:${s.team ?? s.playerId}` : `player:${s.playerId}`;
+
+/** Every picture the card can use, keyed, for the route to fetch through imageAssets. */
+export function matchupAssetUrls(m: ImageMatchup): Record<string, string | null> {
+  const urls: Record<string, string | null> = {
+    'avatar:me': avatarUrl(m.me.avatar),
+    'avatar:opponent': avatarUrl(m.opponent.avatar),
+  };
+  for (const s of [...m.me.lineup, ...m.opponent.lineup, m.me.bestBench, m.opponent.bestBench]) {
+    if (!s?.name || !s.playerId) continue;
+    urls[playerKey(s)] = s.position === 'DEF' ? teamLogoUrl(s.team ?? s.playerId) : headshotUrl(s.playerId);
+  }
+  return urls;
+}
+
+/**
+ * A name that fits: "Rhamondre Stevenson" → "R. Stevenson", never cut mid-word where it can be
+ * helped. A defence keeps its nickname instead — "Kansas City Chiefs" → "KC Chiefs" — since
+ * "K. City Chiefs" reads as a typo.
+ */
+export function playerLabel(name: string, max: number, team?: string | null, position?: string | null): string {
+  const clean = name.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const words = clean.split(' ');
+  if (position === 'DEF' && team) return clip(`${team} ${words[words.length - 1]}`, max);
+  const short = words.length > 1 ? `${words[0][0]}. ${words.slice(1).join(' ')}` : clean;
+  return clip(short, max);
+}
+
+type Row = { index: number; slot: string; mine?: ImageSlot; theirs?: ImageSlot; edge: number };
+
+/** Both games over (or nobody in the slot): the slot has a winner, by points. */
+function decided(r: Pick<Row, 'mine' | 'theirs'>): boolean {
+  const done = (s?: ImageSlot) => !s?.name || s.gameState === 'post' || s.gameState === 'unknown';
+  return done(r.mine) && done(r.theirs);
+}
+
 function stateColour(s: ImageSlot | undefined): string {
   if (!s?.name) return C.dim;
   if (s.gameState === 'in') return C.live;
@@ -85,56 +155,107 @@ function stateColour(s: ImageSlot | undefined): string {
   return C.final;
 }
 
-/** One manager's half of a row. Mirrored for the right side so points sit against the centre. */
-function PlayerCell({ s, side }: { s: ImageSlot | undefined; side: 'left' | 'right' }) {
-  const colour = stateColour(s);
+/** The line under a player's name, and the live badge that leads it while the game is on. */
+function GameLine({ s, right }: { s: ImageSlot; right: boolean }) {
+  const pos = s.position && s.position !== s.slot && s.slot !== 'BN' ? s.position : null;
+  if (s.live) {
+    // The badge takes the room the team code would: the opponent is enough while it is on.
+    const text = [pos, s.live.where].filter(Boolean).join(' · ');
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', flexDirection: right ? 'row-reverse' : 'row', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', height: 20, padding: '0 6px', borderRadius: 5, backgroundColor: 'rgba(59, 227, 126, 0.16)', color: C.live, fontSize: T.micro, fontWeight: 700, whiteSpace: 'nowrap' }}>
+          {s.live.clock}
+        </div>
+        {s.live.hasBall ? (
+          <div style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: BALL, margin: '0 6px' }} />
+        ) : <div style={{ width: 6 }} />}
+        {s.live.redZone ? (
+          <div style={{ display: 'flex', alignItems: 'center', height: 20, padding: '0 5px', borderRadius: 5, backgroundColor: C.bad, color: C.bg, fontSize: 12, fontWeight: 700, margin: right ? '0 0 0 6px' : '0 6px 0 0' }}>RZ</div>
+        ) : null}
+        <div style={{ fontSize: T.micro, color: C.muted, whiteSpace: 'nowrap' }}>{clip(text, 16)}</div>
+      </div>
+    );
+  }
+  const text = [pos, s.team, s.gameDetail].filter(Boolean).join(' · ');
+  return <div style={{ fontSize: T.micro, color: C.muted, marginTop: 4, whiteSpace: 'nowrap' }}>{clip(text, 27)}</div>;
+}
+
+/**
+ * One manager's half of a row, mirrored for the right side so points sit against the centre.
+ * `outcome` is set only when the slot is decided: the winner's points bright, the loser's dimmed.
+ */
+function PlayerCell({ s, side, outcome, assets, dim = false }: {
+  s: ImageSlot | undefined; side: 'left' | 'right'; outcome: 'won' | 'lost' | null; assets: ImageAssets; dim?: boolean;
+}) {
   const right = side === 'right';
   const empty = !s?.name;
-  const sub = empty
-    ? 'empty slot'
-    : [s.position && s.position !== s.slot ? s.position : null, s.team, s.gameDetail]
-        .filter(Boolean)
-        .join(' · ');
+  const pre = !empty && s!.gameState === 'pre';
+  const colour = outcome === 'lost' ? C.muted : outcome === 'won' ? C.text : stateColour(s);
 
   const stripe = (
     // The outer-edge stripe: live and yet-to-play players are findable at a glance down a column.
-    <div style={{ width: STRIPE_W, height: 44, borderRadius: 2, flexShrink: 0, backgroundColor: s?.gameState === 'in' || s?.gameState === 'pre' ? colour : 'transparent' }} />
+    <div style={{ width: STRIPE_W, height: 44, borderRadius: 2, flexShrink: 0, backgroundColor: s?.gameState === 'in' || s?.gameState === 'pre' ? stateColour(s) : 'transparent' }} />
+  );
+  const photo = (
+    <div style={{ display: 'flex', margin: right ? '0 6px 0 8px' : '0 8px 0 6px', opacity: dim ? 0.7 : 1 }}>
+      {empty
+        ? <div style={{ width: PHOTO, height: PHOTO, borderRadius: PHOTO / 2, border: `1px dashed ${C.divider}` }} />
+        : <Avatar src={assets[playerKey(s!)]} label={s!.name!} size={PHOTO} />}
+    </div>
   );
   const names = (
-    <div style={{ display: 'flex', flexDirection: 'column', width: NAME_W, flexShrink: 0, alignItems: right ? 'flex-end' : 'flex-start', padding: '0 10px' }}>
-      <div style={{ fontSize: T.player, fontWeight: 700, color: empty ? C.dim : C.text, whiteSpace: 'nowrap' }}>
-        {empty ? '—' : clip(s.name!, 19)}
+    <div style={{ display: 'flex', flexDirection: 'column', width: NAME_W, flexShrink: 0, alignItems: right ? 'flex-end' : 'flex-start' }}>
+      <div style={{ fontSize: T.player, fontWeight: 700, color: empty ? C.dim : dim ? C.muted : C.text, whiteSpace: 'nowrap' }}>
+        {empty ? 'empty slot' : playerLabel(s!.name!, 17, s!.team, s!.position)}
       </div>
-      <div style={{ fontSize: T.micro, color: C.muted, marginTop: 3, whiteSpace: 'nowrap' }}>{clip(sub, 28)}</div>
+      {empty ? null : <GameLine s={s!} right={right} />}
     </div>
   );
   const score = (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: right ? 'flex-start' : 'flex-end', width: SCORE_W, flexShrink: 0 }}>
-      <div style={{ fontSize: T.score, fontWeight: 700, color: colour, whiteSpace: 'nowrap' }}>{empty ? '0.0' : pts(s.points)}</div>
+      {/* Before kickoff the projection is the number worth reading — a column of 0.0s says nothing —
+          so it takes the big slot in the yet-to-play blue, labelled. */}
+      <div style={{ fontSize: outcome === 'lost' || dim || pre ? T.score - 4 : T.score, fontWeight: 700, color: dim ? C.muted : colour, whiteSpace: 'nowrap' }}>
+        {empty ? '0.0' : pts(pre ? s!.projectedPoints : s!.points)}
+      </div>
       <div style={{ fontSize: T.micro, color: C.muted, marginTop: 1, whiteSpace: 'nowrap' }}>
-        {empty || s.gameState === 'post' ? '' : `proj ${pts(s.projectedPoints)}`}
+        {empty || s!.gameState === 'post' ? '' : pre ? 'proj' : `proj ${pts(s!.projectedPoints)}`}
       </div>
     </div>
   );
 
   return (
     <div style={{ display: 'flex', width: CELL_W, flexShrink: 0, alignItems: 'center', padding: `0 ${CELL_PAD}px` }}>
-      {right ? <>{score}{names}{stripe}</> : <>{stripe}{names}{score}</>}
+      {right ? <>{score}{names}{photo}{stripe}</> : <>{stripe}{photo}{names}{score}</>}
     </div>
   );
 }
 
-function SlotPill({ slot, edge }: { slot: string; edge: number }) {
+const rgba = (hex: string, a: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+};
+
+/** The position pill, and under it the slot edge as a chip in the colour of the side that has it. */
+function SlotPill({ slot, edge, swing, sub }: { slot: string; edge: number | null; swing: boolean; sub?: string }) {
   const s = SLOT[slot] ?? { label: slot.slice(0, 4), color: '#a3b0c8' };
-  // The edge sits under the pill in the colour of whichever side is ahead in the slot.
-  const lead = edge >= 0.05 ? C.sideA : edge <= -0.05 ? C.sideB : C.dim;
+  const lead = edge === null ? null : edge >= 0.05 ? C.sideA : edge <= -0.05 ? C.sideB : null;
+  const label = edge === null
+    ? sub ?? ''
+    : Math.abs(edge) < 0.05 ? 'even' : `${edge > 0 ? '◀ ' : ''}${Math.abs(edge).toFixed(1)}${edge < 0 ? ' ▶' : ''}`;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: PILL_W, flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 28, borderRadius: 14, backgroundColor: s.color, color: C.bg, fontSize: T.micro, fontWeight: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 26, borderRadius: 13, backgroundColor: s.color, color: C.bg, fontSize: T.micro, fontWeight: 700 }}>
         {s.label}
       </div>
-      <div style={{ fontSize: T.micro, color: lead, marginTop: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
-        {Math.abs(edge) < 0.05 ? 'even' : `${edge > 0 ? '◀' : ''} ${Math.abs(edge).toFixed(1)} ${edge < 0 ? '▶' : ''}`.trim()}
+      <div style={{
+        display: 'flex', alignItems: 'center', height: 20, marginTop: 4, padding: '0 6px', borderRadius: 5, whiteSpace: 'nowrap',
+        fontSize: T.micro, fontWeight: 700,
+        // The biggest swing is filled solid, so the row that matters most is findable at a glance.
+        backgroundColor: lead ? (swing ? lead : rgba(lead, 0.2)) : 'transparent',
+        color: lead ? (swing ? C.bg : lead) : C.dim,
+      }}>
+        {label}
       </div>
     </div>
   );
@@ -147,19 +268,31 @@ const STATUS: Record<ImageMatchup['status'], { text: string; tone: StatusTone }>
   final: { text: 'FINAL', tone: 'final' },
 };
 
-function Header({ m }: { m: ImageMatchup }) {
+function Header({ m, assets }: { m: ImageMatchup; assets: ImageAssets }) {
   const final = m.status === 'final';
+  const notStarted = m.status === 'not_started';
   const half = (W - PAD_X * 2) / 2;
   const won = (s: ImageSide, o: ImageSide) => final && s.banked > o.banked;
-  const sideBlock = (s: ImageSide, o: ImageSide, right: boolean, colour: string) => (
+  const sideBlock = (s: ImageSide, o: ImageSide, right: boolean, colour: string, key: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', width: half, flexShrink: 0 }}>
-      <ManagerName
-        name={s.displayName} team={s.teamName} colour={colour} align={right ? 'right' : 'left'}
-        width={half} badge={won(s, o) ? 'WIN' : undefined}
-      />
-      <div style={{ fontSize: T.display, fontWeight: 700, color: final && !won(s, o) ? C.muted : C.text, marginTop: 6 }}>{pts(s.banked)}</div>
-      <div style={{ fontSize: T.body, color: C.muted, whiteSpace: 'nowrap' }}>
-        {final ? 'final' : `proj ${pts(s.projected)} · ${s.playersRemaining} to play`}
+      <div style={{ display: 'flex', alignItems: 'center', flexDirection: right ? 'row-reverse' : 'row' }}>
+        <Avatar src={assets[key]} label={s.displayName} size={AVATAR} ring={colour} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', margin: right ? '0 12px 0 0' : '0 0 0 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexDirection: right ? 'row-reverse' : 'row' }}>
+            <div style={{ fontSize: T.name, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{clip(s.displayName, 16)}</div>
+            {won(s, o) ? (
+              <div style={{ display: 'flex', alignItems: 'center', height: 20, padding: '0 7px', borderRadius: 5, backgroundColor: C.good, color: C.bg, fontSize: 12, fontWeight: 700, margin: right ? '0 8px 0 0' : '0 0 0 8px' }}>WIN</div>
+            ) : null}
+          </div>
+          <div style={{ fontSize: T.micro, color: C.muted, marginTop: 2, whiteSpace: 'nowrap' }}>{s.teamName ? clip(s.teamName, 24) : ' '}</div>
+        </div>
+      </div>
+      {/* Before kickoff the duel is projection against projection; 0.0 – 0.0 would say nothing. */}
+      <div style={{ fontSize: T.hero, fontWeight: 700, color: final && !won(s, o) ? C.muted : notStarted ? C.upcoming : C.text, marginTop: 10, lineHeight: 1 }}>
+        {pts(notStarted ? s.projected : s.banked)}
+      </div>
+      <div style={{ fontSize: T.body, color: C.muted, marginTop: 6, whiteSpace: 'nowrap' }}>
+        {final ? 'final' : notStarted ? `projected · ${s.playersRemaining} to play` : `proj ${pts(s.projected)} · ${s.playersRemaining} to play`}
       </div>
     </div>
   );
@@ -168,16 +301,42 @@ function Header({ m }: { m: ImageMatchup }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: headerHeight(final), flexShrink: 0, padding: `4px ${PAD_X}px 0`, borderBottom: `1px solid ${C.divider}` }}>
       <HeaderStrip league={m.league.name} status={`WEEK ${m.week} · ${status.text}`} tone={status.tone} />
-      <div style={{ display: 'flex', marginTop: 8 }}>
-        {sideBlock(m.me, m.opponent, false, C.sideA)}
-        {sideBlock(m.opponent, m.me, true, C.sideB)}
+      <div style={{ display: 'flex', marginTop: 10 }}>
+        {sideBlock(m.me, m.opponent, false, C.sideA, 'avatar:me')}
+        {sideBlock(m.opponent, m.me, true, C.sideB, 'avatar:opponent')}
       </div>
       {/* No meter once it is over: a decided bar restates the score above it. */}
       {final ? null : (
-        <div style={{ display: 'flex', marginTop: 14 }}>
+        <div style={{ display: 'flex', marginTop: 16 }}>
           <WinBar p={m.winProbability} width={W - PAD_X * 2} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The slot doing the most to decide the matchup: the largest edge. Before kickoff that is a
+ * projection, so it is called the biggest edge rather than a swing that has not happened.
+ */
+export function biggestSwing(rows: Row[], status: ImageMatchup['status']): { row: Row; label: string } | null {
+  const best = rows.reduce<Row | null>((b, r) => (!b || Math.abs(r.edge) > Math.abs(b.edge) ? r : b), null);
+  if (!best || Math.abs(best.edge) < 0.05) return null;
+  return { row: best, label: status === 'not_started' ? 'Biggest projected edge' : 'Biggest swing' };
+}
+
+function SwingBand({ swing, m }: { swing: { row: Row; label: string }; m: ImageMatchup }) {
+  const { row, label } = swing;
+  const forMe = row.edge > 0;
+  const who = forMe ? m.me.displayName : m.opponent.displayName;
+  const colour = forMe ? C.sideA : C.sideB;
+  const name = (s?: ImageSlot) => (s?.name ? playerLabel(s.name, 18, s.team, s.position) : 'empty');
+  const val = (s?: ImageSlot) => pts(s?.name ? (decided(row) ? s.points : s.expectedPoints) : 0);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: SWING_H, flexShrink: 0, padding: `0 ${PAD_X}px`, borderBottom: `1px solid ${C.divider}`, fontSize: T.small, color: C.muted, whiteSpace: 'nowrap' }}>
+      <div style={{ fontWeight: 700, color: C.text }}>{`${label} · ${SLOT[row.slot]?.label ?? row.slot}`}</div>
+      <div style={{ margin: '0 10px' }}>{`${name(row.mine)} ${val(row.mine)} v ${val(row.theirs)} ${name(row.theirs)}`}</div>
+      <div style={{ fontWeight: 700, color: colour }}>{`+${Math.abs(row.edge).toFixed(1)} ${clip(who, 14)}`}</div>
     </div>
   );
 }
@@ -189,15 +348,15 @@ function Legend({ sort }: { sort: 'slot' | 'edge' }) {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <LegendDot colour={C.live} label="Playing" />
           <LegendDot colour={C.upcoming} label="Yet to play" />
-          <LegendDot colour={C.final} label="Final" />
+          <LegendDot colour={BALL} label="Has the ball" />
         </div>
       }
-      note={sort === 'edge' ? 'sorted by projected edge' : 'centre: projected slot edge'}
+      note={sort === 'edge' ? 'sorted by projected edge' : 'chip: projected slot edge'}
     />
   );
 }
 
-export function renderMatchupImage(m: ImageMatchup, sort: 'slot' | 'edge'): ImageResponse {
+function buildRows(m: ImageMatchup, sort: 'slot' | 'edge'): Row[] {
   const n = Math.max(m.me.lineup.length, m.opponent.lineup.length);
   const rows = Array.from({ length: n }, (_, index) => {
     const mine = m.me.lineup[index];
@@ -211,29 +370,75 @@ export function renderMatchupImage(m: ImageMatchup, sort: 'slot' | 'edge'): Imag
     };
   });
   if (sort === 'edge') rows.sort((x, y) => y.edge - x.edge || x.index - y.index);
+  return rows;
+}
 
-  const height = matchupImageHeight(rows.length, m.status === 'final');
+function outcomes(r: Row): ['won' | 'lost' | null, 'won' | 'lost' | null] {
+  if (!decided(r)) return [null, null];
+  const a = r.mine?.name ? r.mine.points : 0;
+  const b = r.theirs?.name ? r.theirs.points : 0;
+  if (Math.abs(a - b) < 0.05) return [null, null];
+  return a > b ? ['won', 'lost'] : ['lost', 'won'];
+}
+
+export function renderMatchupImage(m: ImageMatchup, sort: 'slot' | 'edge', assets: ImageAssets = {}): ImageResponse {
+  const rows = buildRows(m, sort);
+  const swing = biggestSwing(rows, m.status);
+  const bench = m.me.bestBench || m.opponent.bestBench;
+
   // A real element, not a fragment: satori renders only the first child of a fragment root.
   return renderCard(
     <div style={{ display: 'flex', flexDirection: 'column', width: W }}>
-      <Header m={m} />
-      {rows.map((r, i) => (
-        <div key={r.index} style={{ display: 'flex', alignItems: 'center', height: ROW_H, flexShrink: 0, backgroundColor: i % 2 ? C.rowAlt : C.row, borderBottom: `1px solid ${C.divider}` }}>
-          <PlayerCell s={r.mine} side="left" />
-          <SlotPill slot={r.slot} edge={r.edge} />
-          <PlayerCell s={r.theirs} side="right" />
+      <Header m={m} assets={assets} />
+      {rows.map((r, i) => {
+        const [mine, theirs] = outcomes(r);
+        return (
+          <div key={r.index} style={{ display: 'flex', alignItems: 'center', height: ROW_H, flexShrink: 0, backgroundColor: i % 2 ? C.rowAlt : C.row, borderBottom: `1px solid ${C.divider}` }}>
+            <PlayerCell s={r.mine} side="left" outcome={mine} assets={assets} />
+            <SlotPill slot={r.slot} edge={r.edge} swing={swing?.row === r} />
+            <PlayerCell s={r.theirs} side="right" outcome={theirs} assets={assets} />
+          </div>
+        );
+      })}
+      {bench ? (
+        <div style={{ display: 'flex', alignItems: 'center', height: BENCH_H, flexShrink: 0, backgroundColor: C.bg, borderBottom: `1px solid ${C.divider}` }}>
+          <PlayerCell s={m.me.bestBench ?? undefined} side="left" outcome={null} assets={assets} dim />
+          <SlotPill slot="BN" edge={null} swing={false} sub="best bench" />
+          <PlayerCell s={m.opponent.bestBench ?? undefined} side="right" outcome={null} assets={assets} dim />
         </div>
-      ))}
+      ) : null}
+      {swing ? <SwingBand swing={swing} m={m} /> : null}
       <Legend sort={sort} />
     </div>,
-    height,
+    matchupImageHeight(m, sort),
   );
+}
+
+/**
+ * The card as PNG bytes, rendered now rather than streamed. Satori decodes the pictures while the
+ * response streams, so a picture it cannot decode would otherwise fail mid-stream and leave Discord
+ * a broken file. If drawing with pictures fails for any reason, the card is drawn again with
+ * initials — the pictures are decoration, the card is not.
+ */
+export async function renderMatchupPng(m: ImageMatchup, sort: 'slot' | 'edge', assets: ImageAssets): Promise<ArrayBuffer> {
+  try {
+    return await renderMatchupImage(m, sort, assets).arrayBuffer();
+  } catch (err) {
+    console.error('[matchup image] render with pictures failed, retrying without:', err);
+    return renderMatchupImage(m, sort, {}).arrayBuffer();
+  }
 }
 
 function headerHeight(final: boolean): number {
   return final ? HEADER_H - BAR_BAND_H : HEADER_H;
 }
 
-export function matchupImageHeight(rows: number, final: boolean): number {
-  return headerHeight(final) + rows * ROW_H + FOOTER_H;
+/** The card's height for this matchup: header, a row per slot, the bench and swing bands if any. */
+export function matchupImageHeight(m: ImageMatchup, sort: 'slot' | 'edge' = 'slot'): number {
+  const rows = buildRows(m, sort);
+  return headerHeight(m.status === 'final')
+    + rows.length * ROW_H
+    + (m.me.bestBench || m.opponent.bestBench ? BENCH_H : 0)
+    + (biggestSwing(rows, m.status) ? SWING_H : 0)
+    + FOOTER_H;
 }
