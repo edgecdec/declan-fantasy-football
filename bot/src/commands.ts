@@ -34,6 +34,8 @@ import {
   fetchLuck,
   fetchMarkets,
   fetchMatchup,
+  fetchLuckImage,
+  fetchMarketsImage,
   fetchMatchupImage,
   fetchMe,
   type MatchupResponse,
@@ -41,7 +43,7 @@ import {
   type LeaderboardStanding,
 } from './siteApi';
 import { americanOdds, money, pad, padLeft, percent } from './format';
-import { renderMarketsEmbed } from './marketsView';
+import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marketsView';
 import {
   matchupButtonId,
   matchupNotes,
@@ -373,7 +375,8 @@ async function handleBalances(i: ChatInputCommandInteraction): Promise<void> {
 }
 
 /**
- * The priced board, one embed per league. Layout lives in marketsView.ts so it is testable.
+ * The priced board, one picture per league (marketsImage.tsx on the site), with the text board from
+ * marketsView.ts standing in for any league whose picture cannot be produced.
  */
 async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
   const resolved = resolveLeagues(i.guildId!, i.channelId, i.options.getString('league'));
@@ -384,6 +387,7 @@ async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
   const week = i.options.getInteger('week');
 
   const embeds: APIEmbed[] = [];
+  const files: AttachmentBuilder[] = [];
   const problems: string[] = [];
   for (const league of resolved) {
     const res = await fetchMarkets(league.leagueId, week ?? undefined);
@@ -400,7 +404,16 @@ async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
       continue;
     }
 
-    embeds.push(renderMarketsEmbed(res.data));
+    // The week the JSON answered with, not the option: with no week given, both must show the same one.
+    const image = await fetchMarketsImage(meta.leagueId, shown);
+    if (image.ok) {
+      const name = marketsImageName(res.data);
+      files.push(new AttachmentBuilder(image.data, { name }));
+      embeds.push(marketsImageEmbed(res.data, name));
+    } else {
+      console.error('[bot] markets image failed:', image.error);
+      embeds.push(renderMarketsEmbed(res.data));
+    }
   }
 
   if (embeds.length === 0) {
@@ -410,6 +423,7 @@ async function handleMarkets(i: ChatInputCommandInteraction): Promise<void> {
   await i.editReply({
     content: problems.length ? problems.join('\n') : undefined,
     embeds: embeds.slice(0, 10),
+    files: files.slice(0, 10),
   });
 }
 
@@ -847,6 +861,19 @@ async function handleLuck(i: ChatInputCommandInteraction): Promise<void> {
     return;
   }
 
+  const title = `${league.name} — luck through ${weeksCounted} week${weeksCounted === 1 ? '' : 's'}`;
+
+  // The chart (luckImage.tsx on the site); the text table below stands in if it cannot be drawn.
+  const image = await fetchLuckImage(leagueId);
+  if (image.ok) {
+    await i.editReply({
+      embeds: [{ title, color: 0x5865f2, image: { url: 'attachment://luck.png' } }],
+      files: [new AttachmentBuilder(image.data, { name: 'luck.png' })],
+    });
+    return;
+  }
+  console.error('[bot] luck image failed:', image.error);
+
   const signed = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2);
   const lines = [
     `${pad('manager', 13)}${padLeft('W', 4)}${padLeft('exp', 7)}${padLeft('luck', 8)}`,
@@ -862,7 +889,7 @@ async function handleLuck(i: ChatInputCommandInteraction): Promise<void> {
 
   await i.editReply({
     embeds: [{
-      title: `${league.name} — luck through ${weeksCounted} week${weeksCounted === 1 ? '' : 's'}`,
+      title,
       description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
       color: 0x5865f2,
       footer: {

@@ -302,20 +302,13 @@ export function fetchMatchup(args: {
 }
 
 /**
- * The Details picture for a matchup, as PNG bytes. Not through `call`, which expects JSON — an error
- * still comes back as JSON, so that path is read for its message.
+ * A picture from one of the `/api/bot/.../image` routes, as PNG bytes. Not through `call`, which
+ * expects JSON — an error still comes back as JSON, so that path is read for its message, and every
+ * caller falls back to its text rendering on failure.
  */
-export async function fetchMatchupImage(args: {
-  leagueId: string;
-  rosterId: number;
-  week: number;
-  sort: 'slot' | 'edge';
-}): Promise<SiteResult<Buffer>> {
-  const params = new URLSearchParams({
-    leagueId: args.leagueId, rosterId: String(args.rosterId), week: String(args.week), sort: args.sort,
-  });
+async function fetchPng(path: string, params: URLSearchParams): Promise<SiteResult<Buffer>> {
   try {
-    const res = await fetch(`${baseUrl()}/api/bot/matchup/image?${params}`, {
+    const res = await fetch(`${baseUrl()}${path}?${params}`, {
       headers: { 'x-bot-secret': secret() },
     });
     if (!res.ok || !(res.headers.get('content-type') ?? '').startsWith('image/')) {
@@ -326,4 +319,26 @@ export async function fetchMatchupImage(args: {
   } catch (err) {
     return { ok: false, status: 0, error: err instanceof Error ? err.message : 'site unreachable' };
   }
+}
+
+/** The Details picture for a matchup. */
+export function fetchMatchupImage(args: {
+  leagueId: string;
+  rosterId: number;
+  week: number;
+  sort: 'slot' | 'edge';
+}): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/matchup/image', new URLSearchParams({
+    leagueId: args.leagueId, rosterId: String(args.rosterId), week: String(args.week), sort: args.sort,
+  }));
+}
+
+/** The /markets board for one league week. Pass the week the JSON answered with, so the two agree. */
+export function fetchMarketsImage(leagueId: string, week: number): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/markets/image', new URLSearchParams({ leagueId, week: String(week) }));
+}
+
+/** The /luck chart for a league. */
+export function fetchLuckImage(leagueId: string): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/luck/image', new URLSearchParams({ leagueId }));
 }

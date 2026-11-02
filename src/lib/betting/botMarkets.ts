@@ -104,3 +104,23 @@ export function readBotMarkets(
     winner: r.winner,
   }));
 }
+
+export type MarketPhase = 'pre' | 'live' | 'final' | 'void';
+
+/**
+ * Where a matchup is, from the stored row alone — shared by the text board and the picture so the
+ * two cannot label the same matchup differently.
+ *
+ *  - final: graded, or every game over and settlement still to run.
+ *  - live:  anyone has banked points. A clock reading would miss the Thursday-to-Sunday stretch,
+ *           when a TNF starter has given a matchup a real score but no game is on.
+ *  - pre:   nothing scored yet.
+ */
+export function marketPhase(
+  m: Pick<BotMarket, 'status' | 'remainingMinutes' | 'pointsA' | 'pointsB'>,
+): MarketPhase {
+  if (m.status === 'void') return 'void';
+  if (m.status === 'settled' || m.remainingMinutes <= 0) return 'final';
+  if ((m.pointsA ?? 0) !== 0 || (m.pointsB ?? 0) !== 0) return 'live';
+  return 'pre';
+}

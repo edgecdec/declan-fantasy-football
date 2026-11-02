@@ -1,4 +1,5 @@
 import type { APIEmbed, APIEmbedField } from 'discord.js';
+import { marketPhase } from '@/lib/betting/botMarkets';
 import { americanOdds, meter } from './format';
 import type { MarketRow, MarketsResponse } from './siteApi';
 
@@ -24,7 +25,7 @@ const score = (a: number, b: number) => `${pts(a)} – ${pts(b)}`;
 
 /** Every game in the matchup is over: graded, or awaiting settlement with nothing left to play. */
 function isFinal(m: MarketRow): boolean {
-  return m.status === 'settled' || (m.status !== 'void' && m.remainingMinutes <= 0);
+  return marketPhase(m) === 'final';
 }
 
 function winnerText(m: MarketRow): string | null {
@@ -43,10 +44,8 @@ function winnerText(m: MarketRow): string | null {
  *    current score follows so a live board still says where things stand.
  *  - final: `final **131.2 – 119.8** · edgecdec won`, graded scores once settled.
  *
- * "Live" is anyone having banked points rather than a clock reading: between Thursday and Sunday a
- * matchup with a TNF starter has a real current score and no game on, and that is still worth
- * showing. Null when the row predates stored scorelines, so an old board renders as it always did
- * instead of printing zeros.
+ * "Live" is marketPhase's: anyone having banked points. Null when the row predates stored
+ * scorelines, so an old board renders as it always did instead of printing zeros.
  */
 export function scoreLine(m: MarketRow): string | null {
   if (m.status === 'void') return null;
@@ -61,9 +60,7 @@ export function scoreLine(m: MarketRow): string | null {
 
   if (m.projectedA == null || m.projectedB == null) return null;
   const line = `proj **${score(m.projectedA, m.projectedB)}**`;
-  const a = m.pointsA ?? 0;
-  const b = m.pointsB ?? 0;
-  return a !== 0 || b !== 0 ? `${line} · now ${score(a, b)}` : line;
+  return marketPhase(m) === 'live' ? `${line} · now ${score(m.pointsA ?? 0, m.pointsB ?? 0)}` : line;
 }
 
 /**
@@ -106,4 +103,22 @@ export function renderMarketsEmbed(data: MarketsResponse): APIEmbed {
         : 'all games final',
     },
   };
+}
+
+/**
+ * The embed that carries the board as a picture (see marketsImage.tsx on the site). The picture has
+ * its own header and legend, so the embed is only a frame for it; `renderMarketsEmbed` stands in
+ * when the picture cannot be produced.
+ */
+export function marketsImageEmbed(data: MarketsResponse, fileName: string): APIEmbed {
+  return {
+    title: `${data.league.label} — week ${data.week}`,
+    color: 0x5865f2,
+    image: { url: `attachment://${fileName}` },
+  };
+}
+
+/** One file name per league week, so several boards in one reply never collide. */
+export function marketsImageName(data: MarketsResponse): string {
+  return `markets-${data.league.leagueId}-w${data.week}.png`;
 }

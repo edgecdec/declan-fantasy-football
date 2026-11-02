@@ -12,11 +12,13 @@
     "strict": false,
     "resolveJsonModule": true,
     "types": ["node"],
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "jsx": "react-jsx"
   },
   "include": [
     "tests/**/*.ts",
     "src/lib/**/*.ts",
+    "src/lib/**/*.tsx",
     "src/services/**/*.ts",
     "src/types/**/*.ts",
     "bot/src/**/*.ts"

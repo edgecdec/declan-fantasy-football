@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireBot } from '@/lib/betting/botApi';
-import { readBotMarkets, type BotMarketsResponse } from '@/lib/betting/botMarkets';
-import { findBettingLeague } from '@/lib/betting/leagues';
-import { getDb } from '@/lib/db';
-import { getNflStateOrFallback } from '@/services/common/seasonService';
+import { loadMarkets } from '@/lib/betting/marketsData';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,27 +11,14 @@ export const dynamic = 'force-dynamic';
  * `/api/betting/markets` prices as a side effect of being read, which was the whole read-driven
  * problem the tick route exists to fix. A bot command must never be the thing that moves a line.
  *
- * The query and the response type live in `@/lib/betting/botMarkets`, which the bot imports the type
- * from — see there for why it is always filtered by league.
+ * The read lives in `@/lib/betting/marketsData` (shared with the picture route) and the response
+ * type in `@/lib/betting/botMarkets`, which the bot imports — see there for why it is always
+ * filtered by league.
  */
 export async function GET(request: Request) {
   const denied = requireBot(request);
   if (denied) return denied;
-
-  const params = new URL(request.url).searchParams;
-  const leagueId = params.get('leagueId') ?? '';
-  const cfg = findBettingLeague(leagueId);
-  if (!cfg) {
-    return NextResponse.json({ ok: false, error: 'Not a betting league.' }, { status: 404 });
-  }
-
-  const asked = Number(params.get('week'));
-  const week = Number.isFinite(asked) && asked > 0 ? asked : (await getNflStateOrFallback()).week;
-
-  const body: BotMarketsResponse = {
-    league: { leagueId, season: cfg.season, label: cfg.label },
-    week,
-    markets: readBotMarkets(getDb(), leagueId, week),
-  };
+  const { status, body } = await loadMarkets(new URL(request.url).searchParams);
+  if (status !== 200) return NextResponse.json(body, { status });
   return NextResponse.json({ ok: true, ...body });
 }
