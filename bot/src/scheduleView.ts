@@ -59,3 +59,44 @@ export function renderScheduleText(data: ScheduleSwapResponse): APIEmbed {
     },
   };
 }
+
+const count = (n: number) => Math.round(n).toLocaleString('en-US');
+const share = (x: number) => `${(Math.round(x * 1000) / 10).toFixed(1)}%`;
+
+/**
+ * The schedule percentile with its full three-way split, as a second embed: kindest schedule
+ * first, two lines a manager — the shares, then the exact counts beneath — so it stays inside a
+ * phone's width.
+ */
+export function renderSchedulePercentileText(data: ScheduleSwapResponse): APIEmbed {
+  const totals = new Set(data.percentile.map(p => p.counts.total));
+  const lines = [
+    totals.size === 1 ? `of ${count([...totals][0])} round-robin schedules` : 'over every round-robin schedule',
+    `${pad('manager', 12)}${padLeft('%ile', 5)}${padLeft('worse', 9)}${padLeft('same', 8)}${padLeft('better', 8)}`,
+  ];
+  data.managers
+    .map((m, i) => ({ name: m.name, p: data.percentile[i] }))
+    .sort((a, b) => b.p.percentile - a.p.percentile || a.name.localeCompare(b.name))
+    .forEach(({ name, p }) => {
+      lines.push(
+        pad(name, 12)
+        + padLeft((Math.round(p.percentile * 1000) / 10).toFixed(1), 5)
+        + padLeft(share(p.worse), 9) + padLeft(share(p.same), 8) + padLeft(share(p.better), 8),
+      );
+      lines.push(
+        pad('', 17)
+        + padLeft(count(p.counts.worse), 9) + padLeft(count(p.counts.same), 8) + padLeft(count(p.counts.better), 8),
+      );
+    });
+  return {
+    title: `Schedule percentile — ${data.league.season}`,
+    description: ['```', ...lines, '```'].join('\n').slice(0, MAX_BODY),
+    color: 0x5865f2,
+    footer: {
+      text:
+        'every opponent ordering where you play everyone once before anyone twice, all equally likely'
+        + ' · worse/same/better = fewer / as many / more wins than your real schedule gave (a tie is half a win)'
+        + ' · %ile = worse + half of same',
+    },
+  };
+}

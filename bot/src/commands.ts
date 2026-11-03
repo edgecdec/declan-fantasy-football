@@ -49,7 +49,7 @@ import {
 import { americanOdds, money, pad, padLeft, percent } from './format';
 import { luckButtons, luckImageEmbed, parseLuckButtonId, renderLuckText } from './luckView';
 import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marketsView';
-import { renderScheduleText, scheduleImageEmbed } from './scheduleView';
+import { renderSchedulePercentileText, renderScheduleText, scheduleImageEmbed } from './scheduleView';
 import {
   matchupButtonId,
   parseMatchupButtonId,
@@ -970,7 +970,10 @@ async function handleSchedules(i: ChatInputCommandInteraction): Promise<void> {
     return;
   }
   console.error('[bot] schedules image failed:', image.error);
-  await i.editReply({ embeds: [renderScheduleText(res.data)], allowedMentions: { parse: [] } });
+  await i.editReply({
+    embeds: [renderScheduleText(res.data), renderSchedulePercentileText(res.data)],
+    allowedMentions: { parse: [] },
+  });
 }
 
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {

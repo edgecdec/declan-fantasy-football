@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
-  buildScheduleSwap, computeSwapRecords, shortNames, toSwapWeek, type SwapWeek,
+  buildScheduleSwap, computeSwapRecords, schedulePercentile, shortNames, toSwapWeek, type SwapWeek,
 } from '@/lib/betting/scheduleSwap';
-import { deltaIntensity, renderScheduleImage, scheduleImageHeight, signedAverage, signedWins } from '@/lib/betting/scheduleImage';
+import { deltaIntensity, percentileText, renderScheduleImage, scheduleImageHeight, signedAverage, signedWins } from '@/lib/betting/scheduleImage';
 import { CARD_W } from '@/lib/betting/imageKit';
-import { kindnessRanking, renderScheduleText, scheduleImageEmbed } from '../bot/src/scheduleView';
+import { kindnessRanking, renderSchedulePercentileText, renderScheduleText, scheduleImageEmbed } from '../bot/src/scheduleView';
 
 /**
  * Schedule swap: your scores, someone else's schedule.
@@ -167,4 +169,65 @@ test('text fallback: kindest schedule first, then each manager\'s actual, best a
   assert.equal(rows.length, m.managers.length);
   for (const line of body.split('\n')) assert.ok(line.length <= 44, `"${line}" is too wide for a phone`);
   assert.deepEqual(scheduleImageEmbed(m, 'schedules.png').image, { url: 'attachment://schedules.png' });
+});
+
+test('schedule percentile: every round-robin ordering counted, ties as half a win', () => {
+  // Team 3 against the other three. Week 1 (80) beats only 4; week 2 (95) beats 1 and 4.
+  // The 6 orderings of two distinct opponents: (1,2) 0 wins; (1,4) (2,1) (2,4) (4,2) 1; (4,1) 2.
+  const p = schedulePercentile(weeks, 3, 2);
+  assert.deepEqual(p.counts, { worse: 5, same: 1, better: 0, total: 6 });
+  assert.ok(Math.abs(p.percentile - 5.5 / 6) < 1e-12, 'worse + half of same');
+  assert.ok(Math.abs(p.worse + p.same + p.better - 1) < 1e-12);
+
+  // Two cycles: three weeks with every opponent once, then a fourth week starting over.
+  const four = [...weeks, weeks[0], weeks[1]];
+  assert.equal(schedulePercentile(four, 3, 3).counts.total, 3 * 2 * 1 * 3);
+
+  // A tie is half a win: week 1, team 1 ties team 2 and beats 3 and 4.
+  const tie: SwapWeek[] = [{ week: 1, points: { 1: 100, 2: 100, 3: 90, 4: 80 }, opponent: { 1: 2, 2: 1, 3: 4, 4: 3 } }];
+  const t = schedulePercentile(tie, 1, 0.5);
+  assert.deepEqual(t.counts, { worse: 0, same: 1, better: 2, total: 3 });
+  assert.equal(percentileText(0.0025), '0.3');
+  assert.equal(percentileText(0.953), '95.3');
+});
+
+test('schedule percentile matches Declan\'s Graham\'s 2026 weeks 1-8 counts exactly', () => {
+  // better / same / worse of 9P8 = 362,880 orderings, and the percentile he quoted.
+  const declan: Record<string, [number, number, number, number]> = {
+    cemisme: [361464, 1360, 56, 0.2],
+    AggressiveIyAvg: [1902, 30468, 330510, 95.3],
+    kermason: [19194, 68718, 274968, 85.2],
+    Coldst2EvaDoIt: [21852, 76878, 264150, 83.4],
+    pullmanguy: [108885, 104272, 149723, 55.6],
+    TheSebasDog: [92580, 140550, 129750, 55.1],
+    edgecdec: [107226, 125510, 130144, 53.2],
+    Junebugge: [85320, 179760, 97800, 51.7],
+    egruis: [140832, 139200, 82848, 42.0],
+    cdalton3: [264222, 83220, 15438, 15.7],
+  };
+  const fx = JSON.parse(readFileSync(path.join(process.cwd(), 'tests/fixtures/grahams2026_wk1-8_swap.json'), 'utf8')) as {
+    names: Record<string, string>; weeks: SwapWeek[];
+  };
+  const m = buildScheduleSwap(
+    { leagueId: '1383248044669046784', name: "Graham's Football Fantasy", season: '2026' },
+    Object.entries(fx.names).map(([id, name]) => ({ rosterId: Number(id), name, teamName: null })),
+    fx.weeks,
+  );
+  assert.equal(m.weeksCounted, 8);
+  m.managers.forEach((x, i) => {
+    const [better, same, worse, pct] = declan[x.name];
+    assert.deepEqual(m.percentile[i].counts, { better, same, worse, total: 362880 }, x.name);
+    assert.equal(percentileText(m.percentile[i].percentile), pct.toFixed(1), x.name);
+  });
+
+  const e = renderSchedulePercentileText(m);
+  const lines = e.description!.split('\n');
+  assert.equal(lines[1], 'of 362,880 round-robin schedules');
+  for (const line of lines) assert.ok(line.length <= 44, `"${line}" is too wide for a phone`);
+  // Kindest first, two lines a manager: the shares, then the counts.
+  const at = lines.findIndex(l => l.startsWith('AggressiveI'));
+  assert.equal(at, 3, 'the kindest schedule is listed first');
+  assert.match(lines[at], /95\.3\s+91\.1%\s+8\.4%\s+0\.5%$/);
+  assert.match(lines[at + 1], /330,510\s+30,468\s+1,902$/);
+  assert.ok(lines[lines.length - 3].startsWith('cemisme'), 'the cruellest last');
 });

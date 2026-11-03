@@ -13,6 +13,12 @@ import {
  * the whole cell by it; the swapped record sits small beneath. Column heads are short, league-unique
  * labels (scheduleSwap.shortNames) in the same order as the rows, so column n is row n.
  *
+ * The column at the right of each row is the schedule PERCENTILE (scheduleSwap.schedulePercentile):
+ * over every round-robin opponent ordering, the share giving that manager fewer wins than the real
+ * schedule did, plus half of those giving the same — with the raw count of worse orderings beneath.
+ * It answers a different question from the cells — not "whose schedule" but "how lucky was mine
+ * against every possible draw" — so it sits apart, with its own line in the legend.
+ *
  * Green is more wins than the manager really got and red is fewer, matching /luck, where green is
  * better than the scores deserved. Colour saturates at ±4 wins per 13 games, as in the reference, and
  * is never scaled UP for a short season: four weeks in, a one-win swing should not look certain.
@@ -24,10 +30,27 @@ const EXPLAIN_H = 26;
 const COLS_H = 40;
 const ROW_H = 54;
 const KIND_H = 58;
-const ROWHEAD_W = 136;
+const ROWHEAD_W = 134;
+/** The schedule-percentile column at the right of each row, and the gap that sets it apart. */
+const PCT_W = 88;
+const PCT_GAP = 8;
+const LEGEND_H = 30;
 
-/** The cell grid shares what is left after the row heads, evenly. */
-const cellWidth = (n: number) => Math.floor((INNER_W - ROWHEAD_W) / Math.max(1, n));
+/** The cell grid shares what is left after the row heads and the percentile column, evenly. */
+const cellWidth = (n: number) => Math.floor((INNER_W - ROWHEAD_W - PCT_W - PCT_GAP) / Math.max(1, n));
+
+/** A count with thousands separators: `362,880`. */
+export const count = (n: number) => Math.round(n).toLocaleString('en-US');
+
+/** A percentile as the card prints it: one decimal, `0.2`, `94.6`. */
+export function percentileText(p: number): string {
+  return (Math.round(p * 1000) / 10).toFixed(1);
+}
+
+/** Green for a kind schedule (high percentile), red for a brutal one; grey at the median. */
+function percentileTint(p: number): string {
+  return tint(Math.max(-1, Math.min(1, (p - 0.5) * 2)));
+}
 
 /** A cell's wins delta, halves kept: `+2`, `−1.5`, `0`. True minus sign. */
 export function signedWins(d: number): string {
@@ -75,12 +98,16 @@ function Cell({ cell, width, games }: { cell: SwapCell; width: number; games: nu
 }
 
 export function scheduleImageHeight(managers: number): number {
-  return 4 + HEADER_STRIP_H + TITLE_H + EXPLAIN_H + COLS_H + managers * ROW_H + KIND_H + FOOTER_H;
+  return 4 + HEADER_STRIP_H + TITLE_H + EXPLAIN_H + COLS_H + managers * ROW_H + KIND_H + LEGEND_H + FOOTER_H;
 }
 
 export function renderScheduleImage(data: ScheduleSwapResponse): ImageResponse {
   const n = data.managers.length;
   const cw = cellWidth(n);
+  // One ordering count for the whole league when everyone played every week (the usual case), so
+  // the column head can say "of 362,880" once instead of every row repeating it.
+  const totals = new Set(data.percentile.map(p => p.counts.total));
+  const total = totals.size === 1 ? [...totals][0] : null;
   const games = data.weeksCounted;
   const weeks = `${games} WEEK${games === 1 ? '' : 'S'}`;
 
@@ -110,6 +137,10 @@ export function renderScheduleImage(data: ScheduleSwapResponse): ImageResponse {
               {m.short}
             </div>
           ))}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: PCT_W, marginLeft: PCT_GAP, flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.dim }}>
+            <div>SCHED %ILE</div>
+            <div style={{ fontWeight: 400 }}>{total ? `of ${count(total)}` : 'per row'}</div>
+          </div>
         </div>
 
         {data.managers.map((m, r) => (
@@ -119,6 +150,13 @@ export function renderScheduleImage(data: ScheduleSwapResponse): ImageResponse {
               <div style={{ fontSize: T.small, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{clip(m.name, 12)}</div>
             </div>
             {data.cells[r].map((cell, c) => <Cell key={c} cell={cell} width={cw} games={games} />)}
+            {/* Where the real schedule ranks among random ones: high = kinder than most. */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: PCT_W, height: ROW_H, marginLeft: PCT_GAP, flexShrink: 0, borderRadius: 6, backgroundColor: percentileTint(data.percentile[r].percentile) }}>
+              <div style={{ fontSize: T.body, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{percentileText(data.percentile[r].percentile)}</div>
+              <div style={{ fontSize: 12, color: 'rgba(242, 245, 250, 0.72)', whiteSpace: 'nowrap' }}>
+                {`worse ${count(data.percentile[r].counts.worse)}${total ? '' : ` / ${count(data.percentile[r].counts.total)}`}`}
+              </div>
+            </div>
           </div>
         ))}
 
@@ -136,6 +174,10 @@ export function renderScheduleImage(data: ScheduleSwapResponse): ImageResponse {
         </div>
       </div>
 
+      {/* The percentile needs saying in words: it is a different question from the cells. */}
+      <div style={{ display: 'flex', alignItems: 'center', height: LEGEND_H, padding: `0 ${PAD_X}px`, fontSize: T.micro, color: C.muted, whiteSpace: 'nowrap' }}>
+        %ile = round-robin schedules giving fewer wins than the real one, + half those giving the same
+      </div>
       <Footer
         left={<div>green = more wins than actual · red = fewer · diagonal = actual</div>}
         note="head-to-head only"

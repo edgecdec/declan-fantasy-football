@@ -55,8 +55,20 @@ export type ScheduleSwapResponse = {
   /** Per row: the schedule that would have helped / hurt this manager most (column index). */
   best: number[];
   worst: number[];
+  /** Per row: how this manager's actual schedule ranks among random ones (see schedulePercentile). */
+  percentile: SchedulePercentile[];
 };
 
+export type SchedulePercentile = {
+  /** worse + ½·same, 0…1. High = a kinder schedule than most. */
+  percentile: number;
+  /** Shares of every valid round-robin opponent ordering, 0…1. */
+  worse: number;
+  same: number;
+  better: number;
+  /** The exact counts behind those shares, and how many orderings there are in all. */
+  counts: { worse: number; same: number; better: number; total: number };
+};
 const blank = (): SwapRecord => ({ w: 0, l: 0, t: 0 });
 export const swapWins = (r: SwapRecord) => r.w + 0.5 * r.t;
 export const formatRecord = (r: SwapRecord) => (r.t ? `${r.w}-${r.l}-${r.t}` : `${r.w}-${r.l}`);
@@ -124,6 +136,95 @@ export function shortNames(names: string[], min = 4, max = 7): string[] {
   });
 }
 
+/**
+ * How lucky the real schedule was, counted exactly over every schedule the league could have
+ * drawn under the ROUND-ROBIN rule: a manager plays everyone once before anyone twice. So within
+ * each cycle of (n − 1) weeks his opponents are distinct, and every valid ordering of opponents is
+ * equally likely — by symmetry, relabelling the other teams maps any one onto any other.
+ *
+ * Within a cycle the orderings are counted by dynamic programming over weeks × the set of
+ * opponents already used (a bitmask), tracking wins in half-units so a tie is half a win; cycles
+ * are independent, so their win distributions are convolved. The real schedule's win total is then
+ * placed in that distribution: `worse` orderings give fewer wins, `same` the same, `better` more,
+ * and the percentile is worse + ½·same.
+ *
+ * Only weeks the manager really played count, as in the swap matrix, and only head-to-head games.
+ * An opponent with no score in a week cannot be drawn that week. Matches Declan's definition and his
+ * Graham's 2026 weeks 1–8 counts exactly (tests/scheduleSwap.test.ts).
+ *
+ * Cost is about 2^(n−1) × weeks × n per manager — trivial at 10 teams, a few million steps at 14.
+ * Counts stay exact as doubles up to 2^53, far beyond any real league's ordering count.
+ */
+export function schedulePercentile(weeks: SwapWeek[], rosterId: number, actualWins: number): SchedulePercentile {
+  const played = weeks.filter(wk => rosterId in wk.opponent && rosterId in wk.points);
+  const others = [...new Set(played.flatMap(wk => Object.keys(wk.points).map(Number)))]
+    .filter(o => o !== rosterId)
+    .sort((a, b) => a - b);
+  const m = others.length;
+
+  // Win-count distribution in half-units, as exact counts: dist[h] = orderings giving h/2 wins.
+  let dist: number[] = [1];
+  for (let start = 0; start < played.length; start += Math.max(1, m)) {
+    const cycle = played.slice(start, start + Math.max(1, m));
+    dist = convolve(dist, cycleDistribution(cycle, rosterId, others));
+  }
+
+  const total = dist.reduce((a, b) => a + b, 0);
+  const actual = Math.round(actualWins * 2);
+  let worse = 0;
+  let same = 0;
+  let better = 0;
+  dist.forEach((count, h) => {
+    if (h < actual) worse += count;
+    else if (h === actual) same += count;
+    else better += count;
+  });
+  const share = (c: number) => (total ? c / total : 0);
+  return {
+    percentile: share(worse) + share(same) / 2,
+    worse: share(worse),
+    same: share(same),
+    better: share(better),
+    counts: { worse, same, better, total },
+  };
+}
+
+/** One cycle: count every ordering of distinct opponents, by half-wins. */
+function cycleDistribution(cycle: SwapWeek[], rosterId: number, others: number[]): number[] {
+  const m = others.length;
+  const width = 2 * cycle.length + 1;
+  // dp[mask * width + h]: orderings of the cycle's first popcount(mask) weeks using exactly `mask`.
+  let dp = new Map<number, Float64Array>([[0, (() => { const a = new Float64Array(width); a[0] = 1; return a; })()]]);
+  for (const wk of cycle) {
+    const mine = wk.points[rosterId];
+    const next = new Map<number, Float64Array>();
+    for (const [mask, counts] of dp) {
+      for (let i = 0; i < m; i++) {
+        const bit = 1 << i;
+        if (mask & bit) continue;
+        const theirs = wk.points[others[i]];
+        if (theirs === undefined) continue;
+        const d = mine - theirs;
+        const gain = Math.abs(d) < 1e-9 ? 1 : d > 0 ? 2 : 0;
+        const key = mask | bit;
+        let row = next.get(key);
+        if (!row) { row = new Float64Array(width); next.set(key, row); }
+        for (let h = 0; h + gain < width; h++) if (counts[h]) row[h + gain] += counts[h];
+      }
+    }
+    dp = next;
+  }
+  const out = new Array<number>(width).fill(0);
+  for (const counts of dp.values()) counts.forEach((c, h) => { out[h] += c; });
+  return out;
+}
+
+function convolve(a: number[], b: number[]): number[] {
+  const out = new Array<number>(a.length + b.length - 1).fill(0);
+  a.forEach((x, i) => { if (x) b.forEach((y, j) => { out[i + j] += x * y; }); });
+  return out;
+}
+
 /** The whole matrix, in all-play order, with kindness and each row's best and worst schedule. */
 export function buildScheduleSwap(
   league: ScheduleSwapResponse['league'],
@@ -167,6 +268,7 @@ export function buildScheduleSwap(
     kindness,
     best: cells.map((row, r) => extreme(row, r, (a, b) => a > b)),
     worst: cells.map((row, r) => extreme(row, r, (a, b) => a < b)),
+    percentile: ordered.map((x, r) => schedulePercentile(weeks, x.rosterId, swapWins(cells[r][r]))),
   };
 }
 
