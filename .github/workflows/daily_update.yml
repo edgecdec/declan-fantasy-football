@@ -19,7 +19,9 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.9'
+        # 3.9 is EOL and absent from ubuntu-latest (26.04) runners, which failed every run
+        # from 2026-11-04 at this step. 3.13 is the version the three scripts were verified on.
+        python-version: '3.13'
         
     - name: Install dependencies
       run: |
