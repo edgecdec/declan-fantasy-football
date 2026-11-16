@@ -38,6 +38,8 @@ import {
   fetchLuckImage,
   fetchMarketsImage,
   fetchMatchupImage,
+  fetchPlayoffs,
+  fetchPlayoffsImage,
   fetchScheduleImage,
   fetchScheduleSwap,
   fetchMe,
@@ -49,6 +51,7 @@ import {
 import { americanOdds, money, pad, padLeft, percent } from './format';
 import { luckButtons, luckImageEmbed, parseLuckButtonId, renderLuckText } from './luckView';
 import { marketsImageEmbed, marketsImageName, renderMarketsEmbed } from './marketsView';
+import { playoffsImageEmbed, renderPlayoffsText } from './playoffsView';
 import { renderSchedulePercentileText, renderScheduleText, scheduleImageEmbed } from './scheduleView';
 import {
   matchupButtonId,
@@ -151,6 +154,12 @@ export const commandDefinitions = [
   new SlashCommandBuilder()
     .setName('luck')
     .setDescription('Expected wins vs actual wins — who has been lucky')
+    .addStringOption(o =>
+      o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
+    ),
+  new SlashCommandBuilder()
+    .setName('playoffs')
+    .setDescription('Playoff odds — every team’s chance of the playoffs, a bye, the semis, the final, the title')
     .addStringOption(o =>
       o.setName('league').setDescription('Any Sleeper league id; defaults to this channel’s'),
     ),
@@ -976,6 +985,40 @@ async function handleSchedules(i: ChatInputCommandInteraction): Promise<void> {
   });
 }
 
+/**
+ * Playoff odds: the chance of reaching every round, best chance first. Like /luck, `league`
+ * accepts any Sleeper league id. The card is playoffsImage.tsx on the site; if it cannot be drawn,
+ * the same numbers stand in as a text table.
+ */
+async function handlePlayoffs(i: ChatInputCommandInteraction): Promise<void> {
+  let leagueId = i.options.getString('league')?.trim() || null;
+  if (!leagueId) {
+    const resolved = resolveLeagues(i.guildId!, i.channelId, null);
+    if ('error' in resolved) {
+      await i.editReply(`${resolved.error}\nOr pass a league id: \`/playoffs league:<id>\``);
+      return;
+    }
+    leagueId = resolved[0].leagueId;
+  }
+
+  const res = await fetchPlayoffs(leagueId);
+  if (!res.ok) {
+    await i.editReply(`No playoff odds for that league: ${res.error}`);
+    return;
+  }
+  const image = await fetchPlayoffsImage(leagueId);
+  if (image.ok) {
+    await i.editReply({
+      embeds: [playoffsImageEmbed(res.data, 'playoffs.png')],
+      files: [new AttachmentBuilder(image.data, { name: 'playoffs.png' })],
+      allowedMentions: { parse: [] },
+    });
+    return;
+  }
+  console.error('[bot] playoffs image failed:', image.error);
+  await i.editReply({ embeds: [renderPlayoffsText(res.data)], allowedMentions: { parse: [] } });
+}
+
 async function handleWebsite(i: ChatInputCommandInteraction): Promise<void> {
   const base = (process.env.SITE_URL ?? 'https://fantasyfootball.edgecdec.com').replace(/\/$/, '');
   const resolved = resolveLeagues(i.guildId!, i.channelId, null);
@@ -1346,6 +1389,7 @@ export async function handleInteraction(i: ChatInputCommandInteraction): Promise
       case 'website': return await handleWebsite(i);
       case 'luck': return await handleLuck(i);
       case 'schedules': return await handleSchedules(i);
+      case 'playoffs': return await handlePlayoffs(i);
       case 'matchup': return await handleMatchup(i);
       case 'openbets': return await handleOpenBets(i);
       case 'bethistory': return await handleBetHistory(i);

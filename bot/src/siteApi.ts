@@ -1,6 +1,7 @@
 import type { BotMarket, BotMarketsResponse } from '@/lib/betting/botMarkets';
 import type { LuckSort, LuckTeam } from '@/lib/betting/luckSort';
 import type { ScheduleSwapResponse } from '@/lib/betting/scheduleSwap';
+import type { PlayoffsResponse } from '@/lib/betting/playoffOdds';
 
 /**
  * The bot's client for `/api/bot/*`.
@@ -355,4 +356,14 @@ export function fetchLuckImage(leagueId: string, sort: LuckSort): Promise<SiteRe
 /** The schedule-swap matrix as a picture. */
 export function fetchScheduleImage(leagueId: string, season?: string | null): Promise<SiteResult<Buffer>> {
   return fetchPng('/api/bot/schedules/image', scheduleParams(leagueId, season));
+}
+
+/** Playoff odds for any Sleeper league (the site's type — see playoffOdds.ts). */
+export function fetchPlayoffs(leagueId: string): Promise<SiteResult<PlayoffsResponse>> {
+  return call<PlayoffsResponse>(`/api/bot/playoffs?leagueId=${encodeURIComponent(leagueId)}`);
+}
+
+/** The playoff odds card. */
+export function fetchPlayoffsImage(leagueId: string): Promise<SiteResult<Buffer>> {
+  return fetchPng('/api/bot/playoffs/image', new URLSearchParams({ leagueId }));
 }

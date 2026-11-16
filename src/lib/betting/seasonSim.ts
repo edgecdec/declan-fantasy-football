@@ -192,6 +192,18 @@ export type SeasonSimResult = {
   expectedWins: number;
   /** The shrunk per-week mean actually used, for explaining the number. */
   weekMean: number;
+  /**
+   * Only with `bracket: 'standard'` (the /playoffs card). The betting market never asks for
+   * these, so its numbers and its random stream are untouched by them.
+   *
+   * byeProb:    P(seeded into a first-round bye).
+   * roundProbs: roundProbs[r] = P(alive at the start of playoff round r + 1); the last entry is
+   *             the final. A bye counts as alive in round 1.
+   * seedProbs:  seedProbs[k] = P(finishing as seed k + 1); sums to playoffProb.
+   */
+  byeProb?: number;
+  roundProbs?: number[];
+  seedProbs?: number[];
 };
 
 /**
@@ -257,6 +269,24 @@ export type SeasonSimInput = {
   playoffTeams: number;
   sims: number;
   seed?: number;
+  /**
+   * `legacy` (default): the betting market's bracket, exactly as it always was — including its
+   * truncation of fields larger than six. `standard`: Sleeper's fixed bracket for any field size
+   * (byes to the top seeds to fill a power of two: 6 → two byes, 4 and 8 → none), and per-round
+   * reach counts. For 4- and 6-team fields the two play the same games in the same order off the
+   * same random stream, so champions are identical draw for draw (tests/seasonSim.test.ts).
+   */
+  bracket?: 'legacy' | 'standard';
+  /**
+   * Leagues that also play the week's median (league_average_match): each simulated week, the top
+   * half of scores earns an extra win. Off by default; the betting leagues do not use it.
+   */
+  medianGame?: boolean;
+  /**
+   * Division by roster, when the league has divisions: each division's best record (wins, then
+   * points for) takes the top seeds, as Sleeper seeds them, ahead of the wildcards.
+   */
+  divisions?: Map<number, number>;
 };
 
 /**
@@ -277,6 +307,14 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
   const playoffCount = new Map<number, number>(teams.map(t => [t.rosterId, 0]));
   const winsTotal = new Map<number, number>(teams.map(t => [t.rosterId, 0]));
 
+  const standard = input.bracket === 'standard';
+  const field = Math.min(playoffTeams, teams.length);
+  const rounds = bracketRounds(field);
+  const byes = bracketByes(field);
+  const roundCount = new Map<number, number[]>(teams.map(t => [t.rosterId, new Array<number>(rounds).fill(0)]));
+  const seedCount = new Map<number, number[]>(teams.map(t => [t.rosterId, new Array<number>(field).fill(0)]));
+  const byeCount = new Map<number, number>(teams.map(t => [t.rosterId, 0]));
+
   for (let s = 0; s < sims; s++) {
     const wins = new Map<number, number>();
     const pf = new Map<number, number>();
@@ -290,8 +328,16 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
       return mean + normal(rng) * TEAM_WEEK_SD;
     };
 
+    // The week's median game, when the league plays one: the top half of the week's scores win.
+    const awardMedian = (scores: [number, number][]) => {
+      if (!input.medianGame || scores.length < 2) return;
+      const ranked = [...scores].sort((a, b) => b[1] - a[1]);
+      for (const [id] of ranked.slice(0, Math.floor(ranked.length / 2))) wins.set(id, (wins.get(id) ?? 0) + 1);
+    };
+
     // The live week, from partial state.
     if (currentWeekLive) {
+      const weekScores: [number, number][] = [];
       for (const [x, y] of currentWeekPairs) {
         const tx = byRoster.get(x);
         const ty = byRoster.get(y);
@@ -306,11 +352,14 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
           wins.set(x, (wins.get(x) ?? 0) + 0.5);
           wins.set(y, (wins.get(y) ?? 0) + 0.5);
         }
+        weekScores.push([x, sx], [y, sy]);
       }
+      awardMedian(weekScores);
     }
 
     // Future weeks, on the real schedule.
     for (const wk of remainingSchedule) {
+      const weekScores: [number, number][] = [];
       for (const [x, y] of wk.pairs) {
         const sx = scoreOnce(x);
         const sy = scoreOnce(y);
@@ -322,22 +371,39 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
           wins.set(x, (wins.get(x) ?? 0) + 0.5);
           wins.set(y, (wins.get(y) ?? 0) + 0.5);
         }
+        weekScores.push([x, sx], [y, sy]);
       }
+      awardMedian(weekScores);
     }
 
     for (const t of teams) winsTotal.set(t.rosterId, (winsTotal.get(t.rosterId) ?? 0) + (wins.get(t.rosterId) ?? 0));
 
-    // Seed on wins, then points for — Sleeper's default.
-    const seeded = [...teams]
+    // Seed on wins, then points for — Sleeper's default — with division winners first if asked.
+    const standings = [...teams]
       .map(t => ({ id: t.rosterId, w: wins.get(t.rosterId) ?? 0, p: pf.get(t.rosterId) ?? 0 }))
-      .sort((m, n) => (n.w - m.w) || (n.p - m.p))
+      .sort((m, n) => (n.w - m.w) || (n.p - m.p));
+    const seeded = (input.divisions ? divisionSeeding(standings, input.divisions) : standings)
       .slice(0, playoffTeams)
       .map(x => x.id);
 
     for (const id of seeded) playoffCount.set(id, (playoffCount.get(id) ?? 0) + 1);
 
-    const champ = simulateBracket(seeded, scoreOnce);
-    if (champ !== null) titleCount.set(champ, (titleCount.get(champ) ?? 0) + 1);
+    if (!standard) {
+      const champ = simulateBracket(seeded, scoreOnce);
+      if (champ !== null) titleCount.set(champ, (titleCount.get(champ) ?? 0) + 1);
+      continue;
+    }
+
+    seeded.forEach((id, k) => {
+      seedCount.get(id)![k]++;
+      if (k < byes) byeCount.set(id, (byeCount.get(id) ?? 0) + 1);
+    });
+    const played = playBracket(seeded, scoreOnce);
+    for (const [id, reached] of played.reached) {
+      const counts = roundCount.get(id)!;
+      for (let r = 0; r < reached && r < rounds; r++) counts[r]++;
+    }
+    if (played.champion !== null) titleCount.set(played.champion, (titleCount.get(played.champion) ?? 0) + 1);
   }
 
   return teams.map(t => {
@@ -353,8 +419,90 @@ export function simulateSeason(input: SeasonSimInput): SeasonSimResult[] {
       playoffSe: Math.sqrt((playoffProb * (1 - playoffProb)) / sims),
       expectedWins: (winsTotal.get(t.rosterId) ?? 0) / sims,
       weekMean: means.get(t.rosterId) ?? LEAGUE_MEAN_SCORE,
+      ...(standard
+        ? {
+          byeProb: (byeCount.get(t.rosterId) ?? 0) / sims,
+          roundProbs: roundCount.get(t.rosterId)!.map(c => c / sims),
+          seedProbs: seedCount.get(t.rosterId)!.map(c => c / sims),
+        }
+        : {}),
     };
   });
+}
+
+/** Sleeper seeding with divisions: each division's leader first (best of them first), then the rest. */
+function divisionSeeding<T extends { id: number }>(standings: T[], divisions: Map<number, number>): T[] {
+  const leaders: T[] = [];
+  const seen = new Set<number>();
+  for (const row of standings) {
+    const d = divisions.get(row.id);
+    if (d === undefined || seen.has(d)) continue;
+    seen.add(d);
+    leaders.push(row);
+  }
+  const lead = new Set(leaders.map(r => r.id));
+  return [...leaders, ...standings.filter(r => !lead.has(r.id))];
+}
+
+/** The bracket a field of `n` plays in: the next power of two. */
+export function bracketSize(n: number): number {
+  let b = 1;
+  while (b < n) b *= 2;
+  return b;
+}
+
+/** Rounds to play for a field of `n` (6 → 3: quarters with byes, semis, final). */
+export function bracketRounds(n: number): number {
+  return n <= 1 ? 0 : Math.round(Math.log2(bracketSize(n)));
+}
+
+/** First-round byes: the top seeds fill the bracket out to a power of two (6 → 2; 4, 8 → 0). */
+export function bracketByes(n: number): number {
+  return n <= 1 ? 0 : bracketSize(n) - n;
+}
+
+/** Fixed bracket order for `b` slots, by seed: 8 → 1,8,4,5,2,7,3,6. */
+function bracketOrder(b: number): number[] {
+  let order = [1];
+  while (order.length < b) {
+    const size = order.length * 2;
+    order = order.flatMap(s => [s, size + 1 - s]);
+  }
+  return order;
+}
+
+/**
+ * The standard fixed (not re-seeded) bracket for any field size, with how far everyone got.
+ *
+ * `reached` is the number of rounds each seeded team was alive for: a team knocked out in its
+ * first game reached 1, a bye or a first-round win reaches 2, and the champion reaches
+ * rounds + 1. Games are played top half of the bracket first, so a six-team field draws exactly as
+ * `simulateBracket` does: 4v5, 3v6, then 1 v the 4v5 winner, 2 v the 3v6 winner, then the final.
+ */
+export function playBracket(
+  seeded: number[],
+  scoreOnce: (id: number) => number,
+): { champion: number | null; reached: Map<number, number> } {
+  const reached = new Map<number, number>();
+  if (seeded.length === 0) return { champion: null, reached };
+  const beat = (x: number, y: number): number => (scoreOnce(x) >= scoreOnce(y) ? x : y);
+
+  let alive: (number | null)[] = bracketOrder(bracketSize(seeded.length)).map(seed => seeded[seed - 1] ?? null);
+  let round = 0;
+  while (alive.length > 1) {
+    round++;
+    for (const id of alive) if (id !== null) reached.set(id, round);
+    const next: (number | null)[] = [];
+    for (let i = 0; i < alive.length; i += 2) {
+      const x = alive[i];
+      const y = alive[i + 1];
+      next.push(x === null ? y : y === null ? x : beat(x, y));
+    }
+    alive = next;
+  }
+  const champion = alive[0] ?? null;
+  if (champion !== null) reached.set(champion, round + 1);
+  return { champion, reached };
 }
 
 /**
