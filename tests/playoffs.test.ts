@@ -153,6 +153,7 @@ const pteam = (i: number, over: Partial<PlayoffTeam> = {}): PlayoffTeam => ({
 });
 
 const board = (playoffTeams: number, byes: number, over: Partial<PlayoffsResponse> = {}): PlayoffsResponse => ({
+  phase: 'regular',
   league: { leagueId: '1383248044669046784', name: "Graham's Football Fantasy", season: '2026' },
   currentWeek: 10, lastRegularWeek: 13, playoffWeekStart: 14, weeksRemaining: 4, playoffTeams, byes, sims: 20000,
   medianGame: false, divisions: false, boundsApply: true,

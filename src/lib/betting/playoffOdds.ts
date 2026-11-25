@@ -32,6 +32,8 @@ export type PlayoffTeam = {
 export type PlayoffStatus = 'bye' | 'in' | 'out';
 
 export type PlayoffsResponse = {
+  /** Before the playoffs: odds of getting in. (Once they start, see BracketResponse.) */
+  phase: 'regular';
   league: { leagueId: string; name: string; season: string };
   currentWeek: number;
   lastRegularWeek: number;
@@ -116,3 +118,43 @@ export function pctText(p: number, proven: 'yes' | 'no' | null = null): string {
 export function recordText(t: Pick<PlayoffTeam, 'wins' | 'losses' | 'ties'>): string {
   return t.ties ? `${t.wins}-${t.losses}-${t.ties}` : `${t.wins}-${t.losses}`;
 }
+
+/** One team in a live bracket. */
+export type BracketTeam = {
+  rosterId: number;
+  name: string;
+  seed: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  /** This round: the opponent's name, 'TBD' while a re-seed is undecided, or null on a bye. */
+  opponent: string | null;
+  /** This round's points so far (banked weeks plus the live week), when it has started. */
+  roundPoints: number | null;
+  opponentPoints: number | null;
+  /** P(alive in each later round), in `columns` order, then the title. */
+  reach: number[];
+  title: number;
+};
+
+/** Once the playoffs start: odds for each remaining round of the real winners bracket. */
+export type BracketResponse = {
+  phase: 'bracket';
+  league: { leagueId: string; name: string; season: string };
+  currentWeek: number;
+  playoffWeekStart: number;
+  rounds: number;
+  currentRound: number;
+  /** "two-week rounds" etc. */
+  roundLength: string;
+  reseed: boolean;
+  sims: number;
+  /** Later rounds shown as columns, e.g. SEMIS, FINAL; TITLE always follows. */
+  columns: { round: number; label: string }[];
+  /** Teams still alive, best title chance first. */
+  teams: BracketTeam[];
+  /** Decided winners-bracket matches, earliest first. */
+  results: { round: number; label: string; winner: string; loser: string; winnerPoints: number | null; loserPoints: number | null }[];
+};
+
+export type PlayoffsBody = PlayoffsResponse | BracketResponse;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireBot } from '@/lib/betting/botApi';
 import { loadPlayoffs } from '@/lib/betting/playoffsData';
+import { renderBracketImage } from '@/lib/betting/bracketImage';
 import { renderPlayoffsImage } from '@/lib/betting/playoffsImage';
 
 export const dynamic = 'force-dynamic';
@@ -16,5 +17,6 @@ export async function GET(request: Request) {
   if (denied) return denied;
   const { status, body } = await loadPlayoffs(new URL(request.url).searchParams.get('leagueId')?.trim());
   if (status !== 200) return NextResponse.json(body, { status });
-  return renderPlayoffsImage(body);
+  // Before the playoffs, odds of getting in; once they start, the live bracket.
+  return body.phase === 'bracket' ? renderBracketImage(body) : renderPlayoffsImage(body);
 }

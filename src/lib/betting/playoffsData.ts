@@ -1,6 +1,10 @@
 import { GET as nflGames, type NflGamesResponse } from '@/app/api/betting/nfl-games/route';
-import { playoffStatus, type PlayoffsResponse } from '@/lib/betting/playoffOdds';
-import { bracketByes, bracketRounds, simulateSeason } from '@/lib/betting/seasonSim';
+import {
+  bracketState, decidedResults, roundLengthText, roundName, roundWeeks, simulateBracketLive, winnersPath,
+  type BracketMatch, type LiveWeekScore,
+} from '@/lib/betting/playoffBracket';
+import { playoffStatus, type BracketResponse, type PlayoffsBody } from '@/lib/betting/playoffOdds';
+import { bracketByes, bracketRounds, effectiveWeekMean, simulateSeason } from '@/lib/betting/seasonSim';
 import { loadSeasonState, type LiveWeek } from '@/lib/betting/seasonState';
 import { buildMatchupMarkets } from '@/services/betting/matchupMarkets';
 
@@ -27,7 +31,7 @@ export const PLAYOFF_SIMS = 20_000;
 const SEED = 20260904;
 
 export type PlayoffsLoad =
-  | { status: 200; body: PlayoffsResponse }
+  | { status: 200; body: PlayoffsBody }
   | { status: 400 | 404 | 409 | 422 | 502; body: { ok: false; error: string } };
 
 const SLEEPER_BASE = 'https://api.sleeper.app/v1';
@@ -81,8 +85,9 @@ async function computePlayoffs(leagueId: string): Promise<PlayoffsLoad> {
   const st = loaded.state;
   const { league, currentWeek, lastRegularWeek, playoffTeams } = st;
 
+  // Once the playoffs start, the regular-season question is answered: play out the real bracket.
   if (league.status === 'complete' || league.status === 'post_season' || currentWeek > lastRegularWeek) {
-    return { status: 409, body: { ok: false, error: 'The regular season is over — the playoff field is set.' } };
+    return computeBracket(leagueId, st);
   }
 
   /*
@@ -164,6 +169,7 @@ async function computePlayoffs(leagueId: string): Promise<PlayoffsLoad> {
   return {
     status: 200,
     body: {
+      phase: 'regular',
       league: { leagueId, name: league.name ?? 'League', season: league.season },
       currentWeek,
       lastRegularWeek,
@@ -178,4 +184,143 @@ async function computePlayoffs(leagueId: string): Promise<PlayoffsLoad> {
       teams,
     },
   };
+}
+
+type SeasonStateOk = Extract<Awaited<ReturnType<typeof loadSeasonState>>, { ok: true }>['state'];
+
+/**
+ * The playoffs in progress: the remaining winners bracket, simulated from where it stands.
+ *
+ * Finished weeks of a round are banked from Sleeper's matchups, the live week comes from the same
+ * read-only matchup model as the regular season (via loadSeasonState), and every later week is a
+ * draw from the season model's own per-week mean and spread. See playoffBracket.ts for the bracket
+ * rules and how they were confirmed.
+ */
+async function computeBracket(leagueId: string, st: SeasonStateOk): Promise<PlayoffsLoad> {
+  const { league, currentWeek, playoffWeekStart } = st;
+  const raw = await fetch(`${SLEEPER_BASE}/league/${leagueId}/winners_bracket`, { cache: 'no-store' })
+    .then(r => (r.ok ? (r.json() as Promise<BracketMatch[] | null>) : null))
+    .catch(() => null);
+  const bracket = winnersPath(raw ?? []);
+  if (bracket.length === 0) {
+    return { status: 422, body: { ok: false, error: 'Sleeper has no winners bracket for this league yet.' } };
+  }
+
+  const name = new Map(st.teams.map(t => [t.rosterId, t.displayName]));
+  const { rounds, currentRound, champion } = bracketState(bracket);
+  if (champion !== null || league.status === 'complete') {
+    const who = champion !== null ? name.get(champion) ?? `Roster ${champion}` : null;
+    return { status: 409, body: { ok: false, error: postseasonOverMessage(who) } };
+  }
+
+  const roundType = league.settings.playoff_round_type ?? 0;
+  const weeks = roundWeeks(playoffWeekStart, roundType, rounds);
+
+  // Banked playoff weeks, for finished parts of a round and the results lines.
+  const done = Array.from({ length: Math.max(0, currentWeek - playoffWeekStart) }, (_, i) => playoffWeekStart + i);
+  const rows = await Promise.all(done.map(wk =>
+    fetch(`${SLEEPER_BASE}/league/${leagueId}/matchups/${wk}`, { cache: 'no-store' })
+      .then(r => (r.ok ? (r.json() as Promise<{ roster_id: number; points: number | null }[]>) : []))
+      .catch(() => [] as { roster_id: number; points: number | null }[]),
+  ));
+  const actual = new Map<string, number>();
+  done.forEach((wk, i) => { for (const r of rows[i] ?? []) if (r.points != null) actual.set(`${wk}:${r.roster_id}`, r.points); });
+
+  // The live week, for teams the matchup model priced this week.
+  const pricedNow = new Set(st.currentWeekPairs.flat());
+  const live = new Map<number, LiveWeekScore>();
+  for (const t of st.teams) {
+    if (pricedNow.has(t.rosterId)) {
+      live.set(t.rosterId, { banked: t.currentBanked, remainingMean: t.currentRemainingMean, remainingSd: t.currentRemainingSd });
+    }
+  }
+
+  // Seeds from the final regular-season standings: wins (a tie half), then points for.
+  const seeds = new Map(
+    [...st.teams]
+      .sort((a, b) => (b.wins + b.ties / 2) - (a.wins + a.ties / 2) || b.pointsFor - a.pointsFor)
+      .map((t, i) => [t.rosterId, i + 1]),
+  );
+  const reseed = (league.settings.playoff_seed_type ?? 0) === 1;
+
+  const sim = simulateBracketLive({
+    bracket,
+    seeds,
+    reseed,
+    weeks,
+    currentWeek,
+    actual,
+    live,
+    means: new Map(st.teams.map(t => [t.rosterId, effectiveWeekMean(t)])),
+    sims: PLAYOFF_SIMS,
+    seed: SEED,
+  });
+
+  const eliminated = new Set(bracket.filter(m => m.l !== null && m.l !== undefined).map(m => m.l as number));
+  const columns = Array.from({ length: Math.max(0, rounds - currentRound) }, (_, i) => currentRound + 1 + i)
+    .map(r => ({ round: r, label: roundName(r, rounds) }));
+
+  // This round's pairing and points, for the line under each name.
+  const thisRound = bracket.filter(m => m.r === currentRound);
+  const roundPointsOf = (id: number): number | null => {
+    const wks = weeks[currentRound - 1] ?? [];
+    if (!wks.some(wk => wk <= currentWeek)) return null;
+    let total = 0;
+    for (const wk of wks) {
+      if (wk < currentWeek) total += actual.get(`${wk}:${id}`) ?? 0;
+      else if (wk === currentWeek) total += live.get(id)?.banked ?? 0;
+    }
+    return total;
+  };
+
+  const teamRows = sim.teams
+    .filter(t => !eliminated.has(t.rosterId))
+    .map(t => {
+      const st2 = st.teams.find(x => x.rosterId === t.rosterId);
+      const match = thisRound.find(m => m.t1 === t.rosterId || m.t2 === t.rosterId);
+      const oppId = match ? (match.t1 === t.rosterId ? match.t2 : match.t1) : null;
+      const opponent = match ? (oppId !== null ? name.get(oppId) ?? `Roster ${oppId}` : 'TBD') : null;
+      return {
+        rosterId: t.rosterId,
+        name: name.get(t.rosterId) ?? `Roster ${t.rosterId}`,
+        seed: seeds.get(t.rosterId) ?? 0,
+        wins: st2?.wins ?? 0,
+        losses: st2?.losses ?? 0,
+        ties: st2?.ties ?? 0,
+        opponent,
+        roundPoints: match ? roundPointsOf(t.rosterId) : null,
+        opponentPoints: match && oppId !== null ? roundPointsOf(oppId) : null,
+        reach: columns.map(c => t.reach[c.round - 1] ?? 0),
+        title: t.title,
+      };
+    })
+    .sort((a, b) => b.title - a.title || a.seed - b.seed);
+
+  const body: BracketResponse = {
+    phase: 'bracket',
+    league: { leagueId, name: league.name ?? 'League', season: league.season },
+    currentWeek,
+    playoffWeekStart,
+    rounds,
+    currentRound,
+    roundLength: roundLengthText(roundType),
+    reseed,
+    sims: PLAYOFF_SIMS,
+    columns,
+    teams: teamRows,
+    results: decidedResults(bracket, weeks, actual).map(r => ({
+      round: r.round,
+      label: roundName(r.round, rounds),
+      winner: name.get(r.winner) ?? `Roster ${r.winner}`,
+      loser: name.get(r.loser) ?? `Roster ${r.loser}`,
+      winnerPoints: r.winnerPoints,
+      loserPoints: r.loserPoints,
+    })),
+  };
+  return { status: 200, body };
+}
+
+/** The refusal once the final is decided, naming the champion when Sleeper has one. */
+export function postseasonOverMessage(champion: string | null): string {
+  return champion ? `The playoffs are over — ${champion} won the title.` : 'The playoffs are over.';
 }
